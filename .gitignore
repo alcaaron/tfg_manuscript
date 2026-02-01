@@ -1,0 +1,22 @@
+# --- LaTeX ---
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.xmpi
+
+# PDF generado (no versionar durante desarrollo)
+*.pdf
+
+# Editor / SO
+*.swp
+*.swo
+*~
+.DS_Store
