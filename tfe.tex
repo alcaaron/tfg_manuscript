@@ -6,6 +6,7 @@
 
 % Aqui carregueu packages complementaris que necessiteu
 %\usepackage{}
+\usepackage{custom_cmd}
 
 % Indica quines bd bibliografiques usarem
 \addbibresource{tfe.bib}
@@ -65,30 +66,116 @@
 
 \begin{document}
 
-% Si feu servir apèndixs, descomenteu
-%\part{Memòria}
+\part{Report}
 
 \chapter{Introduction}
+% Motivation
+% Problem statement
+% Objectives
+% Scope and limitations
+% Structure of the document
+
 \chapter{Background}
+% Smartphone communication technologies (BLE, Wi-Fi Direct, Cellular)
+% Low-Power Wide-Area Networks (LPWAN)
+% LoRa physical layer principles
+% Mesh networking fundamentals
+% Review of existing solutions (e.g., Meshtastic)
+% Identified limitations in current approaches
 
-% Aqui van els capitols especifics del treball
+\chapter{System Requirements and Problem Definition}
+% Use case definition (rural inter-town communication)
+% Functional requirements
+% Non-functional requirements
+% Regulatory constraints (ISM band EU 868 MHz)
+% Design constraints
 
-\chapter{Economic study}
-\chapter{Environmental and social impact}
+\chapter{System Architecture}
+% Global system overview
+% High-level block diagram
+% Hardware–software partitioning
+% Smartphone–LoRa interaction model
+% Architectural decisions and trade-offs
+
+\chapter{Hardware Design}
+% Technology selection (MCU, LoRa transceiver)
+% Flexible PCB design considerations
+% RF design and antenna strategy
+% Power management architecture
+% Mechanical integration with smartphone
+% Design challenges and mitigation strategies
+
+\chapter{Firmware and Software Design}
+% Firmware architecture (LoRa module)
+% Smartphone application architecture
+% Communication protocol definition
+% Routing and message handling strategy
+% Energy management strategy
+% Security considerations
+
+\chapter{Implementation}
+% Hardware prototype realization
+% PCB fabrication and assembly
+% Firmware implementation details
+% Mobile application implementation
+% Integration process
+
+\chapter{Experimental Validation}
+% Test methodology
+% Measurement setup
+% Range testing
+% Power consumption analysis
+% Latency and reliability evaluation
+% Comparison with reference solutions (e.g., Meshtastic)
+
+\chapter{Results and Discussion}
+% Performance analysis
+% Strengths and limitations
+% Practical implications
+% Lessons learned
+
+\chapter{Economic Study}
+% Bill of Materials (BOM)
+% Manufacturing cost estimation
+% Scalability considerations
+% Cost comparison with existing solutions
+
+\chapter{Environmental and Social Impact}
+% Energy consumption impact
+% Device lifecycle considerations
+% Regulatory compliance
+% Societal impact of infrastructure-free communication
+
 \chapter{Conclusions}
-\chapter{Future work}
+% Summary of contributions
+% Validation of objectives
+% Final assessment of the proposed architecture
 
+\chapter{Future Work}
+% Hardware improvements
+% Protocol optimization
+% Network scalability improvements
+% Field deployment scenarios
 
 \printbibliography
 
-% Si feu servir apèndixs, descomenteu
-% (també la  \part del principi del document)
-%\appendix
-%\part{Apèndixs}
-%\chapter{Un apèndix}
+\appendix
+\part{Appendix}
 
+\chapter{Hardware Schematics}
+% Complete schematics
+
+\chapter{PCB Layout}
+% Layout layers and RF routing details
+
+\chapter{Firmware Source Code}
+% Key modules and architecture diagrams
+
+\chapter{Additional Measurements}
+% Extended tables and raw data
 
 \end{document}
+
 
 %%% Local Variables:
 %%% mode: latex
