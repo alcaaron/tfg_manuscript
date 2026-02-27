@@ -20,3 +20,6 @@
 *.swo
 *~
 .DS_Store
+.vscode/
+%OUTDIR%/
+draft.md

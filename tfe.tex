@@ -1,103 +1,145 @@
-% \documentclass[2026/01/22]{tfgitic}
-% Recordeu que teniu les opcions de classe que es diuen
-% a la documentació. Per exemple:
-% \documentclass[english,master]{tfgitic}[2026/01/22]
 \documentclass[english,bachelor]{tfgitic}[2026/01/22]
 
-% Aqui carregueu packages complementaris que necessiteu
-%\usepackage{}
 \usepackage{custom_cmd}
 
-% Indica quines bd bibliografiques usarem
 \addbibresource{tfe.bib}
 
 
 \title{Design of a mesh communication system between mobile phones for catastrophic situations}
-% Si voleu subtitol descomenteu
 %\subtitle{}
 
-% L'autor del treball. Admet gènere (vegeu 9.2 del manual) fent \author[f]{}
 \author[m]{Aarón Alcalá Alcaina}
 
-% La direcció. Un treball ordinari te un o excepcionalment dos directors.
-% admet gènerer i número (vegeu 9.2 del manual)
 \advisor[m]{Aleix Llusà Serra}
 
-% Si el treball es fa sota un conveni de pràctiques (modalitat empresa)
-% llavors el director (advisor) és la persona de la empresa que
-% dirigeix el treball i, a més, hi ha un professor que fa de tutor (counselor).
-% En aquest cas també es consigna l'empresa (company)
-% \counselor admet gènere (vegeu 9.2 del manual)
-%
-% \counselor{}
-% \company{}
+\topics{IoT, Mobile Networks}
 
-% Els àmbits temàtics en que es classifica el treball. Pregunteu al
-% director.
-\topics{}
-
-% Si defenseu el projecte en una ciutat diferent de Manresa,
-% descomenteu
-% \location{}
-
-% Si l'escola no és UPC Manresa, descomenteu
-% \school{}
-
-% Si el grau no és Sistemes TIC, descomenteu
-% \degree{}
-% \ects{}
-
-% Si voleu dedicatòria descomenteu
 %\dedication{}
 
-% Si voleu agraïments descomenteu
 %\begin{acknowledgments}
 %\end{acknowledgments}
 
+% ------------------------------------------------------------------------------------
 
 \begin{resum}
 \end{resum}
 
+% ------------------------------------------------------------------------------------
+
 \begin{abstract}
 \end{abstract}
 
-
-
+% ------------------------------------------------------------------------------------
 
 \begin{document}
 
-\part{Report}
+% ====================================================================================
+
+\part{Thesis Body}
+
+% ------------------------------------------------------------------------------------
 
 \chapter{Introduction}
-% Motivation
-% Problem statement
-% Objectives
-% Scope and limitations
-% Structure of the document
+\label{chap:introduction}
+% Context, goals and motivation
+% Summary of results
+% Constraints
+% Specific objectives
+% Outline of the document structure
+
+\section{State of the Art}
+In recent years there have been various emergency situations, both of natural origin --such as large-scale floods-- and of human origin --including widespread power outages-- that have exposed the fragility of conventional communication infrastructures.
+In these situations, the lack of communication can have serious consequences, hindering the coordination of rescue efforts, the dissemination of critical information, and contact between affected individuals. 
+Therefore, there is a need to develop alternative communication solutions that can operate independently of traditional infrastructures.
+
+\section{Problem Statement}
+The communication techonologies available in smartphones rely on external infrastructures such as cellular base stations and the Internet. 
+When these fail, there is no standardized mechanism to maintain communication between nearby devices. 
+While technologies like Bluetooth allow for short-range connections, they do not provide coverage over long distances. 
+Therefore, it is necessary to design a system that allows mobile phones to maintain a basic messaging service through a decentralized architecture and mesh topology, where each device acts as a relay node.
+
+\section{Scope and Objectives}
+The main objective of this thesis is to design a resilient communication system that enables message exchange between smartphones in the absence of conventional communication infrastructures.
+In order to achieve this, the system must meet the following specific objectives:
+\begin{itemize}
+    \item Enable peer-to-peer communication between nearby devices.
+    \item Implement a mesh topology that allows for message relaying through multiple nodes, extending the communication range.
+    \item Ensure high energy efficiency to maximize the battery life of the devices.
+    \item Guarantee the confidentiality, integrity, and authenticity of transmitted messages, as well as their privacy.
+    \item Allow occasional Internet connectivity as a gateway between the decentralized network and other online services
+\end{itemize}
+
+Due to the fact that the focus is on providing a basic communication system in emergency situations, the scope of the project is limited to text messaging.
+Additionally, robustness and energy efficiency are prioritized over bandwidth. Therefore, applications that require voice or video transmission are not contemplated within the scope of this work.
+Including the evaluation of regulations and practical limitations related to the use of radio frequencies and security, but without intending to replace cybersecurity standards in critical environments.
+
+% ------------------------------------------------------------------------------------
 
 \chapter{Background}
-% Smartphone communication technologies (BLE, Wi-Fi Direct, Cellular)
-% Low-Power Wide-Area Networks (LPWAN)
-% LoRa physical layer principles
-% Mesh networking fundamentals
-% Review of existing solutions (e.g., Meshtastic)
-% Identified limitations in current approaches
+\label{chap:background}
+% Prior work in the same field, including critical and comparative review
+% Theoretical concepts, tools, languages, and methods used in the project
 
-\chapter{System Requirements and Problem Definition}
+\section{Previous Work}
+\section{Theoretical Concepts and Tools}
+
+% ------------------------------------------------------------------------------------
+
+\chapter{System Design}
+\label{chap:system_design}
+This chapter will describe the design process of the proposed communication system, including requirements analysis, technology selection, and overall system architecture.
+
+\section{Requirements Analysis}
+\label{sec:requirements_analysis}
 % Use case definition (rural inter-town communication)
 % Functional requirements
 % Non-functional requirements
 % Regulatory constraints (ISM band EU 868 MHz)
 % Design constraints
 
-\chapter{System Architecture}
-% Global system overview
-% High-level block diagram
-% Hardware–software partitioning
-% Smartphone–LoRa interaction model
-% Architectural decisions and trade-offs
+Tal y como se describe en la introducción,es el el objetivo de este proyecto es diseñar un sistema de comunicación independiente de las infraestructuras convencionales, que permita a los teléfonos móviles intercambiar mensajes de texto en situaciones de emergencia como desatres naturales o apagones masivos.
+Además, el sistema debe ser capaz de funcionar en un entorno rural, donde la densidad de dispositivos es baja y las distancias entre ellos pueden ser mayores que en un entorno urbano. Paralelamente, dado que el sistema se diseñará para funcionar en situaciones de emergencia, es fundamental que sea robusto, eficiente energéticamente y seguro, garantizando la privacidad de los usuarios y la integridad de los mensajes transmitidos.
+Añadiendo el hecho que el sistema de mensajería será operado por usuarios no técnicos, por lo que la facilidad de uso y la simplicidad de la interfaz también son pilares fundamentales en el diseño.
 
-\chapter{Hardware Design}
+Entrando en detalles técnicos, el sistema deberá permitir el envío y recepcion de mensajes de texto cortos entre dispositivos cercanos, utilizando una arquitectura de red en malla que permita el reenvío de mensajes a través de múltiples nodos para extender el alcance de la comunicación.
+Adicionalmente, el sistema debe ser capaz de funcionar con una eficiencia energética óptima, maximizando la duración de la batería de los dispositivos involucrados mediante técnicas de gestión de energía y optimización del protocolo de comunicación.
+Otro aspecto importante a considerar es la seguridad, por lo que el sistema debe implementar mecanismos de cifrado y autenticación para garantizar la confidencialidad, integridad y autenticidad de los mensajes transmitidos, así como la privacidad de los usuarios.
+También se destaca el cumplimiento de las regulaciones relacionadas con el uso de frecuencias de radio, especialmente en la banda ISM de 868 MHz en Europa, lo que implica limitaciones en la potencia de transmisión y requisitos específicos para garantizar la coexistencia con otros dispositivos que operan en la misma banda.
+Finalmente, aunque el sistema se diseñará para funcionar de manera independiente, también debe contemplar la posibilidad de conectarse ocasionalmente a Internet para actuar como un puente entre la red descentralizada y otros servicios en línea, lo que permitirá a los usuarios acceder a información adicional o comunicarse con personas fuera de la red local en situaciones donde la infraestructura esté parcialmente disponible.
+
+\subsection{Communication Protocol Choice}
+
+Qué tecnologías encontramos en el móvil:
+\begin{itemize}
+    \item Bluetooth: corto alcance, baja potencia.
+    \item Bluetooth LE: similar a Bluetooth pero con menor consumo.
+    \item Infrared: muy corto alcance, requiere línea de vista directa. \cite{ieee_infrared_1995}
+    \item Wi-Fi Direct: mayor alcance que Bluetooth, pero consume más energía y no es tan eficiente para comunicación en malla.
+    \item NFC: muy corto alcance, no adecuado para comunicación entre dispositivos a distancia.
+    \item UWB: corto alcance, alta precisión, pero no ampliamente disponible en todos los dispositivos.
+\end{itemize}
+
+Como las tecnologías integradas en los smartphones no cumplen con los requisitos de alcance y eficiencia energética necesarios, se opta por utilizar un módulo de radio externo basado en LoRa.
+Ofreciendo un alcance de varios kilómetros en entornos rurales y un consumo energético muy bajo, lo que lo hace ideal para este tipo de aplicaciones.
+
+% ---
+
+\section{System Overview}
+
+Móvil + módulo LoRa (hardware externo) + aplicación móvil (firmware) + protocolo de comunicación (software).
+
+% ---
+
+\section{Network Architecture}
+\subsection{Topology}
+\subsection{Routing Protocol}
+\subsection{Medium Access Control}
+\subsection{Packet Structure}
+
+% ---
+
+\section{Node Architecture}
+\subsection{Hardware Architecture}
 % Technology selection (MCU, LoRa transceiver)
 % Flexible PCB design considerations
 % RF design and antenna strategy
@@ -105,7 +147,7 @@
 % Mechanical integration with smartphone
 % Design challenges and mitigation strategies
 
-\chapter{Firmware and Software Design}
+\subsection{Firmware Architecture}
 % Firmware architecture (LoRa module)
 % Smartphone application architecture
 % Communication protocol definition
@@ -113,14 +155,27 @@
 % Energy management strategy
 % Security considerations
 
-\chapter{Implementation}
-% Hardware prototype realization
-% PCB fabrication and assembly
-% Firmware implementation details
-% Mobile application implementation
-% Integration process
+% ---
 
-\chapter{Experimental Validation}
+\section{Smartphone Application Architecture}
+
+% ---
+
+\section{Interfaces}
+
+
+% ---
+
+\section{Power Architecture}
+
+% ---
+
+\section{Security Architecture}
+
+% ------------------------------------------------------------------------------------
+
+\chapter{Testing and Validation Methodology}
+\label{sec:testing_validation_methodology}
 % Test methodology
 % Measurement setup
 % Range testing
@@ -128,51 +183,78 @@
 % Latency and reliability evaluation
 % Comparison with reference solutions (e.g., Meshtastic)
 
-\chapter{Results and Discussion}
-% Performance analysis
-% Strengths and limitations
-% Practical implications
-% Lessons learned
 
-\chapter{Economic Study}
+% ------------------------------------------------------------------------------------
+
+% \chapter{Economic Study} -- Optional
 % Bill of Materials (BOM)
 % Manufacturing cost estimation
 % Scalability considerations
 % Cost comparison with existing solutions
 
-\chapter{Environmental and Social Impact}
+% ------------------------------------------------------------------------------------
+
+% \chapter{Environmental and Social Impact} -- Optional
 % Energy consumption impact
 % Device lifecycle considerations
 % Regulatory compliance
 % Societal impact of infrastructure-free communication
 
+% ------------------------------------------------------------------------------------
+
+\chapter{Results and Discussion}
+\label{chap:results_discussion}
+% Performance analysis
+% Strengths and limitations
+% Practical implications
+% Lessons learned
+
+% ------------------------------------------------------------------------------------
+
 \chapter{Conclusions}
+\label{chap:conclusions}
 % Summary of contributions
 % Validation of objectives
 % Final assessment of the proposed architecture
 
-\chapter{Future Work}
+% ------------------------------------------------------------------------------------
+
+% \chapter{Future Work} -- Optional
 % Hardware improvements
 % Protocol optimization
 % Network scalability improvements
 % Field deployment scenarios
 
+% ------------------------------------------------------------------------------------
+
+\chapter{Bibliography}
+\label{chap:bibliography}
 \printbibliography
 
+% ====================================================================================
+
 \appendix
-\part{Appendix}
+\part{Appendices}
 
 \chapter{Hardware Schematics}
 % Complete schematics
 
+% ------------------------------------------------------------------------------------
+
 \chapter{PCB Layout}
 % Layout layers and RF routing details
+
+% ------------------------------------------------------------------------------------
 
 \chapter{Firmware Source Code}
 % Key modules and architecture diagrams
 
+% ------------------------------------------------------------------------------------
+
 \chapter{Additional Measurements}
 % Extended tables and raw data
+
+% ====================================================================================
 
 \end{document}
 

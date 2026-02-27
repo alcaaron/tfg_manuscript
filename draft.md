@@ -12,6 +12,26 @@ start at 19:45
 
 [LoRa wikipedia](https://en.wikipedia.org/wiki/LoRa)
 
+[IEEE article](https://ieeexplore-ieee-org.recursos.biblioteca.upc.edu/document/4460126)
+
+[LoRaWan](https://lora-alliance.org/about-lorawan/)
+
+[LoRa semtech](https://www.semtech.com/products/wireless-rf)
+
+[IoT Protocols](https://www.jisem-journal.com/index.php/journal)
+
+[NFC forum](https://nfc-forum.org/learn/nfc-technology/)
+
+[IEEE Xplore BLE](https://ieeexplore-ieee-org.recursos.biblioteca.upc.edu/document/8419192)
+
+[Bluetooth](https://www.bluetooth.com/about-us/who-we-are/)
+
+[UWB and table](https://arxiv.org/pdf/2307.13066)
+
+[Infrared](https://ieeexplore-ieee-org.recursos.biblioteca.upc.edu/stamp/stamp.jsp?tp=&arnumber=554222)
+
+
+
 ## Terms to study
 
 P2P, Mesh, Ad-hoc
@@ -269,4 +289,47 @@ Li-Fi operates by modulating the intensity of light emitted from an LED light bu
 Despite these limitations, Li-Fi’s potential for high-speed, secure, and interference-free communication makes it an exciting area of development. Its ability to integrate with existing lighting infrastructure and provide dual-purpose functionality is particularly appealing for smart buildings and urban environments. As of 2023, the global Li-Fi market was valued at approximately $1.2 billion, with a projected CAGR of 45% from 2024 to 2030, driven by increasing demand for high-speed wireless communication and the growing adoption of smart lighting systems. If you are interested to learn more on LiFi, check out our blog post on Li-Fi Technology.
 
 
-## LoRa
+---
+
+# Mesh Algorithm design
+
+Ad-Hoc Networks: Infrastructure-less, decentralized nodes, dynamic topology, self-organizing.
+[Ad-Hoc](https://www.highfrequencyelectronics.com/Mar07/HFE0307_Tutorial.pdf)
+
+Peer-to-peer: is the general concept of a networking model can we wired or not and also can be permanent or temporary, but ad-hoc is always temporary.
+
+Mesh: Focuses on routing, where nodes actively relay data for other nodes to ensure connectivity across a wider area.
+
+Network topologies:
+1. Point to point
+2. Bus
+3. Ring
+4. Star
+5. Tree
+6. **Mesh**
+7. Hybrid
+
+
+OSI model:
+
+
+1. App: API to the phone
+2. Presentation: Serialization, codification, cyphering, etc.
+3. Session: 
+4. Transport: ACK...
+5. Network: Routing, Multi-hop, TTL, Node discovery, Forwarding, Duplicated surpression
+6. Link: Framing, M.A.C, CRC...
+7. Physical: LoRa modulation, Freq. 868 MHz, TX power, SF, BW, CR, Airtime; Check limitations
+
+
+## Analyze LoRa limitations
+
+Interesting pages:
+
+For using LoRa modules API:
+[RadioHead](https://www.airspayce.com/mikem/arduino/RadioHead/examples.html)
+[SX127x](https://www.mouser.com/pdfdocs/semtech-lora-modem-design.pdf?srsltid=AfmBOooXCxh_QLmI7r4JOWug3IKO390HMACHS_HrxPlCIDSQfzQn0sz5)
+[SX1272 details semtech](https://semtech.my.salesforce.com/sfc/p/#E0000000JelG/a/440000001NCE/v_VBhk1IolDgxwwnOpcS_vTFxPfSEPQbuneK3mWsXlU)
+
+EU: 868 MHz
+
