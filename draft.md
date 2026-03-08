@@ -325,11 +325,25 @@ OSI model:
 ## Analyze LoRa limitations
 
 Interesting pages:
-
-For using LoRa modules API:
 [RadioHead](https://www.airspayce.com/mikem/arduino/RadioHead/examples.html)
 [SX127x](https://www.mouser.com/pdfdocs/semtech-lora-modem-design.pdf?srsltid=AfmBOooXCxh_QLmI7r4JOWug3IKO390HMACHS_HrxPlCIDSQfzQn0sz5)
 [SX1272 details semtech](https://semtech.my.salesforce.com/sfc/p/#E0000000JelG/a/440000001NCE/v_VBhk1IolDgxwwnOpcS_vTFxPfSEPQbuneK3mWsXlU)
+[LoRa Calculator](https://www.semtech.com/design-support/lora-calculator)
+[Vídeo explicación LoRa Modulation](https://youtu.be/jHWepP1ZWTk?si=Cj_pdeAbte_X_fY5)
+[Nice Explanation LoRa web](https://www.sghoslya.com/p/how-does-lorawan-nodes-changes-their.html)
+[Nice list of YT tutorials of LoRa](https://youtube.com/playlist?list=PLmL13yqb6OxdeOi97EvI8QeO8o-PqeQ0g&si=ScAtHjRUzWniHnis)
 
-EU: 868 MHz
+## Important Terms
 
+1. Spreading Factor (SF): How much we "spread" our data over time. From 7-12. Determines the number of bits per symbol.
+2. Receiver bandwidth (BW): How big of a slice of the spectrum we use. Typical values in EU: 125kHz, 250kHz and 500kHz.
+3. Receiver noise figure (NF): Fixed for a given hardware implementation. The amount of noise introduced by the receiver difference of the ideal one.
+4. Sound to noise ratio (SNR)
+5. Forward Error Correction (FEC): Uses Hamming Coding, adding redundancy in order to check errors.
+6. Sensitivity (S): Minimum power detectable.
+7. Time On Air (ToA): Time duration of the packet. Affects energy consumption, duty cycle and latency. 
+8. Chip Rate: Equals to bandwidth in chips-per-second-per-Hertz (125 kHz = 125 kcps).
+9. Coding Rate (CR): How much redundancy we encode to resist noise.
+10. Link budget: Determines the theoretical maximum range.
+11. Data Rate
+12. Adaptative Data Rate (ADR)
