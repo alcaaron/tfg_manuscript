@@ -1,0 +1,3 @@
+[submodule "MeshtasticatorMeshAlgoComp"]
+	path = MeshtasticatorMeshAlgoComp
+	url = https://github.com/alcaaron/MeshtasticatorMeshAlgoComp.git
