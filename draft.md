@@ -347,3 +347,78 @@ Interesting pages:
 10. Link budget: Determines the theoretical maximum range.
 11. Data Rate
 12. Adaptative Data Rate (ADR)
+
+
+## Firmware things
+
+[Official web for LoRa 32](https://heltec.org/project/wifi-lora-32-v3/)
+
+
+# Comparison of mesh algorithms
+[Dynamic Routing Algorithms](https://www.sciencedirect.com/science/article/abs/pii/S138912861100377X?utm_source=chatgpt.com)
+
+
+| Algorithm           | Delivery ratio | Overhead | Scalability  | Comentario clave                       |
+| ------------------- | -------------- | -------- | ------------ | -------------------------------------- |
+| Flooding            | High           | High     | Bad         | Entrega masiva, pero congestión real   |
+| Greedy (simple)     | Medium         | Bajo     | Good        | Eficiente, falla si hay voids          |
+| Greedy+fallback     | High           | Medium   | Good        | Soluciona mínimos locales              |
+| AODV / Reactive     | High           | Medium   | Good        | Balance clásico                        |
+| Proactivo (OLSR)    | Variable       | High     | Medium      | Poco eficiente con duty limits         |
+| Multi‑path / Hybrid | High           | Medium   | Good        | Alta robustez sin ineficiencia extrema |
+
+
+
+---
+
+
+# Comparison of Mesh Algorithms
+
+[Classification of Routing Algorithms (GeeksForGeeks)](https://www.geeksforgeeks.org/computer-networks/classification-of-routing-algorithms/)
+
+There are 3 types:
+- Adaptative Routing Algorithms
+- Non-Adaptative Routing Algorithms
+- Hybrid Routing Algorithms
+
+## Adaptative Routing Algorithms
+
+- Dynamic routing: change routing decision whenever networks topology (both physical and logical connections) or traffic load changes.
+
+### Types
+1. Isolated: Makes decision using info. has.
+2. Centralized: centralized node has entire information of the network.
+3. Distributed: Receives info. from neighbors and takes decision.
+
+## Non-Adaptative Algorithms
+
+- **Do not** change their routing decision once they have been selected, a.k.a. **static routing**
+
+### Types
+- Flooding: adapts technique in which every incoming packet is sent.
+- Random walk: sent neighboor-by-neighbor randomly.
+
+
+## Hybrid Algorithms
+
+- Combines both previous in distinct regions:
+  - Link-state: Each router creates a detailed map of the network.
+  - Distance vector: Each router maintains a table that contains information about the dist. and dir. to every other node.
+
+## Additional Information
+Flooding is preferred because adapts more to the environment the problem states for this bachelor's thesis.
+
+
+## Algorithms to Implement
+
+### Flooding / Managed Flooding
+### Gossip / Probabilistic Flooding
+### Distance Vector
+### Hierarchical / Clustered-Based Routing
+### Reverse Path Forwarding (RPF) / Gradient Routing
+### Energy-Aware Routing
+### Neighbor-Based / Local Decision Routing
+### Beacon / Synchronization-Based Routing
+### Multipath Routing
+### Flooding + Memory (Hybrid)
+### Spreading-Factor-Aware Routing
