@@ -1,3 +1,6 @@
 [submodule "MeshtasticatorMeshAlgoComp"]
 	path = MeshtasticatorMeshAlgoComp
 	url = https://github.com/alcaaron/MeshtasticatorMeshAlgoComp.git
+[submodule "tfg_firmware"]
+	path = tfg_firmware
+	url = https://github.com/alcaaron/tfg_firmware.git
