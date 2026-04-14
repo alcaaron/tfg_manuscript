@@ -6,18 +6,12 @@ namespace lib::lora
     LoRaDriver::LoRaDriver()
     {
         this->radio = nullptr;
-        //receivedFlag = false;
+        receivedFlag = false;
     }
 
     bool LoRaDriver::begin(const lora::A3MESHConfig &config)
     {
         ESP_LOGV(A3M_TAG, "Initializing A3MESH v%s", A3M_VERSION);
-
-        esp_err_t err = gpio_install_isr_service(0);
-
-        if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
-            ESP_LOGE("GPIO", "ISR service install failed: %d", err);
-        }
 
         this->config = config;
 
@@ -38,16 +32,8 @@ namespace lib::lora
             config.power,
             config.preamble_len);
 
-        // Initialize queues
-        initTasks();
-
 
         return state == RADIOLIB_ERR_NONE;
-    }
-
-    bool LoRaDriver::initTasks()
-    {
-        return true;
     }
 
     bool LoRaDriver::sendRawPacket(uint8_t* data, size_t len)
@@ -111,28 +97,24 @@ namespace lib::lora
         this->radio->clearDio1Action();
     }
 
-    void LoRaDriver::setDioActionsForReceivePacket() {
-        clearDioActions();
-
-        this->radio->setDio1Action(onReceive);
+    void LoRaDriver::setPacketReceivedAction()
+    {
+        this->radio->setPacketReceivedAction([]() {
+            receivedFlag = true;
+        });
     }
 
-    void LoRaDriver::onReceive()
+    bool LoRaDriver::checkPacketReceived()
     {
-        receivedFlag = true;
-    }
-
-    bool LoRaDriver::available()
-    {
-        return receivedFlag;
+        return this->receivedFlag;
     }
 
     int LoRaDriver::readData(uint8_t* buffer, size_t len)
     {
-        if (!receivedFlag)
+        if (!this->receivedFlag)
             return 0;
 
-        receivedFlag = false;
+        this->receivedFlag = false;
 
         int packetSize = this->radio->getPacketLength();
 

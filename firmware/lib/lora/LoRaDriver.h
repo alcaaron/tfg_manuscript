@@ -23,9 +23,9 @@ namespace lib::lora
 
         void clearDioActions();
 
-        void setDioActionsForReceivePacket();
+        void setPacketReceivedAction();
 
-        bool available();
+        bool checkPacketReceived();
 
         int readData(uint8_t* buffer, size_t len);
 
@@ -37,7 +37,5 @@ namespace lib::lora
         lora::A3MESHConfig config;
 
         static volatile bool receivedFlag;
-
-        static void onReceive();
     };
 } // namespace lib::lora
