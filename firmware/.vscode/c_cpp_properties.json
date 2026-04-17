@@ -9,6 +9,7 @@
             "name": "PlatformIO",
             "includePath": [
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/src",
+                "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/BLE/src",
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/lora",
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/packet",
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/.pio/libdeps/heltec_wifi_lora_32_V3/RadioLib/src",
@@ -220,7 +221,6 @@
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/utils",
                 "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",
                 "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/AsyncUDP/src",
-                "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/BLE/src",
                 "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/BluetoothSerial/src",
                 "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/DNSServer/src",
                 "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/EEPROM/src",
@@ -256,6 +256,7 @@
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/src",
+                    "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/BLE/src",
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/lora",
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/packet",
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/.pio/libdeps/heltec_wifi_lora_32_V3/RadioLib/src",
@@ -467,7 +468,6 @@
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/utils",
                     "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",
                     "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/AsyncUDP/src",
-                    "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/BLE/src",
                     "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/BluetoothSerial/src",
                     "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/DNSServer/src",
                     "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/EEPROM/src",
