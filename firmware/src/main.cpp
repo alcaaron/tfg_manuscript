@@ -1,9 +1,9 @@
 #include <Arduino.h>
-#include "LoRaDriver.h"
-#include "BLEDriver.h"
+#include "A3MESHManager.h"
 
 lib::lora::LoRaDriver lora;
 lib::ble::BLEDriver ble;
+lib::mesh::A3MESHManager A3MESHManager;
 
 bool setupA3MESH()
 {
@@ -37,6 +37,17 @@ bool setupA3MESH()
     return false;
   }
   Serial.println("[BLE] tasks started!");
+
+  // --------- Init A3MESH Manager ---------
+  if (!A3MESHManager.begin())
+  {
+    return false;
+  }
+  Serial.println("[MESH] manager started!");
+
+  A3MESHManager.attachBLE(&ble);
+  A3MESHManager.attachLoRa(&lora);
+  Serial.println("[MESH] drivers attached to manager!");
   return true;
 }
 

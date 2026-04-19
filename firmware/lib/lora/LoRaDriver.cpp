@@ -1,7 +1,4 @@
 #include "LoRaDriver.h"
-#include <config.h>
-#include <freertos/task.h>
-#include <freertos/queue.h>
 
 namespace lib::lora
 {
@@ -41,7 +38,7 @@ namespace lib::lora
         }
 
         this->rxQueue = xQueueCreate(RX_LORA_QUEUE_SIZE, sizeof(RxMessage_t));
-        this->txQueue = xQueueCreate(TX_LORA_QUEUE_SIZE, sizeof(lib::packet::A3MESHPacket_t));
+        this->txQueue = xQueueCreate(TX_LORA_QUEUE_SIZE, sizeof(TxMessage_t));
 
         if (!this->rxQueue || !this->txQueue)
         {
@@ -57,46 +54,22 @@ namespace lib::lora
         if (len > A3MESH_MAX_PACKET_SIZE)
             return false;
 
+        clearDioActions();
+        this->radio->standby();
         int16_t state = this->radio->transmit(data, len);
-        Serial.println("Raw packet sent!");
-        return state == RADIOLIB_ERR_NONE;
-    }
-
-    bool LoRaDriver::sendPacket(const lib::packet::A3MESHPacket_t &packet)
-    {
-        uint8_t buffer[A3MESH_MAX_PACKET_SIZE];
-        size_t total_len = 0;
-
-        // serialize packet
-        buffer[total_len++] = packet.pkt_id;
-        buffer[total_len++] = packet.src;
-        buffer[total_len++] = packet.node_id;
-        buffer[total_len++] = packet.dst;
-        buffer[total_len++] = packet.ttl;
-        buffer[total_len++] = packet.type;
-        buffer[total_len++] = packet.flags;
-        buffer[total_len++] = packet.payload_len;
-        memcpy(&buffer[total_len], packet.payload, packet.payload_len);
-
-        total_len += packet.payload_len;
-
-        if (packet.payload_len > A3MESH_MAX_PAYLOAD)
-            return false;
-
-        int16_t state = this->radio->transmit(buffer, total_len);
-
-        if (state != RADIOLIB_ERR_NONE)
-            return false;
-
-        Serial.println("Packet sent!");
-        Serial.print("Payload: ");
-        for (size_t i = 0; i < packet.payload_len; i++)
+        this->radio->startReceive();
+        setPacketReceivedAction();
+        Serial.print("[LORA] TX: ");
+        for (size_t i = 0; i < len; i++)
         {
-            Serial.print((char)packet.payload[i]);
+            if (data[i] < 0x10)
+                Serial.print("0");
+
+            Serial.print(data[i], HEX);
+            Serial.print(" ");
         }
         Serial.println();
-
-        return true;
+        return state == RADIOLIB_ERR_NONE;
     }
 
     volatile bool LoRaDriver::receivedFlag = false;
@@ -126,10 +99,10 @@ namespace lib::lora
 
     int LoRaDriver::readData(uint8_t *buffer, size_t len)
     {
-        if (!this->receivedFlag)
+        if (!receivedFlag)
             return 0;
 
-        this->receivedFlag = false;
+        receivedFlag = false;
 
         int packetSize = this->radio->getPacketLength();
 
@@ -159,16 +132,25 @@ namespace lib::lora
         for (;;)
         {
             vTaskDelayUntil(&xLastWakeTime, xFrequency);
-
             if (driver->checkPacketReceived())
             {
                 uint8_t buffer[RX_BUFFER_SIZE];
                 int len = driver->readData(buffer, sizeof(buffer));
+                Serial.print("[LORA] RX: ");
+                for (size_t i = 0; i < len; i++)
+                {
+                    if (buffer[i] < 0x10)
+                        Serial.print("0");
 
-                if (len > sizeof(lib::packet::A3MESHHeader))
+                    Serial.print(buffer[i], HEX);
+                    Serial.print(" ");
+                }
+                Serial.println();
+
+                if (len > sizeof(lib::packet::A3MESHHeader_t))
                 {
                     RxMessage_t msg;
-                    memcpy(msg.data, buffer, len);
+                    memcpy(msg.rx_data, buffer, len);
                     msg.len = len;
 
                     xQueueSend(driver->rxQueue, &msg, portMAX_DELAY);
@@ -180,87 +162,15 @@ namespace lib::lora
     void LoRaDriver::txLoRaPacketTask(void *pvParameters)
     {
         LoRaDriver *driver = static_cast<LoRaDriver *>(pvParameters);
-        lib::packet::A3MESHPacket_t packet;
+        TxMessage_t msg;
 
         for (;;)
         {
-            if (xQueueReceive(driver->txQueue, &packet, portMAX_DELAY) == pdTRUE)
+            if (xQueueReceive(driver->txQueue, &msg, portMAX_DELAY) == pdTRUE)
             {
-                driver->sendPacket(packet);
+                driver->sendRawPacket(msg.tx_data, msg.len);
             }
             vTaskDelay(10 / portTICK_PERIOD_MS);
-        }
-    }
-
-    void LoRaDriver::processLoRaPacketTask(void *pvParameters)
-    {
-        LoRaDriver *driver = static_cast<LoRaDriver *>(pvParameters);
-
-        RxMessage_t msg;
-
-        for (;;)
-        {
-            if (xQueueReceive(driver->rxQueue, &msg, portMAX_DELAY) == pdTRUE)
-            {
-                Serial.println("Processing received packet...");
-
-                for (size_t i = 0; i < msg.len; i++)
-                {
-                    Serial.print(msg.data[i], HEX);
-                    Serial.print(" ");
-                }
-                Serial.println();
-
-                lib::packet::A3MESHHeader pktHeader;
-                pktHeader.type = msg.data[0];
-                pktHeader.version = msg.data[1];
-                pktHeader.length = (msg.data[3] << 8) | msg.data[2];
-
-                if (pktHeader.length == 0)
-                {
-                    Serial.println("Invalid packet");
-                    continue;
-                }
-
-                uint8_t payload[pktHeader.length];
-                memcpy(payload, &msg.data[4], pktHeader.length);
-
-                lib::packet::A3MESHPacket_t pkt = {
-                    .pkt_id = ((uint16_t)payload[1] << 8) | payload[0],
-                    .node_id = ((uint16_t)payload[3] << 8) | payload[2],
-                    .src = ((uint16_t)payload[5] << 8) | payload[4],
-                    .dst = ((uint16_t)payload[7] << 8) | payload[6],
-                    .ttl = payload[8],
-                    .type = payload[9],
-                    .flags = payload[10],
-                    .payload_len = payload[11]};
-
-                memcpy(pkt.payload, &payload[12], pkt.payload_len);
-
-                Serial.println("Packet parsed!");
-                Serial.print("pkt_id: ");
-                Serial.print(pkt.pkt_id);
-                Serial.print(", node_id: ");
-                Serial.print(pkt.node_id);
-                Serial.print(", src: ");
-                Serial.print(pkt.src);
-                Serial.print(", dst: ");
-                Serial.print(pkt.dst);
-                Serial.print(", ttl: ");
-                Serial.print(pkt.ttl);
-                Serial.print(", type: ");
-                Serial.print(pkt.type);
-                Serial.print(", flags: ");
-                Serial.print(pkt.flags);
-                Serial.print(", payload_len: ");
-                Serial.println(pkt.payload_len);
-                Serial.print("Payload content: ");
-                for (size_t i = 0; i < pkt.payload_len; i++)                {
-                    Serial.print((char)pkt.payload[i]);
-                    Serial.print(" ");
-                }
-                Serial.println();
-            }
         }
     }
 
@@ -291,20 +201,6 @@ namespace lib::lora
         if (result != pdPASS)
         {
             ESP_LOGE(A3M_TAG, "Failed to create LoRa TX Task");
-            return false;
-        }
-
-        result = xTaskCreate(
-            processLoRaPacketTask,
-            "LoRa PROCESS",
-            4096,
-            this,
-            1,
-            NULL);
-        
-        if (result != pdPASS)
-        {
-            ESP_LOGE(A3M_TAG, "Failed to create LoRa Process Packet Task");
             return false;
         }
 

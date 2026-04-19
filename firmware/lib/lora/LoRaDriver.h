@@ -2,15 +2,24 @@
 
 #include <RadioLib.h>
 #include "LoRaConfig.h"
+#include <config.h>
 #include "A3MESHPacket.h"
+#include <freertos/task.h>
+#include <freertos/queue.h>
 
 namespace lib::lora
 {
     typedef struct
     {
-        uint8_t data[RX_BUFFER_SIZE];
+        uint8_t rx_data[RX_BUFFER_SIZE];
         size_t len;
     } RxMessage_t;
+
+    typedef struct
+    {
+        uint8_t tx_data[A3MESH_MAX_PACKET_SIZE];
+        size_t len;
+    } TxMessage_t;
 
     class LoRaDriver
     {
@@ -22,8 +31,6 @@ namespace lib::lora
         bool begin(const lora::A3MESHConfig &config);
 
         bool sendRawPacket(uint8_t *data, size_t len);
-
-        bool sendPacket(const lib::packet::A3MESHPacket_t &packet);
 
         bool startReceive();
 
@@ -37,6 +44,8 @@ namespace lib::lora
 
         bool startTasks();
 
+        QueueHandle_t getTxQueue() { return txQueue; }
+        QueueHandle_t getRxQueue() { return rxQueue; }
     private:
         SX1262 *radio;
 
@@ -47,9 +56,10 @@ namespace lib::lora
         QueueHandle_t rxQueue;
         QueueHandle_t txQueue;
 
+        // QueueHandle_t routerQueue;
+
         static void rxLoRaPacketTask(void *pvParameters);
         static void txLoRaPacketTask(void *pvParameters);
-        static void processLoRaPacketTask(void *pvParameters);
-
+        // static void processLoRaPacketTask(void *pvParameters);
     };
 } // namespace lib::lora
