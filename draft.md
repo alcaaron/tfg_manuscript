@@ -422,3 +422,11 @@ Flooding is preferred because adapts more to the environment the problem states 
 ### Multipath Routing
 ### Flooding + Memory (Hybrid)
 ### Spreading-Factor-Aware Routing
+
+
+[ps circuit](https://forum.arduino.cc/t/esp32-heltec-wifi-kit-32-v2-fried/942179)
+
+
+[Reyax Module to Copy](https://reyax.com/products/RYLR999)
+
+[video Disaster Relief Messenger](https://www.youtube.com/watch?v=9_yHu9rJt58&t=825s)
