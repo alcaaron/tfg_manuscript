@@ -430,3 +430,13 @@ Flooding is preferred because adapts more to the environment the problem states 
 [Reyax Module to Copy](https://reyax.com/products/RYLR999)
 
 [video Disaster Relief Messenger](https://www.youtube.com/watch?v=9_yHu9rJt58&t=825s)
+
+---
+
+## T-Echo device (interesant)
+
+Links:
+[T-Echo accessories](https://lilygo.cc/en-us/products/t-echo-accessories-1)
+[T-Echo image](https://lilygo.cc/en-us/products/t-echo-accessories-1)
+[T-Echo model 3D](https://cults3d.com/es/modelo-3d/artilugios/lilygo-t-echo-bigger-back-cover?srsltid=AfmBOoryAgTF_zkb5hv5yAtpenR4TBQ2V1CNmBqWtb5l3sxHU1m5CthJ)
+[T-Echo video](https://www.youtube.com/watch?v=6KkTvHnoo_0)
