@@ -56,8 +56,6 @@ namespace lib::lora
         QueueHandle_t rxQueue;
         QueueHandle_t txQueue;
 
-        // QueueHandle_t routerQueue;
-
         static void rxLoRaPacketTask(void *pvParameters);
         static void txLoRaPacketTask(void *pvParameters);
         // static void processLoRaPacketTask(void *pvParameters);

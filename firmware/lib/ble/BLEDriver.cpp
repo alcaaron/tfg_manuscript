@@ -80,10 +80,6 @@ namespace lib::ble
 
     bool BLEDriver::startTasks()
     {
-        // if (xTaskCreate(BLErxTask, "BLE RX Task", 4096, this, 1, NULL) != pdPASS)
-        // {
-        //     return false;
-        // }
 
         if (xTaskCreate(BLEtxTask, "BLE TX Task", 4096, this, 1, NULL) != pdPASS)
         {
