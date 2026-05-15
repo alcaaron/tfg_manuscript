@@ -7,10 +7,9 @@ namespace lib::lora
     struct A3MESHConfig
     {
         // LoRa pins
-        uint8_t cs_pin = CS_PIN;
-        uint8_t irq_pin = IRQ_PIN;
-        uint8_t rst_pin = RST_PIN;
-        uint8_t dio1_pin = DIO1_PIN;
+        uint8_t nss_pin = NSS_GPIO;
+        uint8_t rst_pin = RST_GPIO;
+        uint8_t dio0_pin = DIO0_GPIO;
 
         float frequency = EU868_FREQUENCY;
         float bandwidth = BANDWIDTH_125_KHZ;

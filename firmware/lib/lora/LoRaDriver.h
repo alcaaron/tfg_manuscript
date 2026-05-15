@@ -1,6 +1,7 @@
 #pragma once
 
 #include <RadioLib.h>
+#include <SPI.h>
 #include "LoRaConfig.h"
 #include <config.h>
 #include "A3MESHPacket.h"
@@ -47,7 +48,7 @@ namespace lib::lora
         QueueHandle_t getTxQueue() { return txQueue; }
         QueueHandle_t getRxQueue() { return rxQueue; }
     private:
-        SX1262 *radio;
+        SX1276 *radio;
 
         lora::A3MESHConfig config;
 

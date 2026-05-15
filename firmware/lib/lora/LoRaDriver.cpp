@@ -14,12 +14,13 @@ namespace lib::lora
 
         this->config = config;
 
+        SPI.begin(SCK_GPIO, MISO_GPIO, MOSI_GPIO, NSS_GPIO);
+
         // Set module configuration
-        this->radio = new SX1262(new Module(
-            config.cs_pin,
-            config.irq_pin,
-            config.rst_pin,
-            config.dio1_pin));
+        this->radio = new SX1276(new Module(
+            config.nss_pin,
+            config.dio0_pin,
+            config.rst_pin));
 
         // Initialize the radio with the specified configuration
         int16_t state = this->radio->begin(

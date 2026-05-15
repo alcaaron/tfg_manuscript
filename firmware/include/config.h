@@ -14,10 +14,12 @@
 
 #define A3MESH_MAX_PACKET_SIZE 100  // Maximum size of an A3MESH packet in bytes.
 
-#define CS_PIN    8                 // Chip Select pin
-#define IRQ_PIN   14                // Interrupt Request pin
-#define RST_PIN   12                // Reset pin
-#define DIO1_PIN  13                // DIO1 pin
+#define SCK_GPIO 5
+#define MISO_GPIO 15
+#define MOSI_GPIO 25
+#define NSS_GPIO 18
+#define RST_GPIO 14
+#define DIO0_GPIO 26
 
 #define RX_LORA_QUEUE_SIZE 10
 #define POLLING_INTERVAL_MS 500
