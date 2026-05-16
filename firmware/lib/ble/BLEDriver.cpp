@@ -23,10 +23,10 @@ namespace lib::ble
             char buffer[BLE_BUFFER_SIZE] = {0};
             strncpy(buffer, rxValue.c_str(), sizeof(buffer) - 1);
 
-            if (driver->bleRxQueue != nullptr)
+            if (rxBLEQueue != nullptr)
             {
                 Serial.printf("[BLE] RX: %s\n", buffer);
-                xQueueSend(driver->bleRxQueue, buffer, 0);
+                xQueueSend(rxBLEQueue, buffer, 0);
             }
         }
     }
@@ -37,14 +37,6 @@ namespace lib::ble
 
     bool BLEDriver::setup()
     {
-        this->bleRxQueue = xQueueCreate(10, sizeof(char[BLE_BUFFER_SIZE]));
-        this->bleTxQueue = xQueueCreate(10, sizeof(char[BLE_BUFFER_SIZE]));
-
-        if (!this->bleRxQueue || !this->bleTxQueue)
-        {
-            return false;
-        }
-
         BLEDevice::init(BLE_DEVICE_NAME);
 
         // Crear servidor
@@ -78,21 +70,7 @@ namespace lib::ble
         return true;
     }
 
-    bool BLEDriver::startTasks()
-    {
 
-        if (xTaskCreate(BLEtxTask, "BLE TX Task", 4096, this, 1, NULL) != pdPASS)
-        {
-            return false;
-        }
-
-        if (xTaskCreate(lifeBitTask, "BLE Life Bit Task", 4096, this, 1, NULL) != pdPASS)
-        {
-            return false;
-        }
-
-        return true;
-    }
 
     bool BLEDriver::isConnected()
     {
@@ -115,51 +93,6 @@ namespace lib::ble
         return true;
     }
 
-    void BLEDriver::BLEtxTask(void *pvParameters)
-    {
-        BLEDriver *driver = static_cast<BLEDriver *>(pvParameters);
-        char txBuffer[BLE_BUFFER_SIZE] = {0};
 
-        if (driver == nullptr)
-        {
-            vTaskDelete(NULL);
-            return;
-        }
-
-        for (;;)
-        {
-            if (xQueueReceive(driver->bleTxQueue, &txBuffer, portMAX_DELAY) == pdTRUE)
-            {
-                if (!driver->deviceConnected || driver->txCharacteristic == nullptr)
-                    continue;
-                
-                driver->send(txBuffer);
-                Serial.printf("[BLE] TX: %s\n", txBuffer);
-            }
-        }
-    }
-
-    void BLEDriver::lifeBitTask(void *pvParameters)
-    {
-        BLEDriver *driver = static_cast<BLEDriver *>(pvParameters);
-
-        if (driver == nullptr)
-        {
-            vTaskDelete(NULL);
-            return;
-        }
-
-        for (;;)
-        {
-            if (driver->deviceConnected && driver->txCharacteristic)
-            {
-                const char *msg = "alive";
-                driver->txCharacteristic->setValue((uint8_t *)msg, strlen(msg));
-                driver->txCharacteristic->notify();
-            }
-
-            vTaskDelay(pdMS_TO_TICKS(BLE_LIFE_BIT_INTERVAL_MS));
-        }
-    }
 
 }

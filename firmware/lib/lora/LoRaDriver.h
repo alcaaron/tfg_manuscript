@@ -1,6 +1,6 @@
 #pragma once
 
-#include <RadioLib.h>
+#include <LoRa.h>
 #include <SPI.h>
 #include "LoRaConfig.h"
 #include <config.h>
@@ -27,38 +27,7 @@ namespace lib::lora
     public:
         LoRaDriver();
 
-        TaskHandle_t processPacketTaskHandle;
-
         bool begin(const lora::A3MESHConfig &config);
-
-        bool sendRawPacket(uint8_t *data, size_t len);
-
-        bool startReceive();
-
-        void clearDioActions();
-
-        void setPacketReceivedAction();
-
-        bool checkPacketReceived();
-
-        int readData(uint8_t *buffer, size_t len);
-
-        bool startTasks();
-
-        QueueHandle_t getTxQueue() { return txQueue; }
-        QueueHandle_t getRxQueue() { return rxQueue; }
-    private:
-        SX1276 *radio;
-
-        lora::A3MESHConfig config;
-
-        static volatile bool receivedFlag;
-
-        QueueHandle_t rxQueue;
-        QueueHandle_t txQueue;
-
-        static void rxLoRaPacketTask(void *pvParameters);
-        static void txLoRaPacketTask(void *pvParameters);
-        // static void processLoRaPacketTask(void *pvParameters);
+        bool sendRawPacket(const uint8_t *data, size_t len);
     };
 } // namespace lib::lora
