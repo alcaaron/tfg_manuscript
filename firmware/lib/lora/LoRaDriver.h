@@ -14,6 +14,8 @@ namespace lib::lora
     {
         uint8_t rx_data[RX_BUFFER_SIZE];
         size_t len;
+        int16_t rssi;
+        unsigned long timestamp;
     } RxMessage_t;
 
     typedef struct

@@ -11,19 +11,16 @@ namespace lib::mesh
         A3MESHManager();
 
         bool begin();
-        void attachBLE(lib::ble::BLEDriver *b);
-        void attachLoRa(lib::lora::LoRaDriver *l);
         uint16_t getNodeID();
         uint16_t getNextMsgID();
-        
-        void sendDiscovery();
+        bool shouldForward(lib::packet::A3MESHPacket_t *pkt);
     private:
 
         uint16_t _node_id;
         uint16_t _msg_counter = 0;
         SemaphoreHandle_t _mutex;
-        static void sendDiscoveryTask(void *pvParameters);
         uint32_t generateNodeID();
+        uint8_t _routing_protocol;
         
     };
 }

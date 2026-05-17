@@ -5,6 +5,7 @@ namespace lib::ble
 {
     void ServerCallbacks::onConnect(BLEServer *pServer)
     {
+        Serial.println("[BLE] Device Connected!");
         driver->deviceConnected = true;
     }
 

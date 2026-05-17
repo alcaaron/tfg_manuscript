@@ -20,8 +20,6 @@ void rxLoRaPacketTask(void *pvParameters)
             Serial.printf("[LORA] packet received, length: %d\r\n", msg.len);
 
             if (msg.len <= 0 || msg.len > sizeof(msg.rx_data)) { continue; }
-
-            Serial.println("[LORA] Valid packet!");
             
             if (msg.len > sizeof(lib::packet::A3MESHHeader_t))
             {

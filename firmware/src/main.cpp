@@ -2,6 +2,7 @@
 #include "A3MESHManager.h"
 #include "LoRaTasks.h"
 #include "BLETasks.h"
+#include "AMESHManagerTasks.h"
 
 lib::ble::BLEDriver ble;
 
@@ -79,8 +80,6 @@ void LoRa2BLETask(void *pvParameters)
   {
     if (xQueueReceive(rxLoRaQueue, &rxMsg, portMAX_DELAY) == pdTRUE)
     {
-
-      Serial.printf("[LORA2BLE] Received LoRa packet, length: %u\n", rxMsg.len);
       lib::packet::A3MESHHeader_t header;
       lib::packet::A3MESHPacket_t pkt;
 
@@ -96,21 +95,66 @@ void LoRa2BLETask(void *pvParameters)
         continue;
       }
 
-      char bleBuffer[BLE_BUFFER_SIZE] = {0};
+      // Steps when rx a message
+      // x. Discard msg if src matches with node_id
+      if (pkt.src == a3mesh.getNodeID()) { continue; }
+      // x. Check msg type
+      if (header.type == lib::packet::MSG_TYPE_DISCOVERY)
+      {
+        // Manage neighbors table
+        Serial.println("[LORA2BLE] DISC msg-type received!");
+      }
+      else if (header.type == lib::packet::MSG_TYPE_DATA)
+      {
+        Serial.println("[MESH] DATA msg-type received!");
+        // x. Check dst matches with node_id
+        //  --> IF node_id matches THEN forward directly to BLE
+        //  --> ELSE route or not uppon routing logic
+        if (pkt.dst == a3mesh.getNodeID())
+        {
+          char bleBuffer[BLE_BUFFER_SIZE] = {0};
 
-      if (pkt.payload_len >= (BLE_BUFFER_SIZE - 5)) { continue; }
+          if (pkt.payload_len >= (BLE_BUFFER_SIZE - 5)) { continue; }
 
-      int len = snprintf(
-          bleBuffer,
-          sizeof(bleBuffer),
-          "+RCV=%.*s\r\n",
-          pkt.payload_len,
-          pkt.payload);
+          int len = snprintf(
+              bleBuffer,
+              sizeof(bleBuffer),
+              "+RCV=%.*s\r\n",
+              pkt.payload_len,
+              pkt.payload);
 
-      if (len < 0 || len >= BLE_BUFFER_SIZE) { continue; }
+          if (len < 0 || len >= BLE_BUFFER_SIZE) { continue; }
 
-      Serial.printf("[LORA2BLE] Forwarding to BLE: %s\n", bleBuffer);
-      xQueueSend(txBLEQueue, bleBuffer, 0);
+          Serial.printf("[LORA2BLE] Forwarding to BLE: %s\n", bleBuffer);
+          xQueueSend(txBLEQueue, bleBuffer, 0);
+        }
+        else
+        {
+          // Route the packet if applies
+          if (a3mesh.shouldForward(&pkt))
+          {
+            lib::lora::TxMessage_t txMsg;
+            // Keep the rx pkt except:
+            // + ttl is decreased by 1
+            // + node_id is the current node's
+            // + msg_id is changed bc. is a new msg
+            lib::packet::A3MESHPacket::createLoRaMessage(
+                header.version,
+                header.type,
+                a3mesh.getNextMsgID(),
+                a3mesh.getNodeID(), // node_id
+                pkt.src, // src
+                pkt.dst,
+                pkt.ttl - 1,
+                0, // flags
+                (const uint8_t *)pkt.payload,
+                txMsg.tx_data,
+                txMsg.len);
+
+            lora.sendRawPacket(txMsg.tx_data, txMsg.len);
+          }
+        }
+      }
     }
   }
 }
@@ -160,7 +204,7 @@ void BLE2LoRaTask(void *pvParameters)
             a3mesh.getNodeID(), // src
             dst,
             MAX_TTL,
-            0,
+            0, // flags
             (const uint8_t *)msg,
             lora_msg.tx_data,
             lora_msg.len);
@@ -169,6 +213,32 @@ void BLE2LoRaTask(void *pvParameters)
       }
     }
   }
+}
+
+void sendDiscoveryTask(void *pvParameters)
+{
+    for (;;)
+    {
+        const char *msg = "DISC";
+
+        lib::lora::TxMessage_t lora_msg;
+        lib::packet::A3MESHPacket::createLoRaMessage(
+            A3M_VERSION,
+            lib::packet::MessageType::MSG_TYPE_DISCOVERY,
+            a3mesh.getNextMsgID(),
+            a3mesh.getNodeID(),
+            a3mesh.getNodeID(),
+            0xFFFF, // Broadcast
+            1,      // TTL
+            0,      // Flags
+            (const uint8_t *)msg,
+            lora_msg.tx_data,
+            lora_msg.len);
+
+        xQueueSend(txLoRaQueue, &lora_msg, 0);
+        vTaskDelay(pdMS_TO_TICKS(30000) + (pdMS_TO_TICKS(rand() % 30000)));
+    }
+    vTaskDelete(NULL);
 }
 
 bool setupA3MESH()
@@ -227,11 +297,12 @@ bool setupA3MESH()
   }
 
   // --------- Init A3MESH Manager ---------
-  // result = xTaskCreatePinnedToCore(A3MESHManager::sendDiscoveryTask, "DiscoveryTask", 4096, this, 1, NULL, 1);
-  // if (result != pdPASS)
-  // {
-  //   return false;
-  // }
+  result = xTaskCreatePinnedToCore(sendDiscoveryTask, "DiscoveryTask", 4096, NULL, 1, NULL, 0);
+  if (result != pdPASS)
+  {
+    return false;
+  }
+  Serial.println("[MESH] Discovery Task Initialized!");
 
   return true;
 }
