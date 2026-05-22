@@ -66,3 +66,6 @@ htmlcov/
 # =========================
 .pio/build/
 .pio/libdeps/
+.pio/build/project_checksum
+.vscode/c_cpp_properties.json
+.vscode/launch.json
