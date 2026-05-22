@@ -49,12 +49,12 @@ namespace lib::ble
 
         bool send(const char *txBuffer);
 
-        BLECharacteristic* getTxCharacteristic() const { return txCharacteristic; }
+        BLECharacteristic* getTxCharacteristic() const { return _txCharacteristic; }
 
     private:
-        BLECharacteristic *txCharacteristic = nullptr;
+        BLECharacteristic *_txCharacteristic = nullptr;
 
-        bool deviceConnected = false;
+        bool _deviceConnected = false;
 
         friend class ServerCallbacks;
         friend class RXCallbacks;

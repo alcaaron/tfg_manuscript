@@ -12,15 +12,14 @@ namespace lib::lora
 {
     typedef struct
     {
-        uint8_t rx_data[RX_BUFFER_SIZE];
+        uint8_t rx_data[LORA_MAX_PACKET_SIZE];
         size_t len;
         int16_t rssi;
-        unsigned long timestamp;
     } RxMessage_t;
 
     typedef struct
     {
-        uint8_t tx_data[A3MESH_MAX_PACKET_SIZE];
+        uint8_t tx_data[LORA_MAX_PACKET_SIZE];
         size_t len;
     } TxMessage_t;
 
@@ -30,6 +29,6 @@ namespace lib::lora
         LoRaDriver();
 
         bool begin(const lora::A3MESHConfig &config);
-        bool sendRawPacket(const uint8_t *data, size_t len);
+        bool sendRawPacket(const uint8_t &data, size_t len);
     };
 } // namespace lib::lora

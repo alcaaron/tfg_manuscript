@@ -16,8 +16,9 @@ void rxLoRaPacketTask(void *pvParameters)
         {
             lib::lora::RxMessage_t msg;
             msg.len = LoRa.readBytes(msg.rx_data, sizeof(msg.rx_data));
+            msg.rssi = LoRa.packetRssi();
 
-            Serial.printf("[LORA] packet received, length: %d\r\n", msg.len);
+            Serial.printf("[LORA] packet received, length: %d, rssi: %d\r\n", msg.len, msg.rssi);
 
             if (msg.len <= 0 || msg.len > sizeof(msg.rx_data)) { continue; }
             
@@ -37,7 +38,7 @@ void txLoRaPacketTask(void *pvParameters)
     {
         if (xQueueReceive(txLoRaQueue, &msg, portMAX_DELAY) == pdTRUE)
         {
-            lora.sendRawPacket(msg.tx_data, msg.len);
+            lora.sendRawPacket(*(msg.tx_data), msg.len);
         }
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }

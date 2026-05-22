@@ -31,16 +31,17 @@ namespace lib::lora
         return true;
     }
 
-    bool LoRaDriver::sendRawPacket(const uint8_t *data, size_t len)
+    bool LoRaDriver::sendRawPacket(const uint8_t &data, size_t len)
     {
-        if (len > A3MESH_MAX_PACKET_SIZE)
+        if (len > LORA_MAX_PACKET_SIZE)
             return false;
 
         LoRa.idle();
 
         LoRa.beginPacket();
-        size_t bytesWritten = LoRa.write(data, len);
+        size_t bytesWritten = LoRa.write(&data, len);
         LoRa.endPacket(true);
+        Serial.printf("[LORA] Sent packet with %d bytes\n", bytesWritten);
 
         LoRa.receive();
 

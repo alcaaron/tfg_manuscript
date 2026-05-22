@@ -6,12 +6,12 @@ namespace lib::ble
     void ServerCallbacks::onConnect(BLEServer *pServer)
     {
         Serial.println("[BLE] Device Connected!");
-        driver->deviceConnected = true;
+        driver->_deviceConnected = true;
     }
 
     void ServerCallbacks::onDisconnect(BLEServer *pServer)
     {
-        driver->deviceConnected = false;
+        driver->_deviceConnected = false;
         pServer->startAdvertising();
     }
 
@@ -26,7 +26,7 @@ namespace lib::ble
 
             if (rxBLEQueue != nullptr)
             {
-                Serial.printf("[BLE] RX: %s\n", buffer);
+                Serial.printf("[BLE] RX: %s", buffer);
                 xQueueSend(rxBLEQueue, buffer, 0);
             }
         }
@@ -34,6 +34,7 @@ namespace lib::ble
 
     BLEDriver::BLEDriver()
     {
+        _deviceConnected = false;
     }
 
     bool BLEDriver::setup()
@@ -48,10 +49,10 @@ namespace lib::ble
         BLEService *pService = pServer->createService(SERVICE_UUID);
 
         // TX (notify > móvil)
-        txCharacteristic = pService->createCharacteristic(
+        _txCharacteristic = pService->createCharacteristic(
             CHARACTERISTIC_TX,
             BLECharacteristic::PROPERTY_NOTIFY);
-        txCharacteristic->addDescriptor(new BLE2902());
+        _txCharacteristic->addDescriptor(new BLE2902());
 
         // RX (write > desde móvil)
         BLECharacteristic *rxCharacteristic = pService->createCharacteristic(
@@ -75,7 +76,7 @@ namespace lib::ble
 
     bool BLEDriver::isConnected()
     {
-        return deviceConnected;
+        return _deviceConnected;
     }
 
     void BLEDriver::shutdown()
@@ -85,11 +86,11 @@ namespace lib::ble
 
     bool BLEDriver::send(const char *txBuffer)
     {
-        if (!deviceConnected || txCharacteristic == nullptr)
+        if (!_deviceConnected || _txCharacteristic == nullptr)
             return false;
 
-        txCharacteristic->setValue((uint8_t *)txBuffer, strlen(txBuffer));
-        txCharacteristic->notify();
+        _txCharacteristic->setValue((uint8_t *)txBuffer, strlen(txBuffer));
+        _txCharacteristic->notify();
 
         return true;
     }

@@ -10,13 +10,8 @@ void BLEtxTask(void *pvParameters)
     {
         if (xQueueReceive(txBLEQueue, &txBuffer, portMAX_DELAY) == pdTRUE)
         {
-            if (!ble.isConnected() || ble.getTxCharacteristic() == nullptr)
-            {
-                continue;
-            }
-            
             ble.send(txBuffer);
-            Serial.printf("[BLE] TX: %s\n", txBuffer);
+            Serial.printf("[BLE] TX: %s", txBuffer);
         }
     }
 }
@@ -25,14 +20,7 @@ void lifeBitTask(void *pvParameters)
 {
     for (;;)
     {
-        if (!ble.isConnected() || ble.getTxCharacteristic() == nullptr)
-        {
-            continue;
-        }
-            const char *msg = "alive\r\n";
-            ble.getTxCharacteristic()->setValue((uint8_t *)msg, strlen(msg));
-            ble.getTxCharacteristic()->notify();
-
+        ble.send("alive\r\n");
         vTaskDelay(pdMS_TO_TICKS(BLE_LIFE_BIT_INTERVAL_MS));
     }
 }
