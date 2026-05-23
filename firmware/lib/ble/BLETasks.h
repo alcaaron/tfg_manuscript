@@ -1,6 +1,6 @@
 #pragma once
-#include "BLEDriver.h"
+#include "BLEDriver.hh"
 #include "BLEQueues.h"
 
-void BLEtxTask(void *pvParameters);
-void lifeBitTask(void *pvParameters);
+void vBLETxTask(void *pvParameters);
+void vBLELifeBitTask(void *pvParameters);

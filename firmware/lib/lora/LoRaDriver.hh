@@ -15,13 +15,13 @@ namespace lib::lora
         uint8_t rx_data[LORA_MAX_PACKET_SIZE];
         size_t len;
         int16_t rssi;
-    } RxMessage_t;
+    } rx_LoRa_msg_t;
 
     typedef struct
     {
         uint8_t tx_data[LORA_MAX_PACKET_SIZE];
         size_t len;
-    } TxMessage_t;
+    } tx_LoRa_msg_t;
 
     class LoRaDriver
     {
@@ -29,6 +29,6 @@ namespace lib::lora
         LoRaDriver();
 
         bool begin(const lora::A3MESHConfig &config);
-        bool sendRawPacket(const uint8_t &data, size_t len);
+        bool send_raw_pkt(const uint8_t &data, size_t len);
     };
 } // namespace lib::lora

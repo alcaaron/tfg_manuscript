@@ -1,6 +1,6 @@
 #pragma once
-#include "LoRaDriver.h"
+#include "LoRaDriver.hh"
 #include "LoRaQueues.h"
 
-void rxLoRaPacketTask(void *pvParameters);
-void txLoRaPacketTask(void *pvParameters);
+void vLoRaRxTask(void *pvParameters);
+void vLoRaTxTask(void *pvParameters);

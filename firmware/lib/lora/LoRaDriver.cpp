@@ -1,4 +1,4 @@
-#include "LoRaDriver.h"
+#include "LoRaDriver.hh"
 
 namespace lib::lora
 {
@@ -31,7 +31,7 @@ namespace lib::lora
         return true;
     }
 
-    bool LoRaDriver::sendRawPacket(const uint8_t &data, size_t len)
+    bool LoRaDriver::send_raw_pkt(const uint8_t &data, size_t len)
     {
         if (len > LORA_MAX_PACKET_SIZE)
             return false;

@@ -1,12 +1,17 @@
+// ================
+// === INCLUDES ===
+// ================
+
 #include <Arduino.h>
-#include "A3MESHManager.h"
+#include "A3MESHManager.hh"
 #include "LoRaTasks.h"
 #include "BLETasks.h"
 #include "A3MESHManagerTasks.h"
 
-#define STR_HELPER(x) #x
-#define STR(x) STR_HELPER(x)
-#define BLE_MSG_STARTS_WITH(str, prefix) (strncmp(str, prefix, strlen(prefix)) == 0)
+
+// ======================
+// === Global Objects ===
+// ======================
 
 lib::ble::BLEDriver ble;
 lib::lora::LoRaDriver lora;
@@ -17,39 +22,39 @@ lib::mesh::A3MESHManager a3mesh;
 // === Task Handles =====
 // ======================
 
-TaskHandle_t txBLETaskHandle;
-TaskHandle_t rxLoRaTaskHandle;
-TaskHandle_t txLoRaTaskHandle;
+// TaskHandle_t tx_BLE_task_handle;
+// TaskHandle_t rx_LoRa_task_handle;
+// TaskHandle_t tx_LoRa_task_handle;
 
 
 // ======================
 // ====== Queues ========
 // ======================
 
-QueueHandle_t rxBLEQueue;
-QueueHandle_t txBLEQueue;
+QueueHandle_t xBLERxQueue;
+QueueHandle_t xBLETxQueue;
 
-QueueHandle_t rxLoRaQueue;
-QueueHandle_t txLoRaQueue;
+QueueHandle_t xLoRaRxQueue;
+QueueHandle_t xLoRaTxQueue;
 
 
 // ===============================
 // ===== BLE Tasks & Queues ======
 // ===============================
 
-bool initBLEQueues()
+bool init_BLE_queues()
 {
-  rxBLEQueue = xQueueCreate(10, sizeof(char[BLE_BUFFER_SIZE]));
-  txBLEQueue = xQueueCreate(10, sizeof(char[BLE_BUFFER_SIZE]));
+  xBLETxQueue = xQueueCreate(10, sizeof(char[BLE_BUFFER_SIZE]));
+  xBLERxQueue = xQueueCreate(10, sizeof(char[BLE_BUFFER_SIZE]));
 
-  return rxBLEQueue != NULL && txBLEQueue != NULL;
+  return xBLERxQueue != NULL && xBLETxQueue != NULL;
 }
 
-bool startBLETasks()
+bool start_BLE_tasks()
 {
-  if (xTaskCreatePinnedToCore(BLEtxTask, "BLE TX Task", 4096, NULL, 1, &txBLETaskHandle, 1) != pdPASS) return false;
+  if (xTaskCreatePinnedToCore(vBLETxTask, "BLE TX Task", 4096, NULL, 1, NULL, 1) != pdPASS) return false;
 
-  if (xTaskCreatePinnedToCore(lifeBitTask, "BLE Life Bit Task", 4096, NULL, 1, NULL, 1) != pdPASS) return false;
+  if (xTaskCreatePinnedToCore(vBLELifeBitTask, "BLE Life Bit Task", 4096, NULL, 1, NULL, 1) != pdPASS) return false;
 
   return true;
 }
@@ -61,17 +66,17 @@ bool startBLETasks()
 
 bool initLoRaQueues()
 {
-  rxLoRaQueue = xQueueCreate(10, sizeof(lib::lora::RxMessage_t));
-  txLoRaQueue = xQueueCreate(10, sizeof(lib::lora::TxMessage_t));
+  xLoRaRxQueue = xQueueCreate(10, sizeof(lib::lora::rx_LoRa_msg_t));
+  xLoRaTxQueue = xQueueCreate(10, sizeof(lib::lora::tx_LoRa_msg_t));
 
-  return rxLoRaQueue != NULL && txLoRaQueue != NULL;
+  return xLoRaRxQueue != NULL && xLoRaTxQueue != NULL;
 }
 
 bool startLoRaTasks()
 {
-  if(xTaskCreatePinnedToCore(rxLoRaPacketTask, "LoRa RX", 4096, NULL, 1, &rxLoRaTaskHandle, 0) != pdPASS) return false;
+  if(xTaskCreatePinnedToCore(vLoRaRxTask, "LoRa RX", 4096, NULL, 1, NULL, 0) != pdPASS) return false;
 
-  if(xTaskCreatePinnedToCore(txLoRaPacketTask, "LoRa TX", 4096, NULL, 1, &txLoRaTaskHandle, 0) != pdPASS) return false;
+  if(xTaskCreatePinnedToCore(vLoRaTxTask, "LoRa TX", 4096, NULL, 1, NULL, 0) != pdPASS) return false;
 
   return true;
 }
@@ -83,104 +88,122 @@ bool startLoRaTasks()
 
 enum class MeshRxState
 {
-  RX_IDLE,
+  k_rx_idle,
 
-  RX_VALIDATE,
-  RX_CLASSIFY,
+  k_rx_validate,
+  k_rx_classify,
 
-  RX_PROCESS_DISCOVERY,
-  RX_PROCESS_DATA,
+  k_rx_process_discovery,
+  k_rx_process_data,
 
-  RX_LOCAL_DELIVERY,
-  RX_FORWARD,
+  k_rx_local_delivery,
+  k_rx_forward,
 
-  RX_DROP,
-  RX_DONE
+  k_rx_drop,
+  k_rx_done
 };
 
-struct MeshRxContext
+struct a3mesh_rx_ctx_t
 {
-  lib::lora::RxMessage_t rxMsg;
+  lib::lora::rx_LoRa_msg_t rx_msg;
 
-  lib::packet::A3MESHHeader_t header;
-  lib::packet::A3MESHPacket_t pkt;
+  lib::packet::A3MESH_header_t header;
+  lib::packet::A3MESH_packet_t pkt;
 
-  bool shouldForward;
-  bool isForMe;
+  bool should_forward;
+  bool is_for_me;
 };
 
-MeshRxState handleValidate(MeshRxContext &ctx)
+MeshRxState handleValidate(a3mesh_rx_ctx_t &ctx)
 {
-  bool ok = lib::packet::A3MESHPacket::deserializePacket(
-      ctx.rxMsg.rx_data,
-      ctx.rxMsg.len,
+  bool ok = lib::packet::A3MESHPacket::deserialize_pkt(
+      ctx.rx_msg.rx_data,
+      ctx.rx_msg.len,
       ctx.header,
       ctx.pkt);
 
   if (!ok)
-    return MeshRxState::RX_DROP;
+    return MeshRxState::k_rx_drop;
 
-  if (ctx.pkt.src == a3mesh.getNodeID())
-    return MeshRxState::RX_DROP;
+  Serial.print("[A3MESH] ReceivedHeader:");
+  Serial.printf("[A3MESH] version: %u, type: %u, packet_length: %u\r\n",
+      ctx.header.version,
+      ctx.header.type,
+      ctx.header.packet_length);
 
-  if (ctx.pkt.node_id == a3mesh.getNodeID())
-    return MeshRxState::RX_DROP;
+  Serial.print("[A3MESH] Received packet:");
+  Serial.printf("[A3MESH] pkt_id: %u, src: %hx, node_id: %hx, dst: %hx, ttl: %u, type: %u, flags: %u, payload_len: %u\r\n",
+      ctx.pkt.pkt_id,
+      ctx.pkt.src,
+      ctx.pkt.node_id,
+      ctx.pkt.dst,
+      ctx.pkt.ttl,
+      ctx.pkt.type,
+      ctx.pkt.flags,
+      ctx.pkt.payload_len);
+
+  if (ctx.pkt.src == a3mesh.get_node_id())
+    return MeshRxState::k_rx_drop;
+
+  if (ctx.pkt.node_id == a3mesh.get_node_id())
+    return MeshRxState::k_rx_drop;
 
   if (ctx.pkt.ttl == 0)
-    return MeshRxState::RX_DROP;
+    return MeshRxState::k_rx_drop;
 
-  if (a3mesh.isDuplicate(ctx.pkt))
-    return MeshRxState::RX_DROP;
+  if (a3mesh.is_duplicate(ctx.pkt))
+    return MeshRxState::k_rx_drop;
 
-  return MeshRxState::RX_CLASSIFY;
+  Serial.println("[A3MESH] Packet validated successfully");
+  return MeshRxState::k_rx_classify;
 }
 
-MeshRxState handleClassify(MeshRxContext &ctx)
+MeshRxState handleClassify(a3mesh_rx_ctx_t &ctx)
 {
   switch (ctx.header.type)
   {
-  case lib::packet::MSG_TYPE_DISCOVERY:
-    return MeshRxState::RX_PROCESS_DISCOVERY;
+  case lib::packet::k_discovery_type:
+    return MeshRxState::k_rx_process_discovery;
 
-  case lib::packet::MSG_TYPE_DATA:
-    return MeshRxState::RX_PROCESS_DATA;
+  case lib::packet::k_data_type:
+    return MeshRxState::k_rx_process_data;
 
   default:
-    return MeshRxState::RX_DROP;
+    return MeshRxState::k_rx_drop;
   }
 }
 
-MeshRxState handleDiscovery(MeshRxContext &ctx)
+MeshRxState handleDiscovery(a3mesh_rx_ctx_t &ctx)
 {
   lib::mesh::Neighbor neighbor;
 
-  neighbor.nodeID = ctx.pkt.src;
-  neighbor.rssi = ctx.rxMsg.rssi;
-  neighbor.lastSeen = millis();
+  neighbor.node_id = ctx.pkt.src;
+  neighbor.rssi = ctx.rx_msg.rssi;
+  neighbor.last_seen = millis();
 
-  a3mesh.updateNeighbor(neighbor);
+  a3mesh.update_neighbor(neighbor);
 
-  return MeshRxState::RX_DONE;
+  return MeshRxState::k_rx_done;
 }
 
-MeshRxState handleData(MeshRxContext &ctx)
+MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
 {
-  ctx.isForMe =
-      (ctx.pkt.dst == a3mesh.getNodeID()) ||
+  ctx.is_for_me =
+      (ctx.pkt.dst == a3mesh.get_node_id()) ||
       (ctx.pkt.dst == 0xFFFF);
 
-  if (ctx.isForMe)
-    return MeshRxState::RX_LOCAL_DELIVERY;
+  if (ctx.is_for_me)
+    return MeshRxState::k_rx_local_delivery;
 
-  ctx.shouldForward = a3mesh.shouldForward(ctx.pkt);
+  ctx.should_forward = a3mesh.should_forward(ctx.pkt);
 
-  if (ctx.shouldForward)
-    return MeshRxState::RX_FORWARD;
+  if (ctx.should_forward)
+    return MeshRxState::k_rx_forward;
 
-  return MeshRxState::RX_DROP;
+  return MeshRxState::k_rx_drop;
 }
 
-MeshRxState handleLocalDelivery(MeshRxContext &ctx)
+MeshRxState handleLocalDelivery(a3mesh_rx_ctx_t &ctx)
 {
   char bleBuffer[BLE_BUFFER_SIZE] = {0};
 
@@ -193,77 +216,77 @@ MeshRxState handleLocalDelivery(MeshRxContext &ctx)
       ctx.pkt.payload);
 
   if (len <= 0)
-    return MeshRxState::RX_DROP;
+    return MeshRxState::k_rx_drop;
 
-  xQueueSend(txBLEQueue, bleBuffer, 0);
+  xQueueSend(xBLETxQueue, bleBuffer, 0);
 
-  return MeshRxState::RX_DONE;
+  return MeshRxState::k_rx_done;
 }
 
-MeshRxState handleForward(MeshRxContext &ctx)
+MeshRxState handleForward(a3mesh_rx_ctx_t &ctx)
 {
-  lib::lora::TxMessage_t txMsg;
+  lib::lora::tx_LoRa_msg_t tx_msg;
 
-  ctx.pkt.pkt_id = a3mesh.getNextMsgID();
-  ctx.pkt.node_id = a3mesh.getNodeID();
-  ctx.pkt.neighbor_id = (a3mesh.IsNeighbor(ctx.pkt.dst)) ? ctx.pkt.dst : a3mesh.GetBestNeighborID();
+  ctx.pkt.pkt_id = a3mesh.get_next_pkt_id();
+  ctx.pkt.node_id = a3mesh.get_node_id();
   ctx.pkt.ttl--;
+  ctx.pkt.flags = (a3mesh.is_neighbor(ctx.pkt.dst));
 
-  txMsg.len = lib::packet::A3MESHPacket::serializeLoRaMessage(ctx.header, ctx.pkt, txMsg.tx_data);
+  tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(ctx.header, ctx.pkt, tx_msg.tx_data);
 
   vTaskDelay(pdMS_TO_TICKS(rand() % 250));
 
-  xQueueSend(txLoRaQueue, &txMsg, 0);
+  xQueueSend(xLoRaTxQueue, &tx_msg, 0);
 
-  return MeshRxState::RX_DONE;
+  return MeshRxState::k_rx_done;
 }
 
 void LoRa2BLETask(void *pvParameters)
 {
-  MeshRxContext ctx;
+  a3mesh_rx_ctx_t ctx;
 
   for (;;)
   {
-    if (xQueueReceive(rxLoRaQueue, &ctx.rxMsg, portMAX_DELAY) != pdTRUE)
+    if (xQueueReceive(xLoRaRxQueue, &ctx.rx_msg, portMAX_DELAY) != pdTRUE)
       continue;
 
-    MeshRxState state = MeshRxState::RX_VALIDATE;
+    MeshRxState state = MeshRxState::k_rx_validate;
 
-    while (state != MeshRxState::RX_DONE)
+    while (state != MeshRxState::k_rx_done)
     {
       switch (state)
       {
 
-      case MeshRxState::RX_VALIDATE:
+      case MeshRxState::k_rx_validate:
         state = handleValidate(ctx);
         break;
 
-      case MeshRxState::RX_CLASSIFY:
+      case MeshRxState::k_rx_classify:
         state = handleClassify(ctx);
         break;
 
-      case MeshRxState::RX_PROCESS_DISCOVERY:
+      case MeshRxState::k_rx_process_discovery:
         state = handleDiscovery(ctx);
         break;
 
-      case MeshRxState::RX_PROCESS_DATA:
+      case MeshRxState::k_rx_process_data:
         state = handleData(ctx);
         break;
 
-      case MeshRxState::RX_LOCAL_DELIVERY:
+      case MeshRxState::k_rx_local_delivery:
         state = handleLocalDelivery(ctx);
         break;
 
-      case MeshRxState::RX_FORWARD:
+      case MeshRxState::k_rx_forward:
         state = handleForward(ctx);
         break;
 
-      case MeshRxState::RX_DROP:
-        state = MeshRxState::RX_DONE;
+      case MeshRxState::k_rx_drop:
+        state = MeshRxState::k_rx_done;
         break;
 
       default:
-        state = MeshRxState::RX_DONE;
+        state = MeshRxState::k_rx_done;
         break;
       }
     }
@@ -272,23 +295,28 @@ void LoRa2BLETask(void *pvParameters)
 
 void BLE2LoRaTask(void *pvParameters)
 {
-  char rxBuffer[BLE_BUFFER_SIZE] = {0};
+  char rx_buffer[BLE_BUFFER_SIZE] = {0};
 
   for (;;)
   {
-    if (xQueueReceive(rxBLEQueue, &rxBuffer, portMAX_DELAY) == pdTRUE)
+    if (xQueueReceive(xBLERxQueue, &rx_buffer, portMAX_DELAY) == pdTRUE)
     {
-      if (!BLE_MSG_STARTS_WITH(rxBuffer, "AT"))
+      if (!BLE_MSG_STARTS_WITH(rx_buffer, "AT"))
       {
-        xQueueSend(txBLEQueue, "+ERR=1\r\n", 0);
+        xQueueSend(xBLETxQueue, "+ERR=1\r\n", 0);
         continue;
       }
-      if (strcmp(rxBuffer, "AT\r\n") == 0)
+
+
+      if (strcmp(rx_buffer, "AT\r\n") == 0)
       {
-        xQueueSend(txBLEQueue, "+OK\r\n", 0);
+        /*
+          Expected send format: AT\r\n
+        */
+        xQueueSend(xBLETxQueue, "+OK\r\n", 0);
         continue;
       }
-      else if (BLE_MSG_STARTS_WITH(rxBuffer, "AT+SEND="))
+      else if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SEND="))
       {
         /*
           Expected send format: AT+SEND=<dst>,<payload>\r\n
@@ -296,92 +324,116 @@ void BLE2LoRaTask(void *pvParameters)
         uint16_t dst = 0;
         char msg[A3MESH_MAX_PAYLOAD+1] = {0};
 
-        if (sscanf(rxBuffer + 8, 
+        if (sscanf(rx_buffer + 8, 
                     "%hx,%" STR(A3MESH_MAX_PAYLOAD) "[^\r\n]", 
                     &dst, 
                     msg) != 2)
         {
-          xQueueSend(txBLEQueue, "+ERR=3\r\n", 0);
+          xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
           continue;
         }
 
-        lib::packet::A3MESHHeader_t header = {
+        lib::packet::A3MESH_header_t header = {
             .version = A3M_VERSION,
-            .type = lib::packet::MessageType::MSG_TYPE_DATA,
+            .type = lib::packet::a3mesh_msg_type_t::k_data_type,
+            .packet_length = 0 // Will be set in serializeLoRaMessage
         };
 
-        lib::packet::A3MESHPacket_t pkt = {
-            .pkt_id = a3mesh.getNextMsgID(),
-            .node_id = a3mesh.getNodeID(),
-            .src = a3mesh.getNodeID(),
+        lib::packet::A3MESH_packet_t pkt = {
+            .pkt_id = a3mesh.get_next_pkt_id(),
+            .src = a3mesh.get_node_id(),
+            .node_id = a3mesh.get_node_id(),
             .dst = dst,
-            .neighbor_id = (a3mesh.IsNeighbor(dst)) ? dst : a3mesh.GetBestNeighborID(),
             .ttl = MAX_TTL,
-            .flags = 0x00,
+            .type = 0, // provisional field
+            .flags = (a3mesh.is_neighbor(dst)),
             .payload_len = (uint8_t)strlen(msg)
         };
 
         memcpy(pkt.payload, msg, pkt.payload_len);
 
-        lib::lora::TxMessage_t txMsg;
+        lib::lora::tx_LoRa_msg_t tx_msg;
 
-        txMsg.len = lib::packet::A3MESHPacket::serializeLoRaMessage(
+        tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(
             header,
             pkt,
-            txMsg.tx_data);
+            tx_msg.tx_data);
 
-        if (xQueueSend(txLoRaQueue, &txMsg, 0) == pdTRUE)
+        if (xQueueSend(xLoRaTxQueue, &tx_msg, 0) == pdTRUE)
         {
-          xQueueSend(txBLEQueue, "+OK\r\n", 0);
+          xQueueSend(xBLETxQueue, "+OK\r\n", 0);
         }
         else
         {
-          xQueueSend(txBLEQueue, "+ERR=4\r\n", 0);
+          xQueueSend(xBLETxQueue, "+ERR=4\r\n", 0);
         }
+      }
+      // else if (strcmp(rx_buffer, "AT+NEIGHBORS?\r\n") == 0)
+      // {
+      //   uint8_t neighbor_count = a3mesh.get_neighbor_count();
+      //   char response[BLE_BUFFER_SIZE] = {0};
+
+      //   int offset = snprintf(response, sizeof(response), "+NEIGHBORS=%d", neighbor_count);
+
+      //   for (uint8_t i = 0; i < neighbor_count && offset < sizeof(response); i++)
+      //   {
+      //     uint16_t neighbor_id = a3mesh.get_best_neighbor_id(); // This is just an example. You might want to implement a method to get all neighbors.
+      //     offset += snprintf(response + offset, sizeof(response) - offset, ",%hx", neighbor_id);
+      //   }
+
+      //   offset += snprintf(response + offset, sizeof(response) - offset, "\r\n");
+
+      //   xQueueSend(xBLETxQueue, response, 0);
+      // }
+      else if (strcmp(rx_buffer, "AT+NODEID?\r\n") == 0)
+      {
+        char response[BLE_BUFFER_SIZE] = {0};
+        snprintf(response, sizeof(response), "+NODEID=%hx\r\n", a3mesh.get_node_id());
+        xQueueSend(xBLETxQueue, response, 0);
       }
       else
       {
-        xQueueSend(txBLEQueue, "+ERR=2\r\n", 0);
+        xQueueSend(xBLETxQueue, "+ERR=2\r\n", 0);
       }
     }
   }
 }
 
-void sendDiscoveryTask(void *pvParameters)
+void vSendDiscoveryTask(void *pvParameters)
 {
   // Create discovery packet msg
-  lib::packet::A3MESHHeader_t header = {
+  lib::packet::A3MESH_header_t header = {
       .version = A3M_VERSION,
-      .type = lib::packet::MessageType::MSG_TYPE_DISCOVERY,
+      .type = lib::packet::a3mesh_msg_type_t::k_discovery_type,
   };
 
-  lib::packet::A3MESHPacket_t pkt = {
-      .pkt_id = a3mesh.getNextMsgID(),
-      .node_id = a3mesh.getNodeID(),
-      .src = a3mesh.getNodeID(),
+  lib::packet::A3MESH_packet_t pkt = {
+      .pkt_id = a3mesh.get_next_pkt_id(),
+      .src = a3mesh.get_node_id(),
+      .node_id = a3mesh.get_node_id(),
       .dst = 0xFFFF,
-      .neighbor_id = 0xFFFF,
       .ttl = 0x01,
+      .type = 0, // provisional field
       .flags = 0x00,
       .payload_len = 4
   };
 
   memcpy(pkt.payload, "DISC", pkt.payload_len);
   
-  lib::lora::TxMessage_t discoveryMsg;
-  discoveryMsg.len = lib::packet::A3MESHPacket::serializeLoRaMessage(
+  lib::lora::tx_LoRa_msg_t discovery_msg;
+  discovery_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(
       header,
       pkt,
-      discoveryMsg.tx_data);
+      discovery_msg.tx_data);
   for (;;)
   {
-    xQueueSend(txLoRaQueue, &discoveryMsg, 0);
+    xQueueSend(xLoRaTxQueue, &discovery_msg, 0);
     vTaskDelay(pdMS_TO_TICKS(30000) + (pdMS_TO_TICKS(rand() % 30000)));
   }
   vTaskDelete(NULL);
 }
 
-bool setupA3MESH()
+bool setup_A3MESH()
 {
   // --------- Init SPI ---------
   SPI.begin(SCK_GPIO, MISO_GPIO, MOSI_GPIO, NSS_GPIO);
@@ -402,10 +454,10 @@ bool setupA3MESH()
   if (!ble.setup()) return false;
   Serial.println("[BLE] init success!");
 
-  if (!initBLEQueues()) return false;
+  if (!init_BLE_queues()) return false;
   Serial.println("[BLE] queues initialized!");
 
-  if (!startBLETasks()) return false;
+  if (!start_BLE_tasks()) return false;
   Serial.println("[BLE] tasks started!");
 
 
@@ -418,7 +470,7 @@ bool setupA3MESH()
 
 
   // --------- Init A3MESH Manager ---------
-  if (xTaskCreatePinnedToCore(sendDiscoveryTask, "DiscoveryTask", 4096, NULL, 1, NULL, 0) != pdPASS) return false;
+  if (xTaskCreatePinnedToCore(vSendDiscoveryTask, "DiscoveryTask", 4096, NULL, 1, NULL, 0) != pdPASS) return false;
   Serial.println("[MESH] Discovery Task Initialized!");
 
   if (xTaskCreatePinnedToCore(vNeighborCheckTask, "NeighborCheckTask", 4096, NULL, 1, NULL, 0) != pdPASS) return false;
@@ -453,7 +505,7 @@ void setup()
     break;
   }
 
-  if (!setupA3MESH())
+  if (!setup_A3MESH())
   {
     Serial.println("[SYS] Setup failed");
     while (1)

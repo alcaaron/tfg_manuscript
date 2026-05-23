@@ -1,4 +1,4 @@
-#include "A3MESHManager.h"
+#include "A3MESHManager.hh"
 #include <freertos/queue.h>
 #include <freertos/task.h>
 
@@ -14,17 +14,17 @@ namespace lib::mesh
             while (1)
                 ;
         }
-        _node_id = generateNodeID();
+        _node_id = generate_node_id();
         Serial.printf("Node ID: %u\n", _node_id);
-        _routing_protocol = 0;
+        _routing_protocol = 1;
     }
 
-    uint16_t A3MESHManager::getNodeID()
+    uint16_t A3MESHManager::get_node_id()
     {
         return _node_id;
     }
 
-    uint16_t A3MESHManager::getNextMsgID()
+    uint16_t A3MESHManager::get_next_pkt_id()
     {
 
         uint16_t id;
@@ -36,7 +36,7 @@ namespace lib::mesh
         return id;
     }
 
-    bool A3MESHManager::isDuplicate(const lib::packet::A3MESHPacket_t &pkt)
+    bool A3MESHManager::is_duplicate(const lib::packet::A3MESH_packet_t &pkt)
     {
         uint32_t now = millis();
 
@@ -44,77 +44,77 @@ namespace lib::mesh
 
         for (int i = 0; i < DUP_CACHE_SIZE; i++) {
 
-            if (seenCache[i].msgID == pkt.pkt_id &&
-                seenCache[i].src == pkt.src &&
-                (now - seenCache[i].timestamp < DUP_TIMEOUT)) {
+            if (seen_cache[i].msg_id == pkt.pkt_id &&
+                seen_cache[i].src == pkt.src &&
+                (now - seen_cache[i].timestamp < DUP_TIMEOUT)) {
 
                 xSemaphoreGive(_mutex);
                 return true;
             }
         }
 
-        seenCache[seenIndex].msgID = pkt.pkt_id;
-        seenCache[seenIndex].src = pkt.src;
-        seenCache[seenIndex].timestamp = now;
+        seen_cache[seen_index].msg_id = pkt.pkt_id;
+        seen_cache[seen_index].src = pkt.src;
+        seen_cache[seen_index].timestamp = now;
 
-        seenIndex = (seenIndex + 1) % DUP_CACHE_SIZE;
+        seen_index = (seen_index + 1) % DUP_CACHE_SIZE;
 
         xSemaphoreGive(_mutex);
 
         return false;
     }
 
-    void A3MESHManager::updateNeighbor(const Neighbor &neighbor)
+    void A3MESHManager::update_neighbor(const Neighbor &neighbor)
     {
-        Serial.printf("[NEIGHBOR] Node ID: %u, RSSI: %d\n", neighbor.nodeID, neighbor.rssi);
+        //Serial.printf("[NEIGHBOR] Node ID: %hx, RSSI: %d\n", neighbor.node_id, neighbor.rssi);
 
         TickType_t now = millis();
 
         xSemaphoreTake(_mutex, portMAX_DELAY);
 
-        for (uint8_t i = 0; i < neighborCount; i++)
+        for (uint8_t i = 0; i < neighbor_count; i++)
         {
 
-            if (neighbors[i].nodeID == neighbor.nodeID)
+            if (neighbors[i].node_id == neighbor.node_id)
             {
-                Serial.printf("[NEIGHBOR] Updating node %u\n", neighbor.nodeID);
+                //Serial.printf("[NEIGHBOR] Updating node %hx\n", neighbor.node_id);
                 neighbors[i].rssi = neighbor.rssi;
-                neighbors[i].lastSeen = neighbor.lastSeen;
+                neighbors[i].last_seen = neighbor.last_seen;
                 xSemaphoreGive(_mutex);
                 return;
             }
         }
 
-        if (neighborCount < MAX_NEIGHBORS)
+        if (neighbor_count < MAX_NEIGHBORS)
         {
-            Serial.printf("[NEIGHBOR] Adding node %u\n", neighbor.nodeID);
-            neighbors[neighborCount++] = neighbor;
+            Serial.printf("[NEIGHBOR] Adding node %hx\n", neighbor.node_id);
+            neighbors[neighbor_count++] = neighbor;
         }
 
-        Serial.printf("[NEIGHBOR] Total neighbors: %d\n", neighborCount);
+        Serial.printf("[NEIGHBOR] Total neighbors: %d\n", neighbor_count);
         xSemaphoreGive(_mutex);
     }
 
-    void A3MESHManager::removeTimedOutNeighbors()
+    void A3MESHManager::rm_tout_neigbhors()
     {
         TickType_t now = millis();
 
         xSemaphoreTake(_mutex, portMAX_DELAY);
 
-        for (uint8_t i = 0; i < neighborCount; i++)
+        for (uint8_t i = 0; i < neighbor_count; i++)
         {
-            if (now - neighbors[i].lastSeen > NODE_TIMEOUT)
+            if (now - neighbors[i].last_seen > NODE_TIMEOUT)
             {
                 Serial.printf(
-                    "[NEIGHBOR] Removing node %u due to timeout\n",
-                    neighbors[i].nodeID);
+                    "[NEIGHBOR] Removing node %hx due to timeout\n",
+                    neighbors[i].node_id);
 
-                for (uint8_t j = i; j < neighborCount - 1; j++)
+                for (uint8_t j = i; j < neighbor_count - 1; j++)
                 {
                     neighbors[j] = neighbors[j + 1];
                 }
 
-                neighborCount--;
+                neighbor_count--;
                 i--;
             }
         }
@@ -122,26 +122,26 @@ namespace lib::mesh
         xSemaphoreGive(_mutex);
     }
 
-    uint8_t A3MESHManager::getNeighborCount()
+    uint8_t A3MESHManager::get_neighbor_count()
     {
 
         uint8_t count;
 
         xSemaphoreTake(_mutex, portMAX_DELAY);
-        count = neighborCount;
+        count = neighbor_count;
         xSemaphoreGive(_mutex);
 
         return count;
     }
 
-    uint32_t A3MESHManager::generateNodeID()
+    uint32_t A3MESHManager::generate_node_id()
     {
 
         uint64_t mac = ESP.getEfuseMac();
         return (uint32_t)((mac >> 16) ^ mac);
     }
 
-    uint16_t A3MESHManager::GetBestNeighborID()
+    uint16_t A3MESHManager::get_best_neighbor_id()
     {
         uint16_t best_id = 0xFFFF;
         int16_t best_rssi = -127;
@@ -150,7 +150,7 @@ namespace lib::mesh
 
         xSemaphoreTake(_mutex, portMAX_DELAY);
 
-        if (neighborCount == 0)
+        if (neighbor_count == 0)
         {
             Serial.println("[MESH] No neighbors available, using broadcast address");
             xSemaphoreGive(_mutex);
@@ -158,39 +158,39 @@ namespace lib::mesh
         }
         else
         {
-            best_id = neighbors[0].nodeID;
+            best_id = neighbors[0].node_id;
             best_rssi = neighbors[0].rssi;
         }
 
-        for (uint8_t i = 0; i < neighborCount; i++)
+        for (uint8_t i = 0; i < neighbor_count; i++)
         {
             if (neighbors[i].rssi > best_rssi)
             {
                 best_rssi = neighbors[i].rssi;
-                best_id = neighbors[i].nodeID;
+                best_id = neighbors[i].node_id;
             }
         }
 
         xSemaphoreGive(_mutex);
 
-        Serial.printf("[MESH] Best neighbor selected: %u with RSSI %d\n", best_id, best_rssi);
+        Serial.printf("[MESH] Best neighbor selected: %hx with RSSI %d\n", best_id, best_rssi);
         return best_id;
     }
 
-    bool A3MESHManager::IsNeighbor(uint16_t nodeID)
+    bool A3MESHManager::is_neighbor(uint16_t node_id)
     {
         xSemaphoreTake(_mutex, portMAX_DELAY);
 
-        if (neighborCount == 0)
+        if (neighbor_count == 0)
         {
             Serial.println("[MESH] No neighbors available");
             xSemaphoreGive(_mutex);
             return false; // No neighbors, return false
         }
 
-        for (uint8_t i = 0; i < neighborCount; i++)
+        for (uint8_t i = 0; i < neighbor_count; i++)
         {
-            if (neighbors[i].nodeID == nodeID)
+            if (neighbors[i].node_id == node_id)
             {
                 xSemaphoreGive(_mutex);
                 return true; // Neighbor found, return true
@@ -202,16 +202,16 @@ namespace lib::mesh
         return false; // Neighbor not found, return false
     }
 
-    bool A3MESHManager::shouldForward(const lib::packet::A3MESHPacket_t &pkt)
+    bool A3MESHManager::should_forward(const lib::packet::A3MESH_packet_t &pkt)
     {
         // Check TTL is greater than 0
         if (pkt.ttl == 0) return false;
 
-        // Only forward if I'm the selected neighbor or if it's a broadcast
-        if (pkt.neighbor_id != _node_id && pkt.neighbor_id != 0xFFFF) return false;
-
         // Is duplicate?
-        if (isDuplicate(pkt)) return false;
+        if (is_duplicate(pkt)) return false;
+
+        // Is a Direct message?
+        if (pkt.flags & 0x01) return false;
 
         if (_routing_protocol == 0)
         {

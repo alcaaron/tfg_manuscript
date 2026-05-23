@@ -43,7 +43,7 @@ namespace lib::ble
 
         bool setup();
 
-        bool isConnected();
+        bool is_connected();
 
         void shutdown();
 

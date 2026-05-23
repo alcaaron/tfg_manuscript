@@ -1,4 +1,4 @@
-#include "BLEDriver.h"
+#include "BLEDriver.hh"
 #include <Arduino.h>
 
 namespace lib::ble
@@ -24,10 +24,10 @@ namespace lib::ble
             char buffer[BLE_BUFFER_SIZE] = {0};
             strncpy(buffer, rxValue.c_str(), sizeof(buffer) - 1);
 
-            if (rxBLEQueue != nullptr)
+            if (xBLERxQueue != nullptr)
             {
                 Serial.printf("[BLE] RX: %s", buffer);
-                xQueueSend(rxBLEQueue, buffer, 0);
+                xQueueSend(xBLERxQueue, buffer, 0);
             }
         }
     }
@@ -74,7 +74,7 @@ namespace lib::ble
 
 
 
-    bool BLEDriver::isConnected()
+    bool BLEDriver::is_connected()
     {
         return _deviceConnected;
     }

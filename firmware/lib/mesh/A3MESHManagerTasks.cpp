@@ -11,6 +11,6 @@ void vNeighborCheckTask(void *pvParameters)
     {
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
-        a3mesh.removeTimedOutNeighbors();
+        a3mesh.rm_tout_neigbhors();
     }
 }

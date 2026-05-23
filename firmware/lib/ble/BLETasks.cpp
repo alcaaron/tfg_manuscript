@@ -2,21 +2,21 @@
 
 extern lib::ble::BLEDriver ble;
 
-void BLEtxTask(void *pvParameters)
+void vBLETxTask(void *pvParameters)
 {
-    char txBuffer[BLE_BUFFER_SIZE] = {0};
+    char tx_buffer[BLE_BUFFER_SIZE] = {0};
 
     for (;;)
     {
-        if (xQueueReceive(txBLEQueue, &txBuffer, portMAX_DELAY) == pdTRUE)
+        if (xQueueReceive(xBLETxQueue, &tx_buffer, portMAX_DELAY) == pdTRUE)
         {
-            ble.send(txBuffer);
-            Serial.printf("[BLE] TX: %s", txBuffer);
+            ble.send(tx_buffer);
+            Serial.printf("[BLE] TX: %s", tx_buffer);
         }
     }
 }
 
-void lifeBitTask(void *pvParameters)
+void vBLELifeBitTask(void *pvParameters)
 {
     for (;;)
     {

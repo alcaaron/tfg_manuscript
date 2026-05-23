@@ -2,7 +2,7 @@
 
 extern lib::lora::LoRaDriver lora;
 
-void rxLoRaPacketTask(void *pvParameters)
+void vLoRaRxTask(void *pvParameters)
 {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = POLLING_INTERVAL_MS / portTICK_PERIOD_MS;
@@ -12,33 +12,34 @@ void rxLoRaPacketTask(void *pvParameters)
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
         int packetSize = LoRa.parsePacket();
 
-        if (packetSize > sizeof(lib::packet::A3MESHHeader_t))
+        if (packetSize > sizeof(lib::packet::A3MESH_header_t))
         {
-            lib::lora::RxMessage_t msg;
+            lib::lora::rx_LoRa_msg_t msg;
             msg.len = LoRa.readBytes(msg.rx_data, sizeof(msg.rx_data));
             msg.rssi = LoRa.packetRssi();
 
-            Serial.printf("[LORA] packet received, length: %d, rssi: %d\r\n", msg.len, msg.rssi);
+            //Serial.printf("[LORA] packet received, length: %d, rssi: %d\r\n", msg.len, msg.rssi);
 
             if (msg.len <= 0 || msg.len > sizeof(msg.rx_data)) { continue; }
             
-            if (msg.len > sizeof(lib::packet::A3MESHHeader_t))
+            if (msg.len > sizeof(lib::packet::A3MESH_header_t))
             {
-                xQueueSend(rxLoRaQueue, &msg, portMAX_DELAY);
+                xQueueSend(xLoRaRxQueue, &msg, portMAX_DELAY);
             }
         }
     }
 }
 
-void txLoRaPacketTask(void *pvParameters)
+void vLoRaTxTask(void *pvParameters)
 {
-    lib::lora::TxMessage_t msg;
+    lib::lora::tx_LoRa_msg_t msg;
 
     for (;;)
     {
-        if (xQueueReceive(txLoRaQueue, &msg, portMAX_DELAY) == pdTRUE)
+        if (xQueueReceive(xLoRaTxQueue, &msg, portMAX_DELAY) == pdTRUE)
         {
-            lora.sendRawPacket(*(msg.tx_data), msg.len);
+            //Serial.printf("[LORA] Sending packet, length: %d\r\n", msg.len);
+            lora.send_raw_pkt(*(msg.tx_data), msg.len);
         }
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }

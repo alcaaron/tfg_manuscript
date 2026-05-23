@@ -1,5 +1,5 @@
 #pragma once
 #include <Arduino.h>
 
-extern QueueHandle_t rxLoRaQueue;
-extern QueueHandle_t txLoRaQueue;
+extern QueueHandle_t xLoRaRxQueue;
+extern QueueHandle_t xLoRaTxQueue;

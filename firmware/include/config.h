@@ -1,6 +1,14 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// ==============
+// === MACROS ===
+// ==============
+
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+#define BLE_MSG_STARTS_WITH(str, prefix) (strncmp(str, prefix, strlen(prefix)) == 0)
+
 // ============================
 // === GENERAL CONFIGURATION ===
 // ============================
@@ -69,7 +77,7 @@
 #define BLE_RX_QUEUE_SIZE           10
 #define BLE_TX_QUEUE_SIZE           10
 
-#define BLE_LIFE_BIT_INTERVAL_MS    60000
+#define BLE_LIFE_BIT_INTERVAL_MS   120000
 
 // ===============================
 // === A3MESH LOGIC PARAMETERS ===
@@ -78,7 +86,7 @@
 #define MAX_NEIGHBORS               10
 #define NODE_TIMEOUT                60000           // Time in ms after which a neighbor is considered lost
 #define MAX_TTL                     0x05
-#define A3MESH_MAX_PAYLOAD          239             // LORA_MAX_PACKET_SIZE - (size of header + fixed fields in packet structure)
+#define A3MESH_MAX_PAYLOAD          241             // LORA_MAX_PACKET_SIZE - (size of header + fixed fields in packet structure)
 #define DUP_CACHE_SIZE              50              // Number of recently seen packets to keep in cache for duplicate detection
 #define DUP_TIMEOUT                 30000           // Time in ms to consider a packet as duplicate
 
