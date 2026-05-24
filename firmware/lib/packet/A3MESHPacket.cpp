@@ -31,11 +31,13 @@ namespace lib::packet
         return i;
     }
 
-    size_t A3MESHPacket::serialize_header_pkt(const A3MESH_header_t &header, const A3MESH_packet_t &pkt, uint8_t *buffer)
+    size_t A3MESHPacket::serialize_header_pkt(A3MESH_header_t &header, const A3MESH_packet_t &pkt, uint8_t *buffer)
     {
         uint8_t temp[LORA_MAX_PACKET_SIZE];
 
         size_t packet_len = serialize_pkt(pkt, temp);
+
+        header.packet_length = packet_len;
         
         size_t i = 0;
 
@@ -55,8 +57,8 @@ namespace lib::packet
         if (len < sizeof(header))
             return false;
 
-        header.type = (a3mesh_msg_type_t)buffer[0];
-        header.version = buffer[1];
+        header.version = buffer[0];
+        header.type = (a3mesh_msg_type_t)buffer[1];
         header.packet_length = buffer[2] | (buffer[3] << 8);
 
         if (len < sizeof(header) + header.packet_length)

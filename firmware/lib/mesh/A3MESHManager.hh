@@ -34,7 +34,7 @@ namespace lib::mesh
         void rm_tout_neigbhors();
         uint16_t get_best_neighbor_id();
         bool is_neighbor(uint16_t nodeID);
-        //Neighbor* get_neighbors(uint8_t &neighbors_list);
+        void get_neighbors(Neighbor *neighbors_list);
 
 
     private:

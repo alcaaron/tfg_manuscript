@@ -202,6 +202,11 @@ namespace lib::mesh
         return false; // Neighbor not found, return false
     }
 
+    void A3MESHManager::get_neighbors(Neighbor *neighbors_list)
+    {
+        memcpy(neighbors_list, neighbors, sizeof(Neighbor) * neighbor_count);
+    }
+
     bool A3MESHManager::should_forward(const lib::packet::A3MESH_packet_t &pkt)
     {
         // Check TTL is greater than 0

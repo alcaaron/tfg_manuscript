@@ -11,7 +11,7 @@ namespace lib::packet
         k_discovery_type
     } a3mesh_msg_type_t;
 
-    typedef struct
+    typedef struct __attribute__((packed))
     {
         uint16_t pkt_id;                        // 2 bytes
         uint16_t src;                           // 2 bytes
@@ -26,7 +26,7 @@ namespace lib::packet
     } A3MESH_packet_t;
 
 
-    typedef struct
+    typedef struct __attribute__((packed))
     {
         uint8_t version;                        // 1 byte
         a3mesh_msg_type_t type;                 // 1 byte
@@ -37,7 +37,7 @@ namespace lib::packet
     {
     public:
         static size_t serialize_pkt(const A3MESH_packet_t &pkt, uint8_t *buffer);
-        static size_t serialize_header_pkt(const A3MESH_header_t &header, const A3MESH_packet_t &pkt, uint8_t *buffer);
+        static size_t serialize_header_pkt(A3MESH_header_t &header, const A3MESH_packet_t &pkt, uint8_t *buffer);
         static bool deserialize_pkt(const uint8_t *buffer, size_t len, A3MESH_header_t &header, A3MESH_packet_t &pkt);
     };
 

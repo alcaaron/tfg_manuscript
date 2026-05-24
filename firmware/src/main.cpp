@@ -188,6 +188,7 @@ MeshRxState handleDiscovery(a3mesh_rx_ctx_t &ctx)
 
 MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
 {
+  Serial.println("[A3MESH] Processing data packet");
   ctx.is_for_me =
       (ctx.pkt.dst == a3mesh.get_node_id()) ||
       (ctx.pkt.dst == 0xFFFF);
@@ -195,6 +196,7 @@ MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
   if (ctx.is_for_me)
     return MeshRxState::k_rx_local_delivery;
 
+  Serial.println("[A3MESH] Packet not for me, checking if it should be forwarded");
   ctx.should_forward = a3mesh.should_forward(ctx.pkt);
 
   if (ctx.should_forward)
@@ -205,6 +207,7 @@ MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
 
 MeshRxState handleLocalDelivery(a3mesh_rx_ctx_t &ctx)
 {
+  Serial.println("[A3MESH] Delivering packet locally");
   char bleBuffer[BLE_BUFFER_SIZE] = {0};
 
   int len = snprintf(
@@ -359,6 +362,22 @@ void BLE2LoRaTask(void *pvParameters)
             pkt,
             tx_msg.tx_data);
 
+        Serial.print("[A3MESH] Sending Header:");
+        Serial.printf("[A3MESH] version: %u, type: %u, packet_length: %u\r\n",
+                        header.version,
+                        header.type,
+                        header.packet_length);
+        Serial.print("[A3MESH] Sending packet:");
+        Serial.printf("[A3MESH] pkt_id: %u, src: %hx, node_id: %hx, dst: %hx, ttl: %u, type: %u, flags: %u, payload_len: %u\r\n",
+                        pkt.pkt_id,
+                        pkt.src,
+                        pkt.node_id,
+                        pkt.dst,
+                        pkt.ttl,
+                        pkt.type,
+                        pkt.flags,
+                        pkt.payload_len);
+
         if (xQueueSend(xLoRaTxQueue, &tx_msg, 0) == pdTRUE)
         {
           xQueueSend(xBLETxQueue, "+OK\r\n", 0);
@@ -368,23 +387,30 @@ void BLE2LoRaTask(void *pvParameters)
           xQueueSend(xBLETxQueue, "+ERR=4\r\n", 0);
         }
       }
-      // else if (strcmp(rx_buffer, "AT+NEIGHBORS?\r\n") == 0)
-      // {
-      //   uint8_t neighbor_count = a3mesh.get_neighbor_count();
-      //   char response[BLE_BUFFER_SIZE] = {0};
+      else if (strcmp(rx_buffer, "AT+NEIGHBORS?\r\n") == 0)
+      {
+        char response[BLE_BUFFER_SIZE] = {0};
+        char neighbors_str[BLE_BUFFER_SIZE] = {0};
+        lib::mesh::Neighbor neighbors_list[MAX_NEIGHBORS];
+        a3mesh.get_neighbors(neighbors_list);
 
-      //   int offset = snprintf(response, sizeof(response), "+NEIGHBORS=%d", neighbor_count);
+        int offset = 0;
+        for (uint8_t i = 0; i < a3mesh.get_neighbor_count(); i++)
+        {
+          offset += snprintf(
+              neighbors_str + offset,
+              sizeof(neighbors_str) - offset,
+              "+N: %hx, RSSI: %d, T: %lu;\r\n",
+              neighbors_list[i].node_id,
+              neighbors_list[i].rssi,
+              neighbors_list[i].last_seen);
+          if (offset >= sizeof(neighbors_str))
+            break;
+        }
 
-      //   for (uint8_t i = 0; i < neighbor_count && offset < sizeof(response); i++)
-      //   {
-      //     uint16_t neighbor_id = a3mesh.get_best_neighbor_id(); // This is just an example. You might want to implement a method to get all neighbors.
-      //     offset += snprintf(response + offset, sizeof(response) - offset, ",%hx", neighbor_id);
-      //   }
-
-      //   offset += snprintf(response + offset, sizeof(response) - offset, "\r\n");
-
-      //   xQueueSend(xBLETxQueue, response, 0);
-      // }
+        snprintf(response, sizeof(response), "+NEIGHBORS=%d\r\n%s\r\n", a3mesh.get_neighbor_count(), neighbors_str);
+        xQueueSend(xBLETxQueue, response, 0);
+      }
       else if (strcmp(rx_buffer, "AT+NODEID?\r\n") == 0)
       {
         char response[BLE_BUFFER_SIZE] = {0};
@@ -413,7 +439,7 @@ void vSendDiscoveryTask(void *pvParameters)
       .node_id = a3mesh.get_node_id(),
       .dst = 0xFFFF,
       .ttl = 0x01,
-      .type = 0, // provisional field
+      .type = 0x01, // provisional field
       .flags = 0x00,
       .payload_len = 4
   };
