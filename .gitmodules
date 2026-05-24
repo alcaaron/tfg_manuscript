@@ -7,3 +7,6 @@
 [submodule "tfg_hardware"]
 	path = tfg_hardware
 	url = https://github.com/alcaaron/tfg_hardware.git
+[submodule "tfg_software"]
+	path = tfg_software
+	url = https://github.com/alcaaron/tfg_software.git
