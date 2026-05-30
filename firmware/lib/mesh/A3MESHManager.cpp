@@ -225,6 +225,57 @@ namespace lib::mesh
         xSemaphoreGive(_mutex);
     }
 
+    void A3MESHManager::register_pending_forward(uint16_t pkt_id, uint32_t src)
+    {
+        xSemaphoreTake(_mutex, portMAX_DELAY);
+        for (int i = 0; i < MAX_PENDING_FORWARDS; i++) {
+            if (!_pending_forwards[i].active) {
+                _pending_forwards[i].pkt_id    = pkt_id;
+                _pending_forwards[i].src       = src;
+                _pending_forwards[i].active    = true;
+                _pending_forwards[i].cancelled = false;
+                xSemaphoreGive(_mutex);
+                return;
+            }
+        }
+        MESH_LOG("[MESH] Pending forward table full, cannot register pkt_id=%u\r\n", pkt_id);
+        xSemaphoreGive(_mutex);
+    }
+
+    void A3MESHManager::cancel_pending_forward(uint16_t pkt_id, uint32_t src)
+    {
+        xSemaphoreTake(_mutex, portMAX_DELAY);
+        for (int i = 0; i < MAX_PENDING_FORWARDS; i++) {
+            if (_pending_forwards[i].active      &&
+                _pending_forwards[i].pkt_id == pkt_id &&
+                _pending_forwards[i].src    == src) {
+                _pending_forwards[i].cancelled = true;
+                MESH_LOG("[MESH] Forward suppressed (passive ACK): pkt_id=%u, src=%08x\r\n", pkt_id, src);
+                break;
+            }
+        }
+        xSemaphoreGive(_mutex);
+    }
+
+    // Returns true = proceed with TX, false = suppress (heard from a neighbor).
+    // Always frees the slot regardless of outcome.
+    bool A3MESHManager::consume_pending_forward(uint16_t pkt_id, uint32_t src)
+    {
+        xSemaphoreTake(_mutex, portMAX_DELAY);
+        for (int i = 0; i < MAX_PENDING_FORWARDS; i++) {
+            if (_pending_forwards[i].active      &&
+                _pending_forwards[i].pkt_id == pkt_id &&
+                _pending_forwards[i].src    == src) {
+                bool transmit = !_pending_forwards[i].cancelled;
+                _pending_forwards[i].active = false;
+                xSemaphoreGive(_mutex);
+                return transmit;
+            }
+        }
+        xSemaphoreGive(_mutex);
+        return true;  // entry not found: transmit by default
+    }
+
     bool A3MESHManager::should_forward(const lib::packet::A3MESH_packet_t &pkt)
     {
         if (pkt.ttl == 0)

@@ -7,6 +7,7 @@
 #include "LoRaTasks.h"
 #include "BLETasks.h"
 #include "A3MESHManagerTasks.h"
+#include "PassiveACK.h"
 
 
 // ======================
@@ -16,6 +17,18 @@
 lib::ble::BLEDriver ble;
 lib::lora::LoRaDriver lora;
 lib::mesh::A3MESHManager a3mesh;
+
+// PassiveACK.h wrappers — implemented here so lower-level libs
+// can call them without depending on the mesh include chain.
+void mesh_register_pending_forward(uint16_t pkt_id, uint32_t src) {
+    a3mesh.register_pending_forward(pkt_id, src);
+}
+void mesh_cancel_pending_forward(uint16_t pkt_id, uint32_t src) {
+    a3mesh.cancel_pending_forward(pkt_id, src);
+}
+bool mesh_consume_pending_forward(uint16_t pkt_id, uint32_t src) {
+    return a3mesh.consume_pending_forward(pkt_id, src);
+}
 
 
 // ======================
@@ -53,8 +66,6 @@ bool init_BLE_queues()
 bool start_BLE_tasks()
 {
   if (xTaskCreatePinnedToCore(vBLETxTask, "BLE TX Task", 4096, NULL, 1, NULL, 1) != pdPASS) return false;
-
-  if (xTaskCreatePinnedToCore(vBLELifeBitTask, "BLE Life Bit Task", 4096, NULL, 1, NULL, 1) != pdPASS) return false;
 
   return true;
 }
@@ -149,6 +160,10 @@ MeshRxState handleValidate(a3mesh_rx_ctx_t &ctx)
   if (ctx.pkt.node_id == a3mesh.get_node_id())
     return MeshRxState::k_rx_drop;
 
+  // A neighbor is forwarding this packet — cancel our own pending forward if any.
+  // Must run before is_duplicate so it fires even for packets already in our dup cache.
+  a3mesh.cancel_pending_forward(ctx.pkt.pkt_id, ctx.pkt.src);
+
   if (ctx.pkt.ttl == 0)
     return MeshRxState::k_rx_drop;
 
@@ -232,17 +247,30 @@ MeshRxState handleForward(a3mesh_rx_ctx_t &ctx)
 {
   lib::lora::LoRaDriver::tx_LoRa_msg_t tx_msg = {};
 
+  // Save before modifying the packet fields below
+  const uint16_t orig_pkt_id = ctx.pkt.pkt_id;
+  const uint32_t orig_src    = ctx.pkt.src;
+
   ctx.pkt.node_id = a3mesh.get_node_id();
   ctx.pkt.ttl--;
   ctx.pkt.flags = (a3mesh.is_neighbor(ctx.pkt.dst));
 
-  tx_msg.len      = lib::packet::A3MESHPacket::serialize_header_pkt(ctx.header, ctx.pkt, tx_msg.tx_data);
-  tx_msg.delay_ms = (uint16_t)map(ctx.rx_msg->rssi, -120, -40, 20, 200);
+  tx_msg.len        = lib::packet::A3MESHPacket::serialize_header_pkt(ctx.header, ctx.pkt, tx_msg.tx_data);
+  tx_msg.delay_ms   = (uint16_t)map(ctx.rx_msg->rssi, -120, -40, 20, 200);
+  tx_msg.pkt_id     = orig_pkt_id;
+  tx_msg.src        = orig_src;
+  tx_msg.is_forward = true;
 
-  MESH_LOG("[A3MESH] Forwarding, RSSI: %d, TX delay: %d ms\r\n", ctx.rx_msg->rssi, tx_msg.delay_ms);
+  MESH_LOG("[A3MESH] Forwarding pkt_id=%u, RSSI: %d, TX delay: %d ms\r\n",
+           orig_pkt_id, ctx.rx_msg->rssi, tx_msg.delay_ms);
 
-  if (xQueueSend(xLoRaTxQueue, &tx_msg, 0) != pdTRUE)
+  // Register before queuing so the slot exists if a cancellation arrives during the delay.
+  a3mesh.register_pending_forward(orig_pkt_id, orig_src);
+
+  if (xQueueSend(xLoRaTxQueue, &tx_msg, 0) != pdTRUE) {
     MESH_LOG("[A3MESH] TX queue full, forward packet dropped\r\n");
+    a3mesh.consume_pending_forward(orig_pkt_id, orig_src);  // free the slot
+  }
 
   return MeshRxState::k_rx_done;
 }

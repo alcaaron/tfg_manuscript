@@ -92,6 +92,7 @@
 #define A3MESH_MAX_PAYLOAD          235             // LORA_MAX_PACKET_SIZE - (size of header + fixed fields in packet structure)
 #define DUP_CACHE_SIZE              50              // Number of recently seen packets to keep in cache for duplicate detection
 #define DUP_TIMEOUT                 30000           // Time in ms to consider a packet as duplicate
+#define MAX_PENDING_FORWARDS        8               // Max simultaneous forwards awaiting passive-ACK confirmation
 
 
 // ===============================

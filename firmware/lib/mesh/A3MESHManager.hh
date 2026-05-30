@@ -17,6 +17,13 @@ namespace lib::mesh
         uint32_t timestamp;
     } SeenMessage;
 
+    typedef struct {
+        uint16_t pkt_id;
+        uint32_t src;
+        bool     active;
+        bool     cancelled;
+    } PendingForward;
+
     class A3MESHManager
     {
     public:
@@ -36,6 +43,10 @@ namespace lib::mesh
         bool is_neighbor(uint32_t node_id);
         void get_neighbors(Neighbor *neighbors_list);
 
+        void register_pending_forward(uint16_t pkt_id, uint32_t src);
+        void cancel_pending_forward(uint16_t pkt_id, uint32_t src);
+        bool consume_pending_forward(uint16_t pkt_id, uint32_t src);
+
 
     private:
 
@@ -49,6 +60,8 @@ namespace lib::mesh
 
         SeenMessage seen_cache[DUP_CACHE_SIZE];
         uint8_t seen_index = 0;
+
+        PendingForward _pending_forwards[MAX_PENDING_FORWARDS] = {};
 
 
 

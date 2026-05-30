@@ -1,4 +1,5 @@
 #include "LoRaTasks.h"
+#include "PassiveACK.h"
 
 extern lib::lora::LoRaDriver lora;
 
@@ -50,6 +51,15 @@ void vLoRaTxTask(void *pvParameters)
         {
             if (msg.delay_ms > 0)
                 vTaskDelay(pdMS_TO_TICKS(msg.delay_ms));
+
+            // Passive ACK: if a neighbor was heard forwarding this packet during
+            // the delay window, consume_pending_forward returns false → suppress TX.
+            if (msg.is_forward && !mesh_consume_pending_forward(msg.pkt_id, msg.src))
+            {
+                MESH_LOG("[LORA] TX suppressed by passive ACK: pkt_id=%u\r\n", msg.pkt_id);
+                continue;
+            }
+
             lora.send_raw_pkt(*(msg.tx_data), msg.len);
         }
         vTaskDelay(10 / portTICK_PERIOD_MS);

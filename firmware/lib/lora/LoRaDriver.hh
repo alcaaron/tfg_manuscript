@@ -27,6 +27,9 @@ namespace lib::lora
             uint8_t  tx_data[LORA_MAX_PACKET_SIZE];
             size_t   len;
             uint16_t delay_ms;
+            uint16_t pkt_id;      // mesh packet id, used for passive-ACK check
+            uint32_t src;         // mesh source node id, used for passive-ACK check
+            bool     is_forward;  // true = subject to passive-ACK cancellation
         } tx_LoRa_msg_t;
 
         bool begin(const lora::A3MESHConfig &config);

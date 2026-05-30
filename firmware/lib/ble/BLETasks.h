@@ -3,4 +3,3 @@
 #include "BLEQueues.h"
 
 void vBLETxTask(void *pvParameters);
-void vBLELifeBitTask(void *pvParameters);

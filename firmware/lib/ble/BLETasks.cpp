@@ -15,12 +15,3 @@ void vBLETxTask(void *pvParameters)
         }
     }
 }
-
-void vBLELifeBitTask(void *pvParameters)
-{
-    for (;;)
-    {
-        ble.send("alive\r\n");
-        vTaskDelay(pdMS_TO_TICKS(BLE_LIFE_BIT_INTERVAL_MS));
-    }
-}
