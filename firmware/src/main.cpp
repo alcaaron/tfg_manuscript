@@ -126,22 +126,22 @@ MeshRxState handleValidate(a3mesh_rx_ctx_t &ctx)
     return MeshRxState::k_rx_drop;
   }
 
-  Serial.print("[A3MESH] ReceivedHeader:");
-  Serial.printf("[A3MESH] version: %u, type: %u, packet_length: %u\r\n",
-      ctx.header.version,
-      ctx.header.type,
-      ctx.header.packet_length);
+  // Serial.print("[A3MESH] ReceivedHeader:");
+  // Serial.printf("[A3MESH] version: %u, type: %u, packet_length: %u\r\n",
+  //     ctx.header.version,
+  //     ctx.header.type,
+  //     ctx.header.packet_length);
 
-  Serial.print("[A3MESH] Received packet:");
-  Serial.printf("[A3MESH] pkt_id: %u, src: %hx, node_id: %hx, dst: %hx, ttl: %u, type: %u, flags: %u, payload_len: %u\r\n",
-      ctx.pkt.pkt_id,
-      ctx.pkt.src,
-      ctx.pkt.node_id,
-      ctx.pkt.dst,
-      ctx.pkt.ttl,
-      ctx.pkt.type,
-      ctx.pkt.flags,
-      ctx.pkt.payload_len);
+  // Serial.print("[A3MESH] Received packet:");
+  // Serial.printf("[A3MESH] pkt_id: %u, src: %hx, node_id: %hx, dst: %hx, ttl: %u, type: %u, flags: %u, payload_len: %u\r\n",
+  //     ctx.pkt.pkt_id,
+  //     ctx.pkt.src,
+  //     ctx.pkt.node_id,
+  //     ctx.pkt.dst,
+  //     ctx.pkt.ttl,
+  //     ctx.pkt.type,
+  //     ctx.pkt.flags,
+  //     ctx.pkt.payload_len);
 
   if (ctx.pkt.src == a3mesh.get_node_id())
     return MeshRxState::k_rx_drop;
@@ -190,15 +190,18 @@ MeshRxState handleDiscovery(a3mesh_rx_ctx_t &ctx)
 MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
 {
   // Serial.println("[A3MESH] Processing data packet");
+  Serial.printf("[A3MESH] Sent to: %08x\r\n", ctx.pkt.dst);
+  Serial.printf("[A3MESH] I'm: %08x\r\n", a3mesh.get_node_id());
   ctx.is_for_me =
       (ctx.pkt.dst == a3mesh.get_node_id()) ||
-      (ctx.pkt.dst == 0xFFFF);
+      (ctx.pkt.dst == 0xFFFFFFFF);
 
   if (ctx.is_for_me)
     return MeshRxState::k_rx_local_delivery;
 
-  // Serial.println("[A3MESH] Packet not for me, checking if it should be forwarded");
+  Serial.println("[A3MESH] Packet not for me, checking if it should be forwarded");
   ctx.should_forward = a3mesh.should_forward(ctx.pkt);
+  Serial.printf("[A3MESH] should_forward: %s\r\n", (ctx.should_forward) ? "yes" : "no");
 
   if (ctx.should_forward)
     return MeshRxState::k_rx_forward;
@@ -208,7 +211,7 @@ MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
 
 MeshRxState handleLocalDelivery(a3mesh_rx_ctx_t &ctx)
 {
-  // Serial.println("[A3MESH] Delivering packet locally");
+  Serial.println("[A3MESH] Delivering packet locally");
   char bleBuffer[BLE_BUFFER_SIZE] = {0};
 
   int len = snprintf(
@@ -232,14 +235,21 @@ MeshRxState handleForward(a3mesh_rx_ctx_t &ctx)
 {
   lib::lora::LoRaDriver::tx_LoRa_msg_t tx_msg;
 
-  ctx.pkt.pkt_id = a3mesh.get_next_pkt_id();
   ctx.pkt.node_id = a3mesh.get_node_id();
   ctx.pkt.ttl--;
   ctx.pkt.flags = (a3mesh.is_neighbor(ctx.pkt.dst));
 
   tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(ctx.header, ctx.pkt, tx_msg.tx_data);
 
-  vTaskDelay(pdMS_TO_TICKS(rand() % 250));
+  int delay_ms = map(ctx.rx_msg->rssi,
+                    -120,
+                    -40,
+                    20,
+                    200);
+
+  Serial.printf("[A3MESH] Forwarding packet, RSSI: %d, delaying for %d ms\r\n", ctx.rx_msg->rssi, delay_ms);
+
+  vTaskDelay(pdMS_TO_TICKS(delay_ms));
 
   xQueueSend(xLoRaTxQueue, &tx_msg, 0);
 
@@ -364,7 +374,7 @@ void BLE2LoRaTask(void *pvParameters)
       // memset(pkt.payload, 0, sizeof(pkt.payload));
 
       if (sscanf(args, 
-                  "%hx,%" STR(A3MESH_MAX_PAYLOAD) "[^\r\n]", 
+                  "%08x,%" STR(A3MESH_MAX_PAYLOAD) "[^\r\n]", 
                   &dst, 
                   msg) != 2)
       {
@@ -393,23 +403,23 @@ void BLE2LoRaTask(void *pvParameters)
       // -------------------------
       // TX queue
       // -------------------------
-      Serial.println("[BLE2LORA] Sending header:");
-      Serial.printf("[BLE2LORA] version: %u, type: %u, packet_length: %u\r\n",
-          header.version,
-          header.type,
-          header.packet_length);
-      Serial.printf("[BLE2LORA] Sending packet:\r\n");
-      Serial.printf("[BLE2LORA] pkt_id: %u, src: %hx, node_id: %hx, dst: %hx, ttl: %u, type: %u, flags: %u, payload_len: %u, payload: %.*s\r\n",
-          pkt.pkt_id,
-          pkt.src,
-          pkt.node_id,
-          pkt.dst,
-          pkt.ttl,
-          pkt.type,
-          pkt.flags,
-          pkt.payload_len,
-          pkt.payload_len,
-          pkt.payload);
+      // Serial.println("[BLE2LORA] Sending header:");
+      // Serial.printf("[BLE2LORA] version: %u, type: %u, packet_length: %u\r\n",
+      //     header.version,
+      //     header.type,
+      //     header.packet_length);
+      // Serial.printf("[BLE2LORA] Sending packet:\r\n");
+      // Serial.printf("[BLE2LORA] pkt_id: %u, src: %hx, node_id: %hx, dst: %hx, ttl: %u, type: %u, flags: %u, payload_len: %u, payload: %.*s\r\n",
+      //     pkt.pkt_id,
+      //     pkt.src,
+      //     pkt.node_id,
+      //     pkt.dst,
+      //     pkt.ttl,
+      //     pkt.type,
+      //     pkt.flags,
+      //     pkt.payload_len,
+      //     pkt.payload_len,
+      //     pkt.payload);
       if (xQueueSend(xLoRaTxQueue, &tx_msg, 0) == pdTRUE)
       {
         xQueueSend(xBLETxQueue, "+OK\r\n", 0);

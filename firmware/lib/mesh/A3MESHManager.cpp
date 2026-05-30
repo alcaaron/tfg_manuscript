@@ -218,13 +218,18 @@ namespace lib::mesh
     bool A3MESHManager::should_forward(const lib::packet::A3MESH_packet_t &pkt)
     {
         // Check TTL is greater than 0
-        if (pkt.ttl == 0) return false;
-
-        // Is duplicate?
-        if (is_duplicate(pkt)) return false;
+        if (pkt.ttl == 0) 
+        {
+            Serial.println("[MESH] Not forwarding packet because TTL is 0");
+            return false;
+        }
 
         // Is a Direct message?
-        if (pkt.flags & 0x01) return false;
+        if (pkt.flags & 0x01) 
+        {
+            Serial.println("[MESH] Not forwarding packet because it is a direct message");
+            return false;
+        }
 
         if (_routing_protocol == 0)
         {
@@ -234,7 +239,10 @@ namespace lib::mesh
         else if (_routing_protocol == 1)
         {
             // Gossip with a P value
-            return (rand() % 100) < 15;
+            Serial.println("[MESH] Forwarding packet with gossip routing (P=0.9)");
+            uint8_t will_be_forwarded = (rand() % 100) < 90; // 90% chance to forward
+            Serial.printf("[MESH] Gossip routing: will be forwarded: %s\r\n", (will_be_forwarded) ? "yes" : "no");
+            return will_be_forwarded; // 90% chance to forward
         }
         else
         {

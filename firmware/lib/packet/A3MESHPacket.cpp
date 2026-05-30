@@ -65,8 +65,8 @@ namespace lib::packet
         
         size_t i = 0;
 
-        buffer[i++] = header.type;
         buffer[i++] = header.version;
+        buffer[i++] = header.type;
         buffer[i++] = header.packet_length & 0xFF;
         buffer[i++] = header.packet_length >> 8;
 
