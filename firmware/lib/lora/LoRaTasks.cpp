@@ -48,9 +48,9 @@ void vLoRaTxTask(void *pvParameters)
     {
         if (xQueueReceive(xLoRaTxQueue, &msg, portMAX_DELAY) == pdTRUE)
         {
-            //Serial.printf("[LORA] Sending packet, length: %d\r\n", msg.len);
+            if (msg.delay_ms > 0)
+                vTaskDelay(pdMS_TO_TICKS(msg.delay_ms));
             lora.send_raw_pkt(*(msg.tx_data), msg.len);
-
         }
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }

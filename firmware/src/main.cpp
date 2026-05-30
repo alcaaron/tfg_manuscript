@@ -74,7 +74,7 @@ bool initLoRaQueues()
 
 bool startLoRaTasks()
 {
-  if(xTaskCreatePinnedToCore(vLoRaRxTask, "LoRa RX", 4096, NULL, 1, NULL, 0) != pdPASS) return false;
+  if(xTaskCreatePinnedToCore(vLoRaRxTask, "LoRa RX", 4096, NULL, 2, NULL, 0) != pdPASS) return false;
 
   if(xTaskCreatePinnedToCore(vLoRaTxTask, "LoRa TX", 4096, NULL, 1, NULL, 0) != pdPASS) return false;
 
@@ -189,9 +189,8 @@ MeshRxState handleDiscovery(a3mesh_rx_ctx_t &ctx)
 
 MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
 {
-  // Serial.println("[A3MESH] Processing data packet");
-  Serial.printf("[A3MESH] Sent to: %08x\r\n", ctx.pkt.dst);
-  Serial.printf("[A3MESH] I'm: %08x\r\n", a3mesh.get_node_id());
+  MESH_LOG("[A3MESH] Sent to: %08x\r\n", ctx.pkt.dst);
+  MESH_LOG("[A3MESH] I'm: %08x\r\n", a3mesh.get_node_id());
   ctx.is_for_me =
       (ctx.pkt.dst == a3mesh.get_node_id()) ||
       (ctx.pkt.dst == 0xFFFFFFFF);
@@ -199,9 +198,7 @@ MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
   if (ctx.is_for_me)
     return MeshRxState::k_rx_local_delivery;
 
-  Serial.println("[A3MESH] Packet not for me, checking if it should be forwarded");
   ctx.should_forward = a3mesh.should_forward(ctx.pkt);
-  Serial.printf("[A3MESH] should_forward: %s\r\n", (ctx.should_forward) ? "yes" : "no");
 
   if (ctx.should_forward)
     return MeshRxState::k_rx_forward;
@@ -211,7 +208,7 @@ MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
 
 MeshRxState handleLocalDelivery(a3mesh_rx_ctx_t &ctx)
 {
-  Serial.println("[A3MESH] Delivering packet locally");
+  MESH_LOG("[A3MESH] Delivering packet locally\r\n");
   char bleBuffer[BLE_BUFFER_SIZE] = {0};
 
   int len = snprintf(
@@ -233,25 +230,19 @@ MeshRxState handleLocalDelivery(a3mesh_rx_ctx_t &ctx)
 
 MeshRxState handleForward(a3mesh_rx_ctx_t &ctx)
 {
-  lib::lora::LoRaDriver::tx_LoRa_msg_t tx_msg;
+  lib::lora::LoRaDriver::tx_LoRa_msg_t tx_msg = {};
 
   ctx.pkt.node_id = a3mesh.get_node_id();
   ctx.pkt.ttl--;
   ctx.pkt.flags = (a3mesh.is_neighbor(ctx.pkt.dst));
 
-  tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(ctx.header, ctx.pkt, tx_msg.tx_data);
+  tx_msg.len      = lib::packet::A3MESHPacket::serialize_header_pkt(ctx.header, ctx.pkt, tx_msg.tx_data);
+  tx_msg.delay_ms = (uint16_t)map(ctx.rx_msg->rssi, -120, -40, 20, 200);
 
-  int delay_ms = map(ctx.rx_msg->rssi,
-                    -120,
-                    -40,
-                    20,
-                    200);
+  MESH_LOG("[A3MESH] Forwarding, RSSI: %d, TX delay: %d ms\r\n", ctx.rx_msg->rssi, tx_msg.delay_ms);
 
-  Serial.printf("[A3MESH] Forwarding packet, RSSI: %d, delaying for %d ms\r\n", ctx.rx_msg->rssi, delay_ms);
-
-  vTaskDelay(pdMS_TO_TICKS(delay_ms));
-
-  xQueueSend(xLoRaTxQueue, &tx_msg, 0);
+  if (xQueueSend(xLoRaTxQueue, &tx_msg, 0) != pdTRUE)
+    MESH_LOG("[A3MESH] TX queue full, forward packet dropped\r\n");
 
   return MeshRxState::k_rx_done;
 }
@@ -528,7 +519,7 @@ void vSendDiscoveryTask(void *pvParameters)
 
   memcpy(pkt.payload, "DISC", pkt.payload_len);
   
-  lib::lora::LoRaDriver::tx_LoRa_msg_t discovery_msg;
+  lib::lora::LoRaDriver::tx_LoRa_msg_t discovery_msg = {};
   discovery_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(
       header,
       pkt,
@@ -536,6 +527,9 @@ void vSendDiscoveryTask(void *pvParameters)
 
   for (;;)
   {
+    // NOTE: pkt_id is patched directly at bytes [4:5] of the serialized buffer,
+    // right after the 4-byte A3MESH_header_t. Must be updated if the serialization
+    // format changes.
     uint16_t pkt_id = a3mesh.get_next_pkt_id();
     discovery_msg.tx_data[4] = pkt_id & 0xFF;
     discovery_msg.tx_data[5] = (pkt_id >> 8) & 0xFF;
@@ -553,65 +547,65 @@ bool setup_A3MESH()
 
   // --------- Init LoRa Driver ---------
   if (!lora.begin(lib::lora::A3MESHConfig())) return false;
-  Serial.println("[LORA] init success!");
+  MESH_LOG("[LORA] init success!");
 
   if (!initLoRaQueues()) return false;
-  Serial.println("[LORA] queues initialized!");
+  MESH_LOG("[LORA] queues initialized!");
 
   if (!startLoRaTasks()) return false;
-  Serial.println("[LORA] tasks started!");
+  MESH_LOG("[LORA] tasks started!");
 
 
   // --------- Init BLE Driver ---------
   if (!ble.setup()) return false;
-  Serial.println("[BLE] init success!");
+  MESH_LOG("[BLE] init success!");
 
   if (!init_BLE_queues()) return false;
-  Serial.println("[BLE] queues initialized!");
+  MESH_LOG("[BLE] queues initialized!");
 
   if (!start_BLE_tasks()) return false;
-  Serial.println("[BLE] tasks started!");
+  MESH_LOG("[BLE] tasks started!");
 
 
   // --------- Init Core Tasks ---------
   if (xTaskCreatePinnedToCore(BLE2LoRaTask, "BLE2LoRaTask", 4096, NULL, 1, NULL, 1) != pdPASS) return false;
-  Serial.println("[SYS] BLE2LORA started!");
+  MESH_LOG("[SYS] BLE2LORA started!");
 
   if (xTaskCreatePinnedToCore(LoRa2BLETask, "LoRa2BLETask", 4096, NULL, 1, NULL, 1) != pdPASS) return false;
-  Serial.println("[SYS] LORA2BLE started!");
+  MESH_LOG("[SYS] LORA2BLE started!");
 
 
   // --------- Init A3MESH Manager ---------
   if (xTaskCreatePinnedToCore(vSendDiscoveryTask, "DiscoveryTask", 4096, NULL, 1, NULL, 0) != pdPASS) return false;
-  Serial.println("[MESH] Discovery Task Initialized!");
+  MESH_LOG("[MESH] Discovery Task Initialized!");
 
   if (xTaskCreatePinnedToCore(vNeighborCheckTask, "NeighborCheckTask", 4096, NULL, 1, NULL, 0) != pdPASS) return false;
-  Serial.println("[MESH] Neighbor Check Task Initialized!");
+  MESH_LOG("[MESH] Neighbor Check Task Initialized!");
   return true;
 }
 
 void setup()
 {
   Serial.begin(BAUD_RATE);
-  Serial.println("[SYS] initBoard");
+  MESH_LOG("[SYS] initBoard\r\n");
 
   delay(1000);
   switch (esp_reset_reason())
   {
   case ESP_RST_BROWNOUT:
-    Serial.println("[SYS] power down detected");
+    MESH_LOG("[SYS] power down detected\r\n");
     break;
   case ESP_RST_POWERON:
-    Serial.println("[SYS] power on detected");
+    MESH_LOG("[SYS] power on detected\r\n");
     break;
   case ESP_RST_WDT:
-    Serial.println("[SYS] watch dog timer");
+    MESH_LOG("[SYS] watch dog timer\r\n");
     break;
   case ESP_RST_TASK_WDT:
-    Serial.println("[SYS] task WDT");
+    MESH_LOG("[SYS] task WDT\r\n");
     break;
   case ESP_RST_PANIC:
-    Serial.println("[SYS] self reset");
+    MESH_LOG("[SYS] self reset\r\n");
     break;
   default:
     break;
@@ -619,7 +613,7 @@ void setup()
 
   if (!setup_A3MESH())
   {
-    Serial.println("[SYS] Setup failed");
+    MESH_LOG("[SYS] Setup failed\r\n");
     while (1)
       ;
   }

@@ -102,4 +102,17 @@
 #define BATTERY_THRESHOLD                3.0       // Voltage threshold for low battery warning
 #define BATTERY_MEASUREMENT_INTERVAL_MS  1000      // Interval for battery voltage measurements
 
+
+// ==============================
+// === DEBUG CONFIGURATION ===
+// ==============================
+
+#define A3MESH_DEBUG 1
+
+#if A3MESH_DEBUG
+  #define MESH_LOG(fmt, ...) Serial.printf(fmt, ##__VA_ARGS__)
+#else
+  #define MESH_LOG(fmt, ...) do {} while(0)
+#endif
+
 #endif // CONFIG_H

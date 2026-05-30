@@ -24,8 +24,9 @@ namespace lib::lora
 
         typedef struct
         {
-            uint8_t tx_data[LORA_MAX_PACKET_SIZE];
-            size_t len;
+            uint8_t  tx_data[LORA_MAX_PACKET_SIZE];
+            size_t   len;
+            uint16_t delay_ms;
         } tx_LoRa_msg_t;
 
         bool begin(const lora::A3MESHConfig &config);

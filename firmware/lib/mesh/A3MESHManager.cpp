@@ -42,25 +42,33 @@ namespace lib::mesh
 
         xSemaphoreTake(_mutex, portMAX_DELAY);
 
+        // evict_idx: first expired slot found (preferred over circular overwrite)
+        int evict_idx = -1;
+
         for (int i = 0; i < DUP_CACHE_SIZE; i++) {
-
-            if (seen_cache[i].msg_id == pkt.pkt_id &&
-                seen_cache[i].src == pkt.src &&
-                (now - seen_cache[i].timestamp < DUP_TIMEOUT)) {
-
-                xSemaphoreGive(_mutex);
-                return true;
+            if (seen_cache[i].msg_id == pkt.pkt_id && seen_cache[i].src == pkt.src) {
+                if (now - seen_cache[i].timestamp < DUP_TIMEOUT) {
+                    xSemaphoreGive(_mutex);
+                    MESH_LOG("[MESH] Duplicate packet detected: pkt_id=%u, src=%hx\r\n", pkt.pkt_id, pkt.src);
+                    return true;
+                }
+                // Same key but expired: refresh in place instead of inserting elsewhere
+                evict_idx = i;
+                break;
             }
+            if (evict_idx == -1 && (now - seen_cache[i].timestamp >= DUP_TIMEOUT))
+                evict_idx = i;
         }
 
-        seen_cache[seen_index].msg_id = pkt.pkt_id;
-        seen_cache[seen_index].src = pkt.src;
-        seen_cache[seen_index].timestamp = now;
+        int target = (evict_idx >= 0) ? evict_idx : (int)seen_index;
+        seen_cache[target].msg_id    = pkt.pkt_id;
+        seen_cache[target].src       = pkt.src;
+        seen_cache[target].timestamp = now;
 
-        seen_index = (seen_index + 1) % DUP_CACHE_SIZE;
+        if (evict_idx < 0)
+            seen_index = (seen_index + 1) % DUP_CACHE_SIZE;
 
         xSemaphoreGive(_mutex);
-
         return false;
     }
 
@@ -191,9 +199,9 @@ namespace lib::mesh
 
         if (neighbor_count == 0)
         {
-            Serial.println("[MESH] No neighbors available");
+            MESH_LOG("[MESH] No neighbors available\r\n");
             xSemaphoreGive(_mutex);
-            return false; // No neighbors, return false
+            return false;
         }
 
         for (uint8_t i = 0; i < neighbor_count; i++)
@@ -212,22 +220,22 @@ namespace lib::mesh
 
     void A3MESHManager::get_neighbors(Neighbor *neighbors_list)
     {
+        xSemaphoreTake(_mutex, portMAX_DELAY);
         memcpy(neighbors_list, neighbors, sizeof(Neighbor) * neighbor_count);
+        xSemaphoreGive(_mutex);
     }
 
     bool A3MESHManager::should_forward(const lib::packet::A3MESH_packet_t &pkt)
     {
-        // Check TTL is greater than 0
-        if (pkt.ttl == 0) 
+        if (pkt.ttl == 0)
         {
-            Serial.println("[MESH] Not forwarding packet because TTL is 0");
+            MESH_LOG("[MESH] Drop: TTL is 0\r\n");
             return false;
         }
 
-        // Is a Direct message?
-        if (pkt.flags & 0x01) 
+        if (pkt.flags & 0x01)
         {
-            Serial.println("[MESH] Not forwarding packet because it is a direct message");
+            MESH_LOG("[MESH] Drop: direct message flag set\r\n");
             return false;
         }
 
@@ -238,11 +246,10 @@ namespace lib::mesh
         }
         else if (_routing_protocol == 1)
         {
-            // Gossip with a P value
-            Serial.println("[MESH] Forwarding packet with gossip routing (P=0.9)");
-            uint8_t will_be_forwarded = (rand() % 100) < 90; // 90% chance to forward
-            Serial.printf("[MESH] Gossip routing: will be forwarded: %s\r\n", (will_be_forwarded) ? "yes" : "no");
-            return will_be_forwarded; // 90% chance to forward
+            // Gossip with a P value — esp_random() is thread-safe hardware TRNG
+            uint8_t will_be_forwarded = (esp_random() % 100) < 90;
+            MESH_LOG("[MESH] Gossip routing (P=0.9): will forward: %s\r\n", will_be_forwarded ? "yes" : "no");
+            return will_be_forwarded;
         }
         else
         {
