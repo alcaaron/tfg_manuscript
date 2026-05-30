@@ -10,25 +10,35 @@
 
 namespace lib::lora
 {
-    typedef struct
-    {
-        uint8_t rx_data[LORA_MAX_PACKET_SIZE];
-        size_t len;
-        int16_t rssi;
-    } rx_LoRa_msg_t;
-
-    typedef struct
-    {
-        uint8_t tx_data[LORA_MAX_PACKET_SIZE];
-        size_t len;
-    } tx_LoRa_msg_t;
-
     class LoRaDriver
     {
     public:
         LoRaDriver();
 
+        typedef struct
+        {
+            uint8_t rx_data[LORA_MAX_PACKET_SIZE];
+            size_t len;
+            int16_t rssi;
+        } rx_LoRa_msg_t;
+
+        typedef struct
+        {
+            uint8_t tx_data[LORA_MAX_PACKET_SIZE];
+            size_t len;
+        } tx_LoRa_msg_t;
+
         bool begin(const lora::A3MESHConfig &config);
         bool send_raw_pkt(const uint8_t &data, size_t len);
+
+        static void IRAM_ATTR onLoRaRxIRQ();
+        static bool consume_rx_flag();
+        static rx_LoRa_msg_t* alloc_frame();
+
+    private:
+        static volatile bool lora_rx_flag;
+
+        static rx_LoRa_msg_t pool[8];
+        static volatile uint8_t pool_idx;
     };
 } // namespace lib::lora

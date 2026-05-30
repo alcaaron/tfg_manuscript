@@ -4,6 +4,24 @@
 
 namespace lib::packet
 {
+    static inline uint16_t read_u16(const uint8_t* b, size_t& i)
+    {
+        uint16_t v = (uint16_t)b[i] | ((uint16_t)b[i + 1] << 8);
+        i += 2;
+        return v;
+    }
+
+    static inline uint32_t read_u32(const uint8_t* b, size_t& i)
+    {
+        uint32_t v =
+            ((uint32_t)b[i]) |
+            ((uint32_t)b[i + 1] << 8) |
+            ((uint32_t)b[i + 2] << 16) |
+            ((uint32_t)b[i + 3] << 24);
+        i += 4;
+        return v;
+    }
+
     size_t A3MESHPacket::serialize_pkt(const A3MESH_packet_t &pkt, uint8_t *buffer)
     {
         size_t i = 0;
@@ -11,14 +29,20 @@ namespace lib::packet
         buffer[i++] = pkt.pkt_id & 0xFF;
         buffer[i++] = pkt.pkt_id >> 8;
 
-        buffer[i++] = pkt.src & 0xFF;
-        buffer[i++] = pkt.src >> 8;
+        buffer[i++] = (pkt.src >> 0)  & 0xFF;
+        buffer[i++] = (pkt.src >> 8)  & 0xFF;
+        buffer[i++] = (pkt.src >> 16) & 0xFF;
+        buffer[i++] = (pkt.src >> 24) & 0xFF;
 
-        buffer[i++] = pkt.node_id & 0xFF;
-        buffer[i++] = pkt.node_id >> 8;
+        buffer[i++] = (pkt.node_id >> 0)  & 0xFF;
+        buffer[i++] = (pkt.node_id >> 8)  & 0xFF;
+        buffer[i++] = (pkt.node_id >> 16) & 0xFF;
+        buffer[i++] = (pkt.node_id >> 24) & 0xFF;
 
-        buffer[i++] = pkt.dst & 0xFF;
-        buffer[i++] = pkt.dst >> 8;
+        buffer[i++] = (pkt.dst >> 0)  & 0xFF;
+        buffer[i++] = (pkt.dst >> 8)  & 0xFF;
+        buffer[i++] = (pkt.dst >> 16) & 0xFF;
+        buffer[i++] = (pkt.dst >> 24) & 0xFF;
 
         buffer[i++] = pkt.ttl;
         buffer[i++] = pkt.type; // provision field
@@ -52,40 +76,79 @@ namespace lib::packet
         return i;
     }
 
-    bool A3MESHPacket::deserialize_pkt(const uint8_t *buffer, size_t len, A3MESH_header_t &header, A3MESH_packet_t &pkt)
+    int8_t A3MESHPacket::deserialize_pkt(const uint8_t *buffer, size_t len, A3MESH_header_t &header, A3MESH_packet_t &pkt)
     {
-        if (len < sizeof(header))
-            return false;
+        // -----------------------------
+        // Basic sanity check
+        // -----------------------------
+        if (len < HEADER_SIZE)
+            return -1;
 
-        header.version = buffer[0];
-        header.type = (a3mesh_msg_type_t)buffer[1];
-        header.packet_length = buffer[2] | (buffer[3] << 8);
+        size_t i = 0;
 
-        if (len < sizeof(header) + header.packet_length)
-            return false;
+        // -----------------------------
+        // HEADER (fixed 4 bytes)
+        // -----------------------------
+        header.version = buffer[i++];
+        header.type = (a3mesh_msg_type_t)buffer[i++];
 
-        size_t i = sizeof(header);
-        pkt.pkt_id = buffer[i] | (buffer[i + 1] << 8);
+        header.packet_length =
+            (uint16_t)buffer[i] |
+            ((uint16_t)buffer[i + 1] << 8);
+
         i += 2;
 
-        pkt.src = buffer[i] | (buffer[i + 1] << 8);
-        i += 2;
+        // -----------------------------
+        // Length validation
+        // -----------------------------
+        const size_t expected_len = HEADER_SIZE + header.packet_length;
 
-        pkt.node_id = buffer[i] | (buffer[i + 1] << 8);
-        i += 2;
+        if (len < expected_len)
+            return -2;
 
-        pkt.dst = buffer[i] | (buffer[i + 1] << 8);
-        i += 2;
+        // -----------------------------
+        // PAYLOAD POINTER BASE
+        // -----------------------------
+        const uint8_t* p = buffer + HEADER_SIZE;
 
-        pkt.ttl = buffer[i++];
-        pkt.type = buffer[i++];
-        pkt.flags = buffer[i++];
-        pkt.payload_len = buffer[i++];
+        // -----------------------------
+        // FIXED FIELDS
+        // -----------------------------
+        pkt.pkt_id =
+            *(const uint16_t*)p;
+        p += 2;
 
-        if (pkt.payload_len > A3MESH_MAX_PAYLOAD || i + pkt.payload_len > len)
-            return false;
+        pkt.src =
+            *(const uint32_t*)p;
+        p += 4;
 
-        memcpy(pkt.payload, &buffer[i], pkt.payload_len);
-        return true;
+        pkt.node_id =
+            *(const uint32_t*)p;
+        p += 4;
+
+        pkt.dst =
+            *(const uint32_t*)p;
+        p += 4;
+
+        pkt.ttl = *p++;
+        pkt.type = *p++;
+        pkt.flags = *p++;
+        pkt.payload_len = *p++;
+
+        // -----------------------------
+        // Payload validation
+        // -----------------------------
+        if (pkt.payload_len > A3MESH_MAX_PAYLOAD ||
+            (size_t)(p - buffer) + pkt.payload_len > len)
+        {
+            return -3;
+        }
+
+        // -----------------------------
+        // Payload copy
+        // -----------------------------
+        memcpy(pkt.payload, p, pkt.payload_len);
+
+        return 0;
     }
 } // namespace lib::packet

@@ -11,18 +11,23 @@ namespace lib::packet
         k_discovery_type
     } a3mesh_msg_type_t;
 
+    constexpr size_t HEADER_SIZE = 4;
+    // Sum of sizes of pkt_id, src, node_id, dst, ttl, type, flags, payload_len
+    constexpr size_t FIXED_FIELDS_SIZE = 2 + 4 + 4 + 4 + 1 + 1 + 1 + 1; 
+    
+
     typedef struct __attribute__((packed))
     {
         uint16_t pkt_id;                        // 2 bytes
-        uint16_t src;                           // 2 bytes
-        uint16_t node_id;                       // 2 bytes
-        uint16_t dst;                           // 2 bytes
+        uint32_t src;                           // 4 bytes
+        uint32_t node_id;                       // 4 bytes
+        uint32_t dst;                           // 4 bytes
         uint8_t ttl;                            // 1 byte
         uint8_t type;                           // 1 byte provision field
 
         uint8_t flags;                          // 1 byte
         uint8_t payload_len;                    // 1 byte
-        uint8_t payload[A3MESH_MAX_PAYLOAD];    // (256 - N=15) bytes, N representing the sum of the header size and the fixed fields in the packet structure
+        uint8_t payload[A3MESH_MAX_PAYLOAD];    // (256 - N=21) bytes, N representing the sum of the header size and the fixed fields in the packet structure
     } A3MESH_packet_t;
 
 
@@ -38,7 +43,7 @@ namespace lib::packet
     public:
         static size_t serialize_pkt(const A3MESH_packet_t &pkt, uint8_t *buffer);
         static size_t serialize_header_pkt(A3MESH_header_t &header, const A3MESH_packet_t &pkt, uint8_t *buffer);
-        static bool deserialize_pkt(const uint8_t *buffer, size_t len, A3MESH_header_t &header, A3MESH_packet_t &pkt);
+        static int8_t deserialize_pkt(const uint8_t *buffer, size_t len, A3MESH_header_t &header, A3MESH_packet_t &pkt);
     };
 
 } // namespace lib::packet

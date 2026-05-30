@@ -83,12 +83,23 @@
 // === A3MESH LOGIC PARAMETERS ===
 // ===============================
 
+#define DISCOVERY_INTERVAL_MS       30000
+#define FNV_OFFSET_BASIS            2166136261U
+#define FNV_PRIME                   16777619U
 #define MAX_NEIGHBORS               10
-#define NODE_TIMEOUT                60000           // Time in ms after which a neighbor is considered lost
+#define NODE_TIMEOUT                180000           // Time in ms after which a neighbor is considered lost
 #define MAX_TTL                     0x05
-#define A3MESH_MAX_PAYLOAD          241             // LORA_MAX_PACKET_SIZE - (size of header + fixed fields in packet structure)
+#define A3MESH_MAX_PAYLOAD          235             // LORA_MAX_PACKET_SIZE - (size of header + fixed fields in packet structure)
 #define DUP_CACHE_SIZE              50              // Number of recently seen packets to keep in cache for duplicate detection
 #define DUP_TIMEOUT                 30000           // Time in ms to consider a packet as duplicate
 
+
+// ===============================
+// === BATTERY CONFIGURATION ===
+// ===============================
+
+#define BATTERY_VOLTAGE_PIN              A0        // ADC pin connected to battery voltage divider
+#define BATTERY_THRESHOLD                3.0       // Voltage threshold for low battery warning
+#define BATTERY_MEASUREMENT_INTERVAL_MS  1000      // Interval for battery voltage measurements
 
 #endif // CONFIG_H

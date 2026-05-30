@@ -19,7 +19,7 @@ namespace lib::mesh
         _routing_protocol = 1;
     }
 
-    uint16_t A3MESHManager::get_node_id()
+    uint32_t A3MESHManager::get_node_id()
     {
         return _node_id;
     }
@@ -87,11 +87,10 @@ namespace lib::mesh
 
         if (neighbor_count < MAX_NEIGHBORS)
         {
-            Serial.printf("[NEIGHBOR] Adding node %hx\n", neighbor.node_id);
+            Serial.printf("[NEIGHBOR] Adding node %hx; Total=%d\n", neighbor.node_id, neighbor_count+1);
             neighbors[neighbor_count++] = neighbor;
         }
 
-        Serial.printf("[NEIGHBOR] Total neighbors: %d\n", neighbor_count);
         xSemaphoreGive(_mutex);
     }
 
@@ -136,14 +135,23 @@ namespace lib::mesh
 
     uint32_t A3MESHManager::generate_node_id()
     {
+        uint8_t mac[6];
+        esp_read_mac(mac, ESP_MAC_BT);
 
-        uint64_t mac = ESP.getEfuseMac();
-        return (uint32_t)((mac >> 16) ^ mac);
+        uint32_t hash = FNV_OFFSET_BASIS;
+
+        for (int i = 0; i < 6; i++)
+        {
+            hash ^= mac[i];
+            hash *= FNV_PRIME;
+        }
+
+        return hash;
     }
 
-    uint16_t A3MESHManager::get_best_neighbor_id()
+    uint32_t A3MESHManager::get_best_neighbor_id()
     {
-        uint16_t best_id = 0xFFFF;
+        uint32_t best_id = 0xFFFF;
         int16_t best_rssi = -127;
 
         Serial.println("[MESH] Selecting best neighbor for forwarding...");
@@ -177,7 +185,7 @@ namespace lib::mesh
         return best_id;
     }
 
-    bool A3MESHManager::is_neighbor(uint16_t node_id)
+    bool A3MESHManager::is_neighbor(uint32_t node_id)
     {
         xSemaphoreTake(_mutex, portMAX_DELAY);
 
