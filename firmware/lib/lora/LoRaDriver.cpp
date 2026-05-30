@@ -1,211 +1,79 @@
-#include "LoRaDriver.h"
+#include "LoRaDriver.hh"
 
 namespace lib::lora
 {
-    LoRaDriver::LoRaDriver()
-    {
-        this->radio = nullptr;
-        receivedFlag = false;
-    }
+    volatile bool LoRaDriver::lora_rx_flag = false;
+
+    LoRaDriver::rx_LoRa_msg_t LoRaDriver::pool[8];
+    volatile uint8_t LoRaDriver::pool_idx = 0;
+
+    LoRaDriver::LoRaDriver() {}
+
+
 
     bool LoRaDriver::begin(const lora::A3MESHConfig &config)
     {
-        ESP_LOGV(A3M_TAG, "Initializing A3MESH v%s", A3M_VERSION);
+        // Set LoRa pins
+        LoRa.setPins(config.nss_pin, config.rst_pin, config.dio0_pin);
 
-        this->config = config;
+        attachInterrupt(digitalPinToInterrupt(config.dio0_pin), onLoRaRxIRQ, RISING);
 
-        SPI.begin(SCK_GPIO, MISO_GPIO, MOSI_GPIO, NSS_GPIO);
+        // LoRa Module Reset
+        pinMode(config.rst_pin, OUTPUT);
+        digitalWrite(config.rst_pin, LOW);
+        delay(10);
+        digitalWrite(config.rst_pin, HIGH);
+        delay(10);
 
-        // Set module configuration
-        this->radio = new SX1276(new Module(
-            config.nss_pin,
-            config.dio0_pin,
-            config.rst_pin));
+        // LoRa Initialization
+        if (!LoRa.begin(config.frequency)) { return false; }
 
-        // Initialize the radio with the specified configuration
-        int16_t state = this->radio->begin(
-            config.frequency,
-            config.bandwidth,
-            config.sf,
-            config.cr,
-            config.sync_word,
-            config.power,
-            config.preamble_len);
+        // LoRa Configuration
+        LoRa.setSpreadingFactor(config.sf);
+        LoRa.setSignalBandwidth(config.bandwidth);
+        LoRa.setCodingRate4(config.cr);
+        LoRa.setPreambleLength(config.preamble_len);
+        LoRa.setTxPower(config.power);
 
-        if (state != RADIOLIB_ERR_NONE)
-        {
-            ESP_LOGE(A3M_TAG, "Failed to initialize LoRa module: %d", state);
-            return false;
-        }
-
-        this->rxQueue = xQueueCreate(RX_LORA_QUEUE_SIZE, sizeof(RxMessage_t));
-        this->txQueue = xQueueCreate(TX_LORA_QUEUE_SIZE, sizeof(TxMessage_t));
-
-        if (!this->rxQueue || !this->txQueue)
-        {
-            ESP_LOGE(A3M_TAG, "Failed to create queues");
-            return false;
-        }
+        LoRa.receive();
 
         return true;
     }
 
-    bool LoRaDriver::sendRawPacket(uint8_t *data, size_t len)
+    bool LoRaDriver::send_raw_pkt(const uint8_t &data, size_t len)
     {
-        if (len > A3MESH_MAX_PACKET_SIZE)
+        if (len > LORA_MAX_PACKET_SIZE)
             return false;
 
-        clearDioActions();
-        this->radio->standby();
-        int16_t state = this->radio->transmit(data, len);
-        this->radio->startReceive();
-        setPacketReceivedAction();
-        Serial.print("[LORA] TX: ");
-        for (size_t i = 0; i < len; i++)
-        {
-            if (data[i] < 0x10)
-                Serial.print("0");
+        LoRa.idle();
 
-            Serial.print(data[i], HEX);
-            Serial.print(" ");
-        }
-        Serial.println();
-        return state == RADIOLIB_ERR_NONE;
+        LoRa.beginPacket();
+        size_t bytesWritten = LoRa.write(&data, len);
+        LoRa.endPacket(false);
+        LoRa.receive();
+
+        return bytesWritten > 0;
     }
 
-    volatile bool LoRaDriver::receivedFlag = false;
-
-    bool LoRaDriver::startReceive()
+    void IRAM_ATTR LoRaDriver::onLoRaRxIRQ()
     {
-        int16_t state = this->radio->startReceive();
-
-        return state == RADIOLIB_ERR_NONE;
+        lora_rx_flag = true;
     }
 
-    void LoRaDriver::clearDioActions()
+    bool LoRaDriver::consume_rx_flag()
     {
-        this->radio->clearDio1Action();
-    }
-
-    void LoRaDriver::setPacketReceivedAction()
-    {
-        this->radio->setPacketReceivedAction([]()
-                                             { receivedFlag = true; });
-    }
-
-    bool LoRaDriver::checkPacketReceived()
-    {
-        return this->receivedFlag;
-    }
-
-    int LoRaDriver::readData(uint8_t *buffer, size_t len)
-    {
-        if (!receivedFlag)
-            return 0;
-
-        receivedFlag = false;
-
-        int packetSize = this->radio->getPacketLength();
-
-        if (packetSize == 0)
-            return 0;
-
-        if (packetSize > len)
-            packetSize = len;
-
-        int state = this->radio->readData(buffer, packetSize);
-
-        this->radio->startReceive();
-
-        if (state != RADIOLIB_ERR_NONE)
-            return -1;
-
-        return packetSize;
-    }
-
-    void LoRaDriver::rxLoRaPacketTask(void *pvParameters)
-    {
-        LoRaDriver *driver = static_cast<LoRaDriver *>(pvParameters);
-
-        TickType_t xLastWakeTime = xTaskGetTickCount();
-        const TickType_t xFrequency = POLLING_INTERVAL_MS / portTICK_PERIOD_MS;
-
-        for (;;)
-        {
-            vTaskDelayUntil(&xLastWakeTime, xFrequency);
-            if (driver->checkPacketReceived())
-            {
-                uint8_t buffer[RX_BUFFER_SIZE];
-                int len = driver->readData(buffer, sizeof(buffer));
-                Serial.print("[LORA] RX: ");
-                for (size_t i = 0; i < len; i++)
-                {
-                    if (buffer[i] < 0x10)
-                        Serial.print("0");
-
-                    Serial.print(buffer[i], HEX);
-                    Serial.print(" ");
-                }
-                Serial.println();
-
-                if (len > sizeof(lib::packet::A3MESHHeader_t))
-                {
-                    RxMessage_t msg;
-                    memcpy(msg.rx_data, buffer, len);
-                    msg.len = len;
-
-                    xQueueSend(driver->rxQueue, &msg, portMAX_DELAY);
-                }
-            }
-        }
-    }
-
-    void LoRaDriver::txLoRaPacketTask(void *pvParameters)
-    {
-        LoRaDriver *driver = static_cast<LoRaDriver *>(pvParameters);
-        TxMessage_t msg;
-
-        for (;;)
-        {
-            if (xQueueReceive(driver->txQueue, &msg, portMAX_DELAY) == pdTRUE)
-            {
-                driver->sendRawPacket(msg.tx_data, msg.len);
-            }
-            vTaskDelay(10 / portTICK_PERIOD_MS);
-        }
-    }
-
-    bool LoRaDriver::startTasks()
-    {
-        int result = xTaskCreate(
-            rxLoRaPacketTask,
-            "LoRa RX",
-            4096,
-            this,
-            1,
-            NULL);
-
-        if (result != pdPASS)
-        {
-            ESP_LOGE(A3M_TAG, "Failed to create LoRa RX Task");
+        if (!lora_rx_flag)
             return false;
-        }
 
-        result = xTaskCreate(
-            txLoRaPacketTask,
-            "LoRa TX",
-            4096,
-            this,
-            1,
-            NULL);
-
-        if (result != pdPASS)
-        {
-            ESP_LOGE(A3M_TAG, "Failed to create LoRa TX Task");
-            return false;
-        }
-
+        lora_rx_flag = false;
         return true;
+    }
+
+    LoRaDriver::rx_LoRa_msg_t* LoRaDriver::alloc_frame()
+    {
+        rx_LoRa_msg_t* f = &pool[pool_idx];
+        pool_idx = (pool_idx + 1) & 7;
+        return f;
     }
 
 } // namespace lib::lora

@@ -7,6 +7,7 @@
 #include <BLE2902.h>
 #include <config.h>
 #include "A3MESHPacket.h"
+#include "BLEQueues.h"
 
 
 namespace lib::ble
@@ -42,30 +43,18 @@ namespace lib::ble
 
         bool setup();
 
-        bool isConnected();
-
-        bool startTasks();
+        bool is_connected();
 
         void shutdown();
 
-        //char * parsePacket(const lib::packet::A3MESHPacket_t &pkt);
-
         bool send(const char *txBuffer);
 
-        QueueHandle_t getTxQueue() { return bleTxQueue; }
-        QueueHandle_t getRxQueue() { return bleRxQueue; }
+        BLECharacteristic* getTxCharacteristic() const { return _txCharacteristic; }
 
     private:
-        BLECharacteristic *txCharacteristic = nullptr;
+        BLECharacteristic *_txCharacteristic = nullptr;
 
-        QueueHandle_t bleRxQueue = nullptr;
-        QueueHandle_t bleTxQueue = nullptr;
-
-        bool deviceConnected = false;
-
-        // static void BLErxTask(void *pvParameters);
-        static void lifeBitTask(void *pvParameters);
-        static void BLEtxTask(void *pvParameters);
+        bool _deviceConnected = false;
 
         friend class ServerCallbacks;
         friend class RXCallbacks;

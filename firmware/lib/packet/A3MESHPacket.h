@@ -5,50 +5,45 @@
 
 namespace lib::packet
 {
-    typedef enum
+    typedef enum : uint8_t
     {
-        MSG_TYPE_DATA = 0,
-        MSG_TYPE_DISCOVERY
-    } MessageType;
+        k_data_type = 0,
+        k_discovery_type
+    } a3mesh_msg_type_t;
 
-    typedef struct
+    constexpr size_t HEADER_SIZE = 4;
+    // Sum of sizes of pkt_id, src, node_id, dst, ttl, type, flags, payload_len
+    constexpr size_t FIXED_FIELDS_SIZE = 2 + 4 + 4 + 4 + 1 + 1 + 1 + 1; 
+    
+
+    typedef struct __attribute__((packed))
     {
-        uint16_t pkt_id;
-        uint16_t node_id;
-        uint16_t src;
-        uint16_t dst;
+        uint16_t pkt_id;                        // 2 bytes
+        uint32_t src;                           // 4 bytes
+        uint32_t node_id;                       // 4 bytes
+        uint32_t dst;                           // 4 bytes
+        uint8_t ttl;                            // 1 byte
+        uint8_t type;                           // 1 byte provision field
 
-        uint8_t ttl;
-        uint8_t type;
+        uint8_t flags;                          // 1 byte
+        uint8_t payload_len;                    // 1 byte
+        uint8_t payload[A3MESH_MAX_PAYLOAD];    // (256 - N=21) bytes, N representing the sum of the header size and the fixed fields in the packet structure
+    } A3MESH_packet_t;
 
-        uint8_t flags;
 
-        uint8_t payload_len;
-        uint8_t payload[A3MESH_MAX_PAYLOAD];
-    } A3MESHPacket_t;
-
-    typedef struct
+    typedef struct __attribute__((packed))
     {
-        uint8_t version;
-        uint8_t type;
-        uint16_t packet_length;
-    } A3MESHHeader_t;
-
-    enum class Transport : uint8_t
-    {
-        BLE,
-        LORA
-    };
+        uint8_t version;                        // 1 byte
+        a3mesh_msg_type_t type;                 // 1 byte
+        uint16_t packet_length;                 // 2 bytes
+    } A3MESH_header_t;
 
     class A3MESHPacket
     {
     public:
-        static size_t serializePacket(const A3MESHPacket_t &pkt, uint8_t *buffer);
-        static size_t serializeLoRaMessage(const A3MESHHeader_t &header, const A3MESHPacket_t &pkt, uint8_t *buffer);
-        static bool deserializePacket(const uint8_t *buffer, size_t len, A3MESHHeader_t &header, A3MESHPacket_t &pkt);
-        //static bool deserializeLoRaMessage(const uint8_t *buffer, size_t len, A3MESHHeader_t &header, A3MESHPacket_t &pkt);
-        static void createLoRaMessage(uint8_t version, uint8_t type, uint16_t pkt_id, uint16_t node_id, uint16_t src, uint16_t dst, uint8_t ttl, uint8_t flags, const uint8_t *payload, uint8_t *buffer, size_t &len);
-
+        static size_t serialize_pkt(const A3MESH_packet_t &pkt, uint8_t *buffer);
+        static size_t serialize_header_pkt(A3MESH_header_t &header, const A3MESH_packet_t &pkt, uint8_t *buffer);
+        static int8_t deserialize_pkt(const uint8_t *buffer, size_t len, A3MESH_header_t &header, A3MESH_packet_t &pkt);
     };
 
 } // namespace lib::packet
