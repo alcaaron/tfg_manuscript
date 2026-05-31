@@ -9,7 +9,6 @@
 #include "A3MESHManagerTasks.h"
 #include "PassiveACK.h"
 
-
 // ======================
 // === Global Objects ===
 // ======================
@@ -105,6 +104,7 @@ enum class MeshRxState
 
   k_rx_process_discovery,
   k_rx_process_data,
+  k_rx_process_key,
 
   k_rx_local_delivery,
   k_rx_forward,
@@ -184,6 +184,9 @@ MeshRxState handleClassify(a3mesh_rx_ctx_t &ctx)
   case lib::packet::k_data_type:
     return MeshRxState::k_rx_process_data;
 
+  case lib::packet::k_key_exchange:
+    return MeshRxState::k_rx_process_key;
+
   default:
     return MeshRxState::k_rx_drop;
   }
@@ -213,12 +216,27 @@ MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
   if (ctx.is_for_me)
     return MeshRxState::k_rx_local_delivery;
 
+  MESH_LOG("[A3MESH] No es para mí, pero soy un cotilla y el payload es:");
+  MESH_LOG("\"%s\"\r\n", ctx.pkt.payload);
+
   ctx.should_forward = a3mesh.should_forward(ctx.pkt);
 
   if (ctx.should_forward)
     return MeshRxState::k_rx_forward;
 
   return MeshRxState::k_rx_drop;
+}
+
+MeshRxState handleKeyExchange(a3mesh_rx_ctx_t &ctx)
+{
+  ctx.is_for_me =
+      (ctx.pkt.dst == a3mesh.get_node_id()) ||
+      (ctx.pkt.dst == 0xFFFFFFFF);
+
+  return (ctx.is_for_me) ? 
+  MeshRxState::k_rx_local_delivery 
+  : MeshRxState::k_rx_drop;
+  
 }
 
 MeshRxState handleLocalDelivery(a3mesh_rx_ctx_t &ctx)
@@ -229,7 +247,7 @@ MeshRxState handleLocalDelivery(a3mesh_rx_ctx_t &ctx)
   int len = snprintf(
       bleBuffer,
       sizeof(bleBuffer),
-      "+RCV=%hx,%hx,%.*s\r\n",
+      "+RCV=%08x,%08x,%.*s\r\n",
       ctx.pkt.src,
       ctx.pkt.node_id,
       ctx.pkt.payload_len,
@@ -310,6 +328,9 @@ void LoRa2BLETask(void *pvParameters)
         state = handleData(ctx);
         break;
 
+      case MeshRxState::k_rx_process_key:
+        state = handleKeyExchange(ctx);
+
       case MeshRxState::k_rx_local_delivery:
         state = handleLocalDelivery(ctx);
         break;
@@ -338,14 +359,11 @@ void BLE2LoRaTask(void *pvParameters)
 
   lib::packet::A3MESH_header_t header = {
       .version = A3M_VERSION,
-      .type = lib::packet::a3mesh_msg_type_t::k_data_type,
   };
 
   lib::packet::A3MESH_packet_t pkt = {
       .src = node_id,
       .node_id = node_id,
-      .ttl = MAX_TTL,
-      .type = 0x00
   };
 
   lib::lora::LoRaDriver::tx_LoRa_msg_t tx_msg = {};
@@ -404,6 +422,8 @@ void BLE2LoRaTask(void *pvParameters)
       // -------------------------
       // Packet fill (dynamic fields only)
       // -------------------------
+      pkt.type = lib::packet::k_data_type;
+      pkt.ttl = MAX_TTL;
       pkt.pkt_id = a3mesh.get_next_pkt_id();
       pkt.dst = dst;
       pkt.flags = (a3mesh.is_neighbor(dst)) ? 0x01 : 0x00;
@@ -517,6 +537,74 @@ void BLE2LoRaTask(void *pvParameters)
       continue;
     }
 
+    if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SENDKX="))
+    {
+      uint32_t dst = 0;
+
+      char msg[A3MESH_MAX_PAYLOAD+1];
+
+      const char *args = rx_buffer + 8;
+
+      if (sscanf(args, 
+                  "%08x,%" STR(A3MESH_MAX_PAYLOAD) "[^\r\n]", 
+                  &dst, 
+                  msg) != 2)
+      {
+        xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
+        continue;
+      }
+
+      // -------------------------
+      // Packet fill (dynamic fields only)
+      // -------------------------
+      pkt.type = lib::packet::k_key_exchange;
+      pkt.ttl = 0x01;
+      pkt.pkt_id = a3mesh.get_next_pkt_id();
+      pkt.dst = dst;
+      pkt.flags = (a3mesh.is_neighbor(dst)) ? 0x01 : 0x00;
+      pkt.payload_len = (uint8_t)strlen(msg);
+
+      memcpy(pkt.payload, msg, pkt.payload_len);
+
+      // -------------------------
+      // Serialize
+      // -------------------------
+      tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(
+          header,
+          pkt,
+          tx_msg.tx_data);
+
+      // -------------------------
+      // TX queue
+      // -------------------------
+      // Serial.println("[BLE2LORA] Sending header:");
+      // Serial.printf("[BLE2LORA] version: %u, type: %u, packet_length: %u\r\n",
+      //     header.version,
+      //     header.type,
+      //     header.packet_length);
+      // Serial.printf("[BLE2LORA] Sending packet:\r\n");
+      // Serial.printf("[BLE2LORA] pkt_id: %u, src: %hx, node_id: %hx, dst: %hx, ttl: %u, type: %u, flags: %u, payload_len: %u, payload: %.*s\r\n",
+      //     pkt.pkt_id,
+      //     pkt.src,
+      //     pkt.node_id,
+      //     pkt.dst,
+      //     pkt.ttl,
+      //     pkt.type,
+      //     pkt.flags,
+      //     pkt.payload_len,
+      //     pkt.payload_len,
+      //     pkt.payload);
+      if (xQueueSend(xLoRaTxQueue, &tx_msg, 0) == pdTRUE)
+      {
+        xQueueSend(xBLETxQueue, "+OK\r\n", 0);
+      }
+      else
+      {
+        xQueueSend(xBLETxQueue, "+ERR=4\r\n", 0);
+      }
+      continue;
+    }
+
 
     // -------------------------
     // Fallback
@@ -575,40 +663,40 @@ bool setup_A3MESH()
 
   // --------- Init LoRa Driver ---------
   if (!lora.begin(lib::lora::A3MESHConfig())) return false;
-  MESH_LOG("[LORA] init success!");
+  MESH_LOG("[LORA] init success!\r\n");
 
   if (!initLoRaQueues()) return false;
-  MESH_LOG("[LORA] queues initialized!");
+  MESH_LOG("[LORA] queues initialized!\r\n");
 
   if (!startLoRaTasks()) return false;
-  MESH_LOG("[LORA] tasks started!");
+  MESH_LOG("[LORA] tasks started!\r\n");
 
 
   // --------- Init BLE Driver ---------
   if (!ble.setup()) return false;
-  MESH_LOG("[BLE] init success!");
+  MESH_LOG("[BLE] init success!\r\n");
 
   if (!init_BLE_queues()) return false;
-  MESH_LOG("[BLE] queues initialized!");
+  MESH_LOG("[BLE] queues initialized!\r\n");
 
   if (!start_BLE_tasks()) return false;
-  MESH_LOG("[BLE] tasks started!");
+  MESH_LOG("[BLE] tasks started!\r\n");
 
 
   // --------- Init Core Tasks ---------
   if (xTaskCreatePinnedToCore(BLE2LoRaTask, "BLE2LoRaTask", 4096, NULL, 1, NULL, 1) != pdPASS) return false;
-  MESH_LOG("[SYS] BLE2LORA started!");
+  MESH_LOG("[SYS] BLE2LORA started!\r\n");
 
   if (xTaskCreatePinnedToCore(LoRa2BLETask, "LoRa2BLETask", 4096, NULL, 1, NULL, 1) != pdPASS) return false;
-  MESH_LOG("[SYS] LORA2BLE started!");
+  MESH_LOG("[SYS] LORA2BLE started!\r\n");
 
 
   // --------- Init A3MESH Manager ---------
   if (xTaskCreatePinnedToCore(vSendDiscoveryTask, "DiscoveryTask", 4096, NULL, 1, NULL, 0) != pdPASS) return false;
-  MESH_LOG("[MESH] Discovery Task Initialized!");
+  MESH_LOG("[MESH] Discovery Task Initialized!\r\n");
 
   if (xTaskCreatePinnedToCore(vNeighborCheckTask, "NeighborCheckTask", 4096, NULL, 1, NULL, 0) != pdPASS) return false;
-  MESH_LOG("[MESH] Neighbor Check Task Initialized!");
+  MESH_LOG("[MESH] Neighbor Check Task Initialized!\r\n");
   return true;
 }
 

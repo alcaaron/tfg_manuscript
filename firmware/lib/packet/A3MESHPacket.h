@@ -8,7 +8,8 @@ namespace lib::packet
     typedef enum : uint8_t
     {
         k_data_type = 0,
-        k_discovery_type
+        k_discovery_type,
+        k_key_exchange
     } a3mesh_msg_type_t;
 
     constexpr size_t HEADER_SIZE = 4;
