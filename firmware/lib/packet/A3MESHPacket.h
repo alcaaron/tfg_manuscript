@@ -7,10 +7,18 @@ namespace lib::packet
 {
     typedef enum : uint8_t
     {
-        k_data_type = 0,
+        k_data_plain = 0,
         k_discovery_type,
-        k_key_exchange
+        k_key_exchange,
+        k_data_encrypted,
     } a3mesh_msg_type_t;
+
+    typedef enum : uint8_t
+    {
+        k_enc_none = 0,
+        k_enc_group,
+        k_enc_node2node,
+    } a3mesh_enc_type_t;
 
     constexpr size_t HEADER_SIZE = 4;
     // Sum of sizes of pkt_id, src, node_id, dst, ttl, type, flags, payload_len

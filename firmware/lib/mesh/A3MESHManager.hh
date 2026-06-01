@@ -35,7 +35,7 @@ namespace lib::mesh
         
         void send_discovery();
         bool should_forward(const lib::packet::A3MESH_packet_t &pkt);
-        void update_neighbor(const Neighbor &neighbor);
+        bool update_neighbor(const Neighbor &neighbor);
         bool is_duplicate(const lib::packet::A3MESH_packet_t &pkt);
         uint8_t get_neighbor_count();
         void rm_tout_neigbhors();

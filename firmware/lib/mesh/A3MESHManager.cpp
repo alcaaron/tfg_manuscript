@@ -72,24 +72,18 @@ namespace lib::mesh
         return false;
     }
 
-    void A3MESHManager::update_neighbor(const Neighbor &neighbor)
+    bool A3MESHManager::update_neighbor(const Neighbor &neighbor)
     {
-        //Serial.printf("[NEIGHBOR] Node ID: %hx, RSSI: %d\n", neighbor.node_id, neighbor.rssi);
-
-        TickType_t now = millis();
-
         xSemaphoreTake(_mutex, portMAX_DELAY);
 
         for (uint8_t i = 0; i < neighbor_count; i++)
         {
-
             if (neighbors[i].node_id == neighbor.node_id)
             {
-                //Serial.printf("[NEIGHBOR] Updating node %hx\n", neighbor.node_id);
                 neighbors[i].rssi = neighbor.rssi;
                 neighbors[i].last_seen = neighbor.last_seen;
                 xSemaphoreGive(_mutex);
-                return;
+                return false;
             }
         }
 
@@ -100,6 +94,7 @@ namespace lib::mesh
         }
 
         xSemaphoreGive(_mutex);
+        return true;
     }
 
     void A3MESHManager::rm_tout_neigbhors()

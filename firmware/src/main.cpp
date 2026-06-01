@@ -181,7 +181,8 @@ MeshRxState handleClassify(a3mesh_rx_ctx_t &ctx)
   case lib::packet::k_discovery_type:
     return MeshRxState::k_rx_process_discovery;
 
-  case lib::packet::k_data_type:
+  case lib::packet::k_data_plain:
+  case lib::packet::k_data_encrypted:
     return MeshRxState::k_rx_process_data;
 
   case lib::packet::k_key_exchange:
@@ -200,7 +201,14 @@ MeshRxState handleDiscovery(a3mesh_rx_ctx_t &ctx)
   neighbor.rssi = ctx.rx_msg->rssi;
   neighbor.last_seen = millis();
 
-  a3mesh.update_neighbor(neighbor);
+  bool is_new = a3mesh.update_neighbor(neighbor);
+
+  if (is_new)
+  {
+    char disc_buf[32];
+    snprintf(disc_buf, sizeof(disc_buf), "+DISC=%08x\r\n", neighbor.node_id);
+    xQueueSend(xBLETxQueue, disc_buf, 0);
+  }
 
   return MeshRxState::k_rx_done;
 }
@@ -243,21 +251,53 @@ MeshRxState handleLocalDelivery(a3mesh_rx_ctx_t &ctx)
 {
   MESH_LOG("[A3MESH] Delivering packet locally\r\n");
   char bleBuffer[BLE_BUFFER_SIZE] = {0};
+  int len = 0;
 
-  int len = snprintf(
-      bleBuffer,
-      sizeof(bleBuffer),
-      "+RCV=%08x,%08x,%.*s\r\n",
-      ctx.pkt.src,
-      ctx.pkt.node_id,
-      ctx.pkt.payload_len,
-      ctx.pkt.payload);
+  if (ctx.header.type == lib::packet::k_key_exchange)
+  {
+    len = snprintf(bleBuffer, sizeof(bleBuffer),
+        "+KX=%08x,%08x,%.*s\r\n",
+        ctx.pkt.src, ctx.pkt.node_id,
+        ctx.pkt.payload_len, ctx.pkt.payload);
+  }
+  else if (ctx.header.type == lib::packet::k_data_encrypted)
+  {
+    if (ctx.pkt.type == lib::packet::k_enc_group && ctx.pkt.payload_len > 4)
+    {
+      uint32_t group_id =
+          ((uint32_t)ctx.pkt.payload[0])        |
+          ((uint32_t)ctx.pkt.payload[1] << 8)   |
+          ((uint32_t)ctx.pkt.payload[2] << 16)  |
+          ((uint32_t)ctx.pkt.payload[3] << 24);
+      len = snprintf(bleBuffer, sizeof(bleBuffer),
+          "+RCVGRP=%08x,%08x,%08x,%.*s\r\n",
+          group_id, ctx.pkt.src, ctx.pkt.node_id,
+          (int)(ctx.pkt.payload_len - 4), ctx.pkt.payload + 4);
+    }
+    else if (ctx.pkt.type == lib::packet::k_enc_node2node)
+    {
+      len = snprintf(bleBuffer, sizeof(bleBuffer),
+          "+RCVE2E=%08x,%08x,%.*s\r\n",
+          ctx.pkt.src, ctx.pkt.node_id,
+          ctx.pkt.payload_len, ctx.pkt.payload);
+    }
+    else
+    {
+      return MeshRxState::k_rx_drop;
+    }
+  }
+  else
+  {
+    len = snprintf(bleBuffer, sizeof(bleBuffer),
+        "+RCV=%08x,%08x,%.*s\r\n",
+        ctx.pkt.src, ctx.pkt.node_id,
+        ctx.pkt.payload_len, ctx.pkt.payload);
+  }
 
   if (len <= 0)
     return MeshRxState::k_rx_drop;
 
   xQueueSend(xBLETxQueue, bleBuffer, 0);
-
   return MeshRxState::k_rx_done;
 }
 
@@ -330,6 +370,7 @@ void LoRa2BLETask(void *pvParameters)
 
       case MeshRxState::k_rx_process_key:
         state = handleKeyExchange(ctx);
+        break;
 
       case MeshRxState::k_rx_local_delivery:
         state = handleLocalDelivery(ctx);
@@ -422,7 +463,8 @@ void BLE2LoRaTask(void *pvParameters)
       // -------------------------
       // Packet fill (dynamic fields only)
       // -------------------------
-      pkt.type = lib::packet::k_data_type;
+      header.type = lib::packet::k_data_plain;
+      pkt.type = lib::packet::k_enc_none;
       pkt.ttl = MAX_TTL;
       pkt.pkt_id = a3mesh.get_next_pkt_id();
       pkt.dst = dst;
@@ -431,34 +473,8 @@ void BLE2LoRaTask(void *pvParameters)
 
       memcpy(pkt.payload, msg, pkt.payload_len);
 
-      // -------------------------
-      // Serialize
-      // -------------------------
-      tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(
-          header,
-          pkt,
-          tx_msg.tx_data);
+      tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(header, pkt, tx_msg.tx_data);
 
-      // -------------------------
-      // TX queue
-      // -------------------------
-      // Serial.println("[BLE2LORA] Sending header:");
-      // Serial.printf("[BLE2LORA] version: %u, type: %u, packet_length: %u\r\n",
-      //     header.version,
-      //     header.type,
-      //     header.packet_length);
-      // Serial.printf("[BLE2LORA] Sending packet:\r\n");
-      // Serial.printf("[BLE2LORA] pkt_id: %u, src: %hx, node_id: %hx, dst: %hx, ttl: %u, type: %u, flags: %u, payload_len: %u, payload: %.*s\r\n",
-      //     pkt.pkt_id,
-      //     pkt.src,
-      //     pkt.node_id,
-      //     pkt.dst,
-      //     pkt.ttl,
-      //     pkt.type,
-      //     pkt.flags,
-      //     pkt.payload_len,
-      //     pkt.payload_len,
-      //     pkt.payload);
       if (xQueueSend(xLoRaTxQueue, &tx_msg, 0) == pdTRUE)
       {
         xQueueSend(xBLETxQueue, "+OK\r\n", 0);
@@ -501,7 +517,7 @@ void BLE2LoRaTask(void *pvParameters)
         offset += snprintf(
             neighbors_str + offset,
             sizeof(neighbors_str) - offset,
-            "+N:%hx,RSSI:%d,T:%lu;\r\n",
+            "+N:%08x,RSSI:%d,T:%lu;\r\n",
             neighbors_list[i].node_id,
             neighbors_list[i].rssi,
             neighbors_list[i].last_seen);
@@ -530,7 +546,7 @@ void BLE2LoRaTask(void *pvParameters)
 
       snprintf(response,
         sizeof(response),
-        "+NODEID=%hx\r\n",
+        "+NODEID=%08x\r\n",
         node_id);
 
       xQueueSend(xBLETxQueue, response, 0);
@@ -539,25 +555,21 @@ void BLE2LoRaTask(void *pvParameters)
 
     if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SENDKX="))
     {
+      // Format: AT+SENDKX=<dst_hex>,<payload>\r\n
       uint32_t dst = 0;
+      char msg[A3MESH_MAX_PAYLOAD + 1];
+      const char *args = rx_buffer + 10;
 
-      char msg[A3MESH_MAX_PAYLOAD+1];
-
-      const char *args = rx_buffer + 8;
-
-      if (sscanf(args, 
-                  "%08x,%" STR(A3MESH_MAX_PAYLOAD) "[^\r\n]", 
-                  &dst, 
-                  msg) != 2)
+      if (sscanf(args,
+                  "%08x,%" STR(A3MESH_MAX_PAYLOAD) "[^\r\n]",
+                  &dst, msg) != 2)
       {
         xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
         continue;
       }
 
-      // -------------------------
-      // Packet fill (dynamic fields only)
-      // -------------------------
-      pkt.type = lib::packet::k_key_exchange;
+      header.type = lib::packet::k_key_exchange;
+      pkt.type = lib::packet::k_enc_none;
       pkt.ttl = 0x01;
       pkt.pkt_id = a3mesh.get_next_pkt_id();
       pkt.dst = dst;
@@ -566,42 +578,103 @@ void BLE2LoRaTask(void *pvParameters)
 
       memcpy(pkt.payload, msg, pkt.payload_len);
 
-      // -------------------------
-      // Serialize
-      // -------------------------
-      tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(
-          header,
-          pkt,
-          tx_msg.tx_data);
+      tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(header, pkt, tx_msg.tx_data);
 
-      // -------------------------
-      // TX queue
-      // -------------------------
-      // Serial.println("[BLE2LORA] Sending header:");
-      // Serial.printf("[BLE2LORA] version: %u, type: %u, packet_length: %u\r\n",
-      //     header.version,
-      //     header.type,
-      //     header.packet_length);
-      // Serial.printf("[BLE2LORA] Sending packet:\r\n");
-      // Serial.printf("[BLE2LORA] pkt_id: %u, src: %hx, node_id: %hx, dst: %hx, ttl: %u, type: %u, flags: %u, payload_len: %u, payload: %.*s\r\n",
-      //     pkt.pkt_id,
-      //     pkt.src,
-      //     pkt.node_id,
-      //     pkt.dst,
-      //     pkt.ttl,
-      //     pkt.type,
-      //     pkt.flags,
-      //     pkt.payload_len,
-      //     pkt.payload_len,
-      //     pkt.payload);
       if (xQueueSend(xLoRaTxQueue, &tx_msg, 0) == pdTRUE)
-      {
         xQueueSend(xBLETxQueue, "+OK\r\n", 0);
-      }
       else
-      {
         xQueueSend(xBLETxQueue, "+ERR=4\r\n", 0);
+      continue;
+    }
+
+
+    // -------------------------
+    // SENDE2E command
+    // Format: AT+SENDE2E=<dst_hex>,<ciphertext>\r\n
+    // Payload already encrypted by the app (node2node key).
+    // -------------------------
+    if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SENDE2E="))
+    {
+      uint32_t dst = 0;
+      char cipher[A3MESH_MAX_PAYLOAD + 1];
+      const char *args = rx_buffer + 11;
+
+      if (sscanf(args,
+                  "%08x,%" STR(A3MESH_MAX_PAYLOAD) "[^\r\n]",
+                  &dst, cipher) != 2)
+      {
+        xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
+        continue;
       }
+
+      header.type = lib::packet::k_data_encrypted;
+      pkt.type = lib::packet::k_enc_node2node;
+      pkt.ttl = MAX_TTL;
+      pkt.pkt_id = a3mesh.get_next_pkt_id();
+      pkt.dst = dst;
+      pkt.flags = (a3mesh.is_neighbor(dst)) ? 0x01 : 0x00;
+      pkt.payload_len = (uint8_t)strlen(cipher);
+
+      memcpy(pkt.payload, cipher, pkt.payload_len);
+
+      tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(header, pkt, tx_msg.tx_data);
+
+      if (xQueueSend(xLoRaTxQueue, &tx_msg, 0) == pdTRUE)
+        xQueueSend(xBLETxQueue, "+OK\r\n", 0);
+      else
+        xQueueSend(xBLETxQueue, "+ERR=4\r\n", 0);
+      continue;
+    }
+
+
+    // -------------------------
+    // SENDGRP command
+    // Format: AT+SENDGRP=<group_id_hex>,<ciphertext>\r\n
+    // Payload already encrypted by the app (group key).
+    // The group_id is prepended as 4 LE bytes in the LoRa payload.
+    // -------------------------
+    if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SENDGRP="))
+    {
+      uint32_t group_id = 0;
+      char cipher[A3MESH_MAX_PAYLOAD + 1];
+      const char *args = rx_buffer + 11;
+
+      if (sscanf(args,
+                  "%08x,%" STR(A3MESH_MAX_PAYLOAD) "[^\r\n]",
+                  &group_id, cipher) != 2)
+      {
+        xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
+        continue;
+      }
+
+      size_t cipher_len = strlen(cipher);
+      if (cipher_len + 4 > A3MESH_MAX_PAYLOAD)
+      {
+        xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
+        continue;
+      }
+
+      header.type = lib::packet::k_data_encrypted;
+      pkt.type = lib::packet::k_enc_group;
+      pkt.ttl = MAX_TTL;
+      pkt.pkt_id = a3mesh.get_next_pkt_id();
+      pkt.dst = 0xFFFFFFFF;
+      pkt.flags = 0x00;
+
+      // Payload = [group_id LE 4B][ciphertext]
+      pkt.payload[0] = (group_id >> 0)  & 0xFF;
+      pkt.payload[1] = (group_id >> 8)  & 0xFF;
+      pkt.payload[2] = (group_id >> 16) & 0xFF;
+      pkt.payload[3] = (group_id >> 24) & 0xFF;
+      memcpy(pkt.payload + 4, cipher, cipher_len);
+      pkt.payload_len = (uint8_t)(4 + cipher_len);
+
+      tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(header, pkt, tx_msg.tx_data);
+
+      if (xQueueSend(xLoRaTxQueue, &tx_msg, 0) == pdTRUE)
+        xQueueSend(xBLETxQueue, "+OK\r\n", 0);
+      else
+        xQueueSend(xBLETxQueue, "+ERR=4\r\n", 0);
       continue;
     }
 
