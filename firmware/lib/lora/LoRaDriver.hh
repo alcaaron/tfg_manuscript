@@ -39,10 +39,26 @@ namespace lib::lora
         static bool consume_rx_flag();
         static rx_LoRa_msg_t* alloc_frame();
 
+        // Returns estimated time-on-air in ms for a packet of pkt_len bytes,
+        // using the configured SF/BW/CR/preamble from config.h.
+        static uint32_t compute_airtime_ms(size_t pkt_len);
+
     private:
         static volatile bool lora_rx_flag;
 
         static rx_LoRa_msg_t pool[8];
         static volatile uint8_t pool_idx;
+
+        // Duty-cycle tracking: ring buffer of recent TX records (tx timestamp + duration).
+        // Accessed only from vLoRaTxTask — no mutex needed.
+        struct AirtimeEntry {
+            uint32_t ts_ms;
+            uint32_t dur_ms;
+        };
+        AirtimeEntry _airtime_log[LORA_AIRTIME_RECORDS] = {};
+        uint8_t      _airtime_log_idx = 0;
+
+        // Returns true and records airtime if TX is within duty-cycle budget; false otherwise.
+        bool check_and_record_airtime(uint32_t airtime_ms);
     };
 } // namespace lib::lora

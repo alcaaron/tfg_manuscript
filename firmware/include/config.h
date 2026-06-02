@@ -95,6 +95,48 @@
 #define MAX_PENDING_FORWARDS        8               // Max simultaneous forwards awaiting passive-ACK confirmation
 
 
+// ============================================
+// === DEMO MODE PARAMETERS (lab / TFG demo) ===
+// ============================================
+// Active when AT+DEMO=1. Same formula as Smart Gossip but tuned for
+// close-range lab conditions (RSSI ≈ -20 to -40 dBm).
+// DEMO_MESH_P_FLOOR=0.95 ensures the network always relays visibly.
+
+#define DEMO_MESH_ALPHA       0.03f    // Very gentle sigmoid: RSSI barely suppresses forwarding
+#define DEMO_MESH_RSSI_REF   -30.0f   // Inflection point shifted to lab-range RSSI
+#define DEMO_MESH_BETA        0.05f    // Density effect nearly negligible
+#define DEMO_MESH_GAMMA       0.05f    // Duplicate penalty nearly negligible
+#define DEMO_MESH_P_FLOOR     0.95f   // At least 95% forwarding probability guaranteed
+
+
+// ================================
+// === SMART GOSSIP PARAMETERS ===
+// ================================
+// p = max(GOSSIP_P_FLOOR, f_rssi * f_density * f_dupe)
+//
+//   f_rssi    = 1 / (1 + exp(GOSSIP_ALPHA * (rssi - GOSSIP_RSSI_REF)))   logistic sigmoid
+//   f_density = 1 / (1 + GOSSIP_BETA * n_neighbors)                      rational decay
+//   f_dupe    = exp(-GOSSIP_GAMMA * (copies - 1))                         exponential decay
+//
+
+#define GOSSIP_ALPHA          0.145f    // RSSI sigmoid slope (dBm⁻¹)
+#define GOSSIP_RSSI_REF      -103.8f   // RSSI sigmoid inflection point (dBm)
+#define GOSSIP_BETA           0.146f   // Density decay coefficient
+#define GOSSIP_GAMMA          0.311f   // Exponential penalty for duplicate packets
+#define GOSSIP_P_FLOOR        0.111f   // Minimum forwarding probability
+#define GOSSIP_MAX_COPIES     3        // Discard packet after receiving more than N copies (anti-loop)
+
+
+// =======================================
+// === LORA DUTY CYCLE CONFIGURATION ===
+// =======================================
+// EU868 regulations: max 1% duty cycle over a 1-hour window.
+
+#define LORA_DUTY_CYCLE_WINDOW_MS   3600000UL  // Sliding window duration (1 hour)
+#define LORA_DUTY_CYCLE_MAX_MS      36000UL    // Max airtime per window (1% of 3600 s = 36 s)
+#define LORA_AIRTIME_RECORDS        20         // Ring buffer depth for recent TX records
+
+
 // ==============================
 // === FIRMWARE VERSION ===
 // ==============================

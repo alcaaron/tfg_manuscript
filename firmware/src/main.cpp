@@ -120,8 +120,9 @@ struct a3mesh_rx_ctx_t
   lib::packet::A3MESH_header_t header;
   lib::packet::A3MESH_packet_t pkt;
 
-  bool should_forward;
-  bool is_for_me;
+  bool    should_forward;
+  bool    is_for_me;
+  uint8_t copies;   // 1 = first receipt, 2+ = duplicate; drives f_dupe in smart gossip
 };
 
 MeshRxState handleValidate(a3mesh_rx_ctx_t &ctx)
@@ -161,16 +162,18 @@ MeshRxState handleValidate(a3mesh_rx_ctx_t &ctx)
     return MeshRxState::k_rx_drop;
 
   // A neighbor is forwarding this packet — cancel our own pending forward if any.
-  // Must run before is_duplicate so it fires even for packets already in our dup cache.
+  // Must run before get_copies so it fires even for packets already in our dup cache.
   a3mesh.cancel_pending_forward(ctx.pkt.pkt_id, ctx.pkt.src);
 
   if (ctx.pkt.ttl == 0)
     return MeshRxState::k_rx_drop;
 
-  if (a3mesh.is_duplicate(ctx.pkt))
+  // Count copies: 1 = first receipt, 2+ = already seen.
+  // Drop after GOSSIP_MAX_COPIES to bound loop potential while allowing f_dupe to act.
+  ctx.copies = a3mesh.get_copies(ctx.pkt);
+  if (ctx.copies > GOSSIP_MAX_COPIES)
     return MeshRxState::k_rx_drop;
 
-  // Serial.println("[A3MESH] Packet validated successfully");
   return MeshRxState::k_rx_classify;
 }
 
@@ -215,19 +218,17 @@ MeshRxState handleDiscovery(a3mesh_rx_ctx_t &ctx)
 
 MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
 {
-  MESH_LOG("[A3MESH] Sent to: %08x\r\n", ctx.pkt.dst);
-  MESH_LOG("[A3MESH] I'm: %08x\r\n", a3mesh.get_node_id());
+  MESH_LOG("[A3MESH] dst=%08x me=%08x\r\n", ctx.pkt.dst, a3mesh.get_node_id());
   ctx.is_for_me =
       (ctx.pkt.dst == a3mesh.get_node_id()) ||
       (ctx.pkt.dst == 0xFFFFFFFF);
 
-  if (ctx.is_for_me)
-    return MeshRxState::k_rx_local_delivery;
+  if (ctx.is_for_me) {
+    // Deliver locally only on first copy; subsequent copies are already handled.
+    return (ctx.copies == 1) ? MeshRxState::k_rx_local_delivery : MeshRxState::k_rx_done;
+  }
 
-  MESH_LOG("[A3MESH] No es para mí, pero soy un cotilla y el payload es:");
-  MESH_LOG("\"%s\"\r\n", ctx.pkt.payload);
-
-  ctx.should_forward = a3mesh.should_forward(ctx.pkt);
+  ctx.should_forward = a3mesh.should_forward(ctx.pkt, ctx.rx_msg->rssi, ctx.copies);
 
   if (ctx.should_forward)
     return MeshRxState::k_rx_forward;
@@ -721,6 +722,38 @@ void BLE2LoRaTask(void *pvParameters)
           (int)a3mesh.get_neighbor_count());
 
       xQueueSend(xBLETxQueue, response, 0);
+      continue;
+    }
+
+
+    // -------------------------
+    // DEMO mode
+    // AT+DEMO=1  → enable (high-probability forwarding for lab demos)
+    // AT+DEMO=0  → disable (normal Smart Gossip)
+    // AT+DEMO?   → query current state
+    // -------------------------
+    if (strcmp(rx_buffer, "AT+DEMO?\r\n") == 0)
+    {
+      char response[32];
+      snprintf(response, sizeof(response),
+               "+DEMO=%d\r\n+OK\r\n",
+               (int)a3mesh.get_demo_mode());
+      xQueueSend(xBLETxQueue, response, 0);
+      continue;
+    }
+
+    if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+DEMO="))
+    {
+      const char *arg = rx_buffer + 8;
+      if (arg[0] == '1') {
+        a3mesh.set_demo_mode(true);
+        xQueueSend(xBLETxQueue, "+DEMO=1\r\n+OK\r\n", 0);
+      } else if (arg[0] == '0') {
+        a3mesh.set_demo_mode(false);
+        xQueueSend(xBLETxQueue, "+DEMO=0\r\n+OK\r\n", 0);
+      } else {
+        xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
+      }
       continue;
     }
 

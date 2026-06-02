@@ -1,6 +1,7 @@
 #include "A3MESHManager.hh"
 #include <freertos/queue.h>
 #include <freertos/task.h>
+#include <math.h>
 
 namespace lib::mesh
 {
@@ -16,7 +17,6 @@ namespace lib::mesh
         }
         _node_id = generate_node_id();
         Serial.printf("Node ID: %u\n", _node_id);
-        _routing_protocol = 1;
     }
 
     uint32_t A3MESHManager::get_node_id()
@@ -36,23 +36,24 @@ namespace lib::mesh
         return id;
     }
 
-    bool A3MESHManager::is_duplicate(const lib::packet::A3MESH_packet_t &pkt)
+    uint8_t A3MESHManager::get_copies(const lib::packet::A3MESH_packet_t &pkt)
     {
         uint32_t now = millis();
 
         xSemaphoreTake(_mutex, portMAX_DELAY);
 
-        // evict_idx: first expired slot found (preferred over circular overwrite)
         int evict_idx = -1;
 
         for (int i = 0; i < DUP_CACHE_SIZE; i++) {
             if (seen_cache[i].msg_id == pkt.pkt_id && seen_cache[i].src == pkt.src) {
                 if (now - seen_cache[i].timestamp < DUP_TIMEOUT) {
+                    seen_cache[i].copies++;
+                    uint8_t c = seen_cache[i].copies;
                     xSemaphoreGive(_mutex);
-                    MESH_LOG("[MESH] Duplicate packet detected: pkt_id=%u, src=%hx\r\n", pkt.pkt_id, pkt.src);
-                    return true;
+                    MESH_LOG("[MESH] Copy #%u: pkt_id=%u src=%08x\r\n", c, pkt.pkt_id, pkt.src);
+                    return c;
                 }
-                // Same key but expired: refresh in place instead of inserting elsewhere
+                // Same key but expired: refresh in place
                 evict_idx = i;
                 break;
             }
@@ -64,12 +65,13 @@ namespace lib::mesh
         seen_cache[target].msg_id    = pkt.pkt_id;
         seen_cache[target].src       = pkt.src;
         seen_cache[target].timestamp = now;
+        seen_cache[target].copies    = 1;
 
         if (evict_idx < 0)
             seen_index = (seen_index + 1) % DUP_CACHE_SIZE;
 
         xSemaphoreGive(_mutex);
-        return false;
+        return 1;
     }
 
     bool A3MESHManager::update_neighbor(const Neighbor &neighbor)
@@ -252,8 +254,7 @@ namespace lib::mesh
         xSemaphoreGive(_mutex);
     }
 
-    // Returns true = proceed with TX, false = suppress (heard from a neighbor).
-    // Always frees the slot regardless of outcome.
+
     bool A3MESHManager::consume_pending_forward(uint16_t pkt_id, uint32_t src)
     {
         xSemaphoreTake(_mutex, portMAX_DELAY);
@@ -271,7 +272,51 @@ namespace lib::mesh
         return true;  // entry not found: transmit by default
     }
 
-    bool A3MESHManager::should_forward(const lib::packet::A3MESH_packet_t &pkt)
+    void A3MESHManager::set_demo_mode(bool enabled)
+    {
+        xSemaphoreTake(_mutex, portMAX_DELAY);
+        _demo_mode = enabled;
+        xSemaphoreGive(_mutex);
+        MESH_LOG("[MESH] Demo mode %s\r\n", enabled ? "ENABLED" : "disabled");
+    }
+
+    bool A3MESHManager::get_demo_mode()
+    {
+        xSemaphoreTake(_mutex, portMAX_DELAY);
+        bool v = _demo_mode;
+        xSemaphoreGive(_mutex);
+        return v;
+    }
+
+    uint8_t A3MESHManager::gossip_forward_probability(uint8_t n_neighbors, int16_t rssi, uint8_t copies, bool demo)
+    {
+        float alpha, rssi_ref, beta, gamma, p_floor;
+
+        if (demo) {
+            alpha   = DEMO_MESH_ALPHA;
+            rssi_ref = DEMO_MESH_RSSI_REF;
+            beta    = DEMO_MESH_BETA;
+            gamma   = DEMO_MESH_GAMMA;
+            p_floor = DEMO_MESH_P_FLOOR;
+        } else {
+            alpha   = GOSSIP_ALPHA;
+            rssi_ref = GOSSIP_RSSI_REF;
+            beta    = GOSSIP_BETA;
+            gamma   = GOSSIP_GAMMA;
+            p_floor = GOSSIP_P_FLOOR;
+        }
+
+        float f_rssi    = 1.0f / (1.0f + expf(alpha * ((float)rssi - rssi_ref)));
+        float f_density = 1.0f / (1.0f + beta  * (float)n_neighbors);
+        float f_dupe    = expf(-gamma * (float)(copies - 1));
+
+        float p = f_rssi * f_density * f_dupe;
+        if (p < p_floor) p = p_floor;
+
+        return (uint8_t)(p * 100.0f + 0.5f);
+    }
+
+    bool A3MESHManager::should_forward(const lib::packet::A3MESH_packet_t &pkt, int16_t rssi, uint8_t copies)
     {
         if (pkt.ttl == 0)
         {
@@ -285,22 +330,15 @@ namespace lib::mesh
             return false;
         }
 
-        if (_routing_protocol == 0)
-        {
-            // Flooding
-            return true;
-        }
-        else if (_routing_protocol == 1)
-        {
-            // Gossip with a P value — esp_random() is thread-safe hardware TRNG
-            uint8_t will_be_forwarded = (esp_random() % 100) < 90;
-            MESH_LOG("[MESH] Gossip routing (P=0.9): will forward: %s\r\n", will_be_forwarded ? "yes" : "no");
-            return will_be_forwarded;
-        }
-        else
-        {
-            // Default to no forwarding
-            return false;
-        }
+        uint8_t n     = get_neighbor_count();
+        bool    demo  = get_demo_mode();
+        uint8_t threshold = gossip_forward_probability(n, rssi, copies, demo);
+        // esp_random() is a thread-safe hardware TRNG
+        bool forward = (esp_random() % 100) < threshold;
+
+        MESH_LOG("[MESH] %sSmartGossip: n=%u rssi=%d copies=%u | P=%u%% → %s\r\n",
+                 demo ? "DEMO " : "", n, rssi, copies, threshold, forward ? "fwd" : "drop");
+
+        return forward;
     }
 }

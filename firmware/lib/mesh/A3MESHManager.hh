@@ -15,6 +15,7 @@ namespace lib::mesh
         uint16_t msg_id;
         uint32_t src;
         uint32_t timestamp;
+        uint8_t  copies;    // number of times this (pkt_id, src) has been received
     } SeenMessage;
 
     typedef struct {
@@ -34,9 +35,9 @@ namespace lib::mesh
         uint16_t get_next_pkt_id();
         
         void send_discovery();
-        bool should_forward(const lib::packet::A3MESH_packet_t &pkt);
+        bool should_forward(const lib::packet::A3MESH_packet_t &pkt, int16_t rssi, uint8_t copies);
         bool update_neighbor(const Neighbor &neighbor);
-        bool is_duplicate(const lib::packet::A3MESH_packet_t &pkt);
+        uint8_t get_copies(const lib::packet::A3MESH_packet_t &pkt);
         uint8_t get_neighbor_count();
         void rm_tout_neigbhors();
         uint32_t get_best_neighbor_id();
@@ -47,14 +48,18 @@ namespace lib::mesh
         void cancel_pending_forward(uint16_t pkt_id, uint32_t src);
         bool consume_pending_forward(uint16_t pkt_id, uint32_t src);
 
+        void set_demo_mode(bool enabled);
+        bool get_demo_mode();
+
 
     private:
 
         uint32_t _node_id;
         uint16_t _msg_counter = 0;
+        bool     _demo_mode   = false;
         SemaphoreHandle_t _mutex;
         uint32_t generate_node_id();
-        uint8_t _routing_protocol;
+        static uint8_t gossip_forward_probability(uint8_t n_neighbors, int16_t rssi, uint8_t copies, bool demo);
         Neighbor neighbors[MAX_NEIGHBORS];
         uint8_t neighbor_count = 0;
 
