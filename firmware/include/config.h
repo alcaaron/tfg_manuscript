@@ -95,13 +95,23 @@
 #define MAX_PENDING_FORWARDS        8               // Max simultaneous forwards awaiting passive-ACK confirmation
 
 
+// ==============================
+// === FIRMWARE VERSION ===
+// ==============================
+
+#define A3M_FW_VERSION               "1.0.0"
+
+
 // ===============================
 // === BATTERY CONFIGURATION ===
 // ===============================
 
 #define BATTERY_VOLTAGE_PIN              A0        // ADC pin connected to battery voltage divider
-#define BATTERY_THRESHOLD                3.0       // Voltage threshold for low battery warning
+#define BATTERY_THRESHOLD                3.0f      // Voltage threshold for low battery warning
 #define BATTERY_MEASUREMENT_INTERVAL_MS  1000      // Interval for battery voltage measurements
+#define BATTERY_ADC_FACTOR               2.0f      // Multiply ADC voltage by this (accounts for voltage divider)
+#define BATTERY_MAX_V                    4.2f      // Nominal full LiPo voltage
+#define BATTERY_MIN_V                    3.0f      // Nominal empty LiPo voltage
 
 
 // ==============================

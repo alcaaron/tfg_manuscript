@@ -680,6 +680,52 @@ void BLE2LoRaTask(void *pvParameters)
 
 
     // -------------------------
+    // INFO command
+    // Format: AT+INFO?\r\n
+    // Returns: NODEID, FW version, battery %, uptime, LoRa params, neighbor count
+    // -------------------------
+    if (strcmp(rx_buffer, "AT+INFO?\r\n") == 0)
+    {
+      // --- Battery percentage ---
+      // ADC returns 0-4095 for 0-3.3 V; multiply by BATTERY_ADC_FACTOR for actual voltage.
+      float adc_v   = (analogRead(BATTERY_VOLTAGE_PIN) / 4095.0f) * 3.3f * BATTERY_ADC_FACTOR;
+      int   bat_pct = (int)(((adc_v - BATTERY_MIN_V) / (BATTERY_MAX_V - BATTERY_MIN_V)) * 100.0f);
+      if (bat_pct > 100) bat_pct = 100;
+      if (bat_pct <   0) bat_pct =   0;
+
+      // --- Uptime ---
+      uint32_t uptime_s = millis() / 1000UL;
+      uint32_t h = uptime_s / 3600;
+      uint32_t m = (uptime_s % 3600) / 60;
+      uint32_t s = uptime_s % 60;
+
+      // --- LoRa params ---
+      uint32_t freq_mhz = (uint32_t)(EU868_FREQUENCY / 1000000UL);
+
+      char response[BLE_BUFFER_SIZE];
+      snprintf(response, sizeof(response),
+          "+NODEID=%08x\r\n"
+          "+FWVER=%s\r\n"
+          "+BATT=%d\r\n"
+          "+UPTIME=%02u:%02u:%02u\r\n"
+          "+FREQ=%u\r\n"
+          "+SF=SF%d\r\n"
+          "+NEIGHBORS=%d\r\n"
+          "+OK\r\n",
+          node_id,
+          A3M_FW_VERSION,
+          bat_pct,
+          h, m, s,
+          freq_mhz,
+          (int)A3MESH_SF,
+          (int)a3mesh.get_neighbor_count());
+
+      xQueueSend(xBLETxQueue, response, 0);
+      continue;
+    }
+
+
+    // -------------------------
     // Fallback
     // -------------------------
     xQueueSend(xBLETxQueue, "+ERR=2\r\n", 0);
