@@ -7,11 +7,7 @@ void vLoRaRxTask(void *pvParameters)
 {
     for (;;)
     {
-        if (!lib::lora::LoRaDriver::consume_rx_flag())
-        {
-            vTaskDelay(1);
-            continue;
-        }
+        lib::lora::LoRaDriver::wait_for_rx();
 
         int pkt_size = LoRa.parsePacket();
         if (pkt_size <= 0)
@@ -62,6 +58,5 @@ void vLoRaTxTask(void *pvParameters)
 
             lora.send_raw_pkt(*(msg.tx_data), msg.len);
         }
-        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }

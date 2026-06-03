@@ -22,6 +22,18 @@ namespace lib::packet
         return v;
     }
 
+    uint16_t A3MESHPacket::compute_crc(const uint8_t *data, size_t len)
+    {
+        uint16_t crc = 0xFFFF;
+        for (size_t i = 0; i < len; i++) {
+            crc ^= (uint16_t)data[i] << 8;
+            for (int j = 0; j < 8; j++) {
+                crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : (crc << 1);
+            }
+        }
+        return crc;
+    }
+
     size_t A3MESHPacket::serialize_pkt(const A3MESH_packet_t &pkt, uint8_t *buffer)
     {
         size_t i = 0;
@@ -45,9 +57,13 @@ namespace lib::packet
         buffer[i++] = (pkt.dst >> 24) & 0xFF;
 
         buffer[i++] = pkt.ttl;
-        buffer[i++] = pkt.type; // provision field
+        buffer[i++] = pkt.type;
         buffer[i++] = pkt.flags;
         buffer[i++] = pkt.payload_len;
+
+        uint16_t crc = compute_crc(pkt.payload, pkt.payload_len);
+        buffer[i++] = crc & 0xFF;
+        buffer[i++] = crc >> 8;
 
         memcpy(&buffer[i], pkt.payload, pkt.payload_len);
         i += pkt.payload_len;
@@ -57,23 +73,16 @@ namespace lib::packet
 
     size_t A3MESHPacket::serialize_header_pkt(A3MESH_header_t &header, const A3MESH_packet_t &pkt, uint8_t *buffer)
     {
-        uint8_t temp[LORA_MAX_PACKET_SIZE];
-
-        size_t packet_len = serialize_pkt(pkt, temp);
+        size_t packet_len = serialize_pkt(pkt, buffer + HEADER_SIZE);
 
         header.packet_length = packet_len;
-        
-        size_t i = 0;
 
-        buffer[i++] = header.version;
-        buffer[i++] = header.type;
-        buffer[i++] = header.packet_length & 0xFF;
-        buffer[i++] = header.packet_length >> 8;
+        buffer[0] = header.version;
+        buffer[1] = header.type;
+        buffer[2] = packet_len & 0xFF;
+        buffer[3] = packet_len >> 8;
 
-        memcpy(&buffer[i], temp, packet_len);
-        i += packet_len;
-
-        return i;
+        return HEADER_SIZE + packet_len;
     }
 
     int8_t A3MESHPacket::deserialize_pkt(const uint8_t *buffer, size_t len, A3MESH_header_t &header, A3MESH_packet_t &pkt)
@@ -135,6 +144,9 @@ namespace lib::packet
         pkt.flags = *p++;
         pkt.payload_len = *p++;
 
+        const uint16_t stored_crc = (uint16_t)p[0] | ((uint16_t)p[1] << 8);
+        p += 2;
+
         // -----------------------------
         // Payload validation
         // -----------------------------
@@ -148,6 +160,14 @@ namespace lib::packet
         // Payload copy
         // -----------------------------
         memcpy(pkt.payload, p, pkt.payload_len);
+
+        // -----------------------------
+        // CRC verification
+        // -----------------------------
+        if (compute_crc(pkt.payload, pkt.payload_len) != stored_crc)
+            return -4;
+
+        pkt.crc = stored_crc;
 
         return 0;
     }

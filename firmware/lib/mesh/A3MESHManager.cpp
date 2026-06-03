@@ -26,14 +26,7 @@ namespace lib::mesh
 
     uint16_t A3MESHManager::get_next_pkt_id()
     {
-
-        uint16_t id;
-
-        xSemaphoreTake(_mutex, portMAX_DELAY);
-        id = _msg_counter++;
-        xSemaphoreGive(_mutex);
-
-        return id;
+        return _msg_counter.fetch_add(1, std::memory_order_relaxed);
     }
 
     uint8_t A3MESHManager::get_copies(const lib::packet::A3MESH_packet_t &pkt)
@@ -113,12 +106,7 @@ namespace lib::mesh
                     "[NEIGHBOR] Removing node %hx due to timeout\n",
                     neighbors[i].node_id);
 
-                for (uint8_t j = i; j < neighbor_count - 1; j++)
-                {
-                    neighbors[j] = neighbors[j + 1];
-                }
-
-                neighbor_count--;
+                neighbors[i] = neighbors[--neighbor_count];
                 i--;
             }
         }
@@ -152,42 +140,6 @@ namespace lib::mesh
         }
 
         return hash;
-    }
-
-    uint32_t A3MESHManager::get_best_neighbor_id()
-    {
-        uint32_t best_id = 0xFFFF;
-        int16_t best_rssi = -127;
-
-        Serial.println("[MESH] Selecting best neighbor for forwarding...");
-
-        xSemaphoreTake(_mutex, portMAX_DELAY);
-
-        if (neighbor_count == 0)
-        {
-            Serial.println("[MESH] No neighbors available, using broadcast address");
-            xSemaphoreGive(_mutex);
-            return best_id; // No neighbors, return broadcast
-        }
-        else
-        {
-            best_id = neighbors[0].node_id;
-            best_rssi = neighbors[0].rssi;
-        }
-
-        for (uint8_t i = 0; i < neighbor_count; i++)
-        {
-            if (neighbors[i].rssi > best_rssi)
-            {
-                best_rssi = neighbors[i].rssi;
-                best_id = neighbors[i].node_id;
-            }
-        }
-
-        xSemaphoreGive(_mutex);
-
-        Serial.printf("[MESH] Best neighbor selected: %hx with RSSI %d\n", best_id, best_rssi);
-        return best_id;
     }
 
     bool A3MESHManager::is_neighbor(uint32_t node_id)
@@ -274,18 +226,13 @@ namespace lib::mesh
 
     void A3MESHManager::set_demo_mode(bool enabled)
     {
-        xSemaphoreTake(_mutex, portMAX_DELAY);
-        _demo_mode = enabled;
-        xSemaphoreGive(_mutex);
+        _demo_mode.store(enabled, std::memory_order_relaxed);
         MESH_LOG("[MESH] Demo mode %s\r\n", enabled ? "ENABLED" : "disabled");
     }
 
     bool A3MESHManager::get_demo_mode()
     {
-        xSemaphoreTake(_mutex, portMAX_DELAY);
-        bool v = _demo_mode;
-        xSemaphoreGive(_mutex);
-        return v;
+        return _demo_mode.load(std::memory_order_relaxed);
     }
 
     uint8_t A3MESHManager::gossip_forward_probability(uint8_t n_neighbors, int16_t rssi, uint8_t copies, bool demo)
@@ -324,14 +271,14 @@ namespace lib::mesh
             return false;
         }
 
-        if (pkt.flags & 0x01)
+        if (pkt.flags & DIRECT_UNICAST_FLAG)
         {
             MESH_LOG("[MESH] Drop: direct message flag set\r\n");
             return false;
         }
 
         uint8_t n     = get_neighbor_count();
-        bool    demo  = get_demo_mode();
+        bool    demo  = _demo_mode.load(std::memory_order_relaxed);
         uint8_t threshold = gossip_forward_probability(n, rssi, copies, demo);
         // esp_random() is a thread-safe hardware TRNG
         bool forward = (esp_random() % 100) < threshold;

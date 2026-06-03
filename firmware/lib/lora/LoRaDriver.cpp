@@ -2,7 +2,7 @@
 
 namespace lib::lora
 {
-    volatile bool LoRaDriver::lora_rx_flag = false;
+    SemaphoreHandle_t LoRaDriver::_rx_sem = nullptr;
 
     LoRaDriver::rx_LoRa_msg_t LoRaDriver::pool[8];
     volatile uint8_t LoRaDriver::pool_idx = 0;
@@ -16,6 +16,7 @@ namespace lib::lora
         // Set LoRa pins
         LoRa.setPins(config.nss_pin, config.rst_pin, config.dio0_pin);
 
+        _rx_sem = xSemaphoreCreateBinary();
         attachInterrupt(digitalPinToInterrupt(config.dio0_pin), onLoRaRxIRQ, RISING);
 
         // LoRa Module Reset
@@ -114,16 +115,14 @@ namespace lib::lora
 
     void IRAM_ATTR LoRaDriver::onLoRaRxIRQ()
     {
-        lora_rx_flag = true;
+        BaseType_t woken = pdFALSE;
+        xSemaphoreGiveFromISR(_rx_sem, &woken);
+        portYIELD_FROM_ISR(woken);
     }
 
-    bool LoRaDriver::consume_rx_flag()
+    void LoRaDriver::wait_for_rx()
     {
-        if (!lora_rx_flag)
-            return false;
-
-        lora_rx_flag = false;
-        return true;
+        xSemaphoreTake(_rx_sem, portMAX_DELAY);
     }
 
     LoRaDriver::rx_LoRa_msg_t* LoRaDriver::alloc_frame()

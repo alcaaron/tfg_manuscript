@@ -10,9 +10,9 @@ namespace lib::power
     {
         float voltage;
         uint8_t percent;
-    } battery_porint_t;
+    } battery_point_t;
 
-    static constexpr battery_porint_t LUT[] =
+    static constexpr battery_point_t LUT[] =
     {
         {4.20f, 100},
         {4.15f, 95},

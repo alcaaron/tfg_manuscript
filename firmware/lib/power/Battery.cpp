@@ -1,4 +1,4 @@
-#include "battery.hh"
+#include "Battery.hh"
 
 namespace lib::power
 {
@@ -28,8 +28,8 @@ namespace lib::power
 
         for (size_t i = 0; i < LUT_SIZE - 1; ++i)
         {
-            const battery_porint_t &high = LUT[i];
-            const battery_porint_t &low  = LUT[i + 1];
+            const battery_point_t &high = LUT[i];
+            const battery_point_t &low  = LUT[i + 1];
 
             if (voltage <= high.voltage &&
                 voltage >= low.voltage)

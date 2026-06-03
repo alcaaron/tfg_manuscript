@@ -221,7 +221,7 @@ MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
   MESH_LOG("[A3MESH] dst=%08x me=%08x\r\n", ctx.pkt.dst, a3mesh.get_node_id());
   ctx.is_for_me =
       (ctx.pkt.dst == a3mesh.get_node_id()) ||
-      (ctx.pkt.dst == 0xFFFFFFFF);
+      (ctx.pkt.dst == BROADCAST_NODE_ID);
 
   if (ctx.is_for_me) {
     // Deliver locally only on first copy; subsequent copies are already handled.
@@ -240,7 +240,7 @@ MeshRxState handleKeyExchange(a3mesh_rx_ctx_t &ctx)
 {
   ctx.is_for_me =
       (ctx.pkt.dst == a3mesh.get_node_id()) ||
-      (ctx.pkt.dst == 0xFFFFFFFF);
+      (ctx.pkt.dst == BROADCAST_NODE_ID);
 
   return (ctx.is_for_me) ? 
   MeshRxState::k_rx_local_delivery 
@@ -571,10 +571,10 @@ void BLE2LoRaTask(void *pvParameters)
 
       header.type = lib::packet::k_key_exchange;
       pkt.type = lib::packet::k_enc_none;
-      pkt.ttl = 0x01;
+      pkt.ttl = MIN_TTL;
       pkt.pkt_id = a3mesh.get_next_pkt_id();
       pkt.dst = dst;
-      pkt.flags = (a3mesh.is_neighbor(dst)) ? 0x01 : 0x00;
+      pkt.flags = (a3mesh.is_neighbor(dst)) ? DIRECT_UNICAST_FLAG : BROADCAST_FLAG;
       pkt.payload_len = (uint8_t)strlen(msg);
 
       memcpy(pkt.payload, msg, pkt.payload_len);
@@ -613,7 +613,7 @@ void BLE2LoRaTask(void *pvParameters)
       pkt.ttl = MAX_TTL;
       pkt.pkt_id = a3mesh.get_next_pkt_id();
       pkt.dst = dst;
-      pkt.flags = (a3mesh.is_neighbor(dst)) ? 0x01 : 0x00;
+      pkt.flags = (a3mesh.is_neighbor(dst)) ? DIRECT_UNICAST_FLAG : BROADCAST_FLAG;
       pkt.payload_len = (uint8_t)strlen(cipher);
 
       memcpy(pkt.payload, cipher, pkt.payload_len);
@@ -659,8 +659,8 @@ void BLE2LoRaTask(void *pvParameters)
       pkt.type = lib::packet::k_enc_group;
       pkt.ttl = MAX_TTL;
       pkt.pkt_id = a3mesh.get_next_pkt_id();
-      pkt.dst = 0xFFFFFFFF;
-      pkt.flags = 0x00;
+      pkt.dst = BROADCAST_NODE_ID;
+      pkt.flags = BROADCAST_FLAG;
 
       // Payload = [group_id LE 4B][ciphertext]
       pkt.payload[0] = (group_id >> 0)  & 0xFF;
@@ -778,10 +778,10 @@ void vSendDiscoveryTask(void *pvParameters)
       .pkt_id = a3mesh.get_next_pkt_id(),
       .src = node_id,
       .node_id = node_id,
-      .dst = 0xFFFFFFFF, // Broadcast
-      .ttl = 0x01,
-      .type = 0x01, // provisional field
-      .flags = 0x00,
+      .dst = BROADCAST_NODE_ID, 
+      .ttl = MIN_TTL,
+      .type = lib::packet::a3mesh_enc_type_t::k_enc_none,
+      .flags = BROADCAST_FLAG,
       .payload_len = 4
   };
 

@@ -4,20 +4,48 @@
 
 namespace lib::lora
 {
+    /*!
+     * \brief Radio configuration parameters for the A3MESH LoRa driver.
+     *
+     * All fields are pre-initialised with the project-wide constants from
+     * config.h so that a default-constructed A3MESHConfig produces a fully
+     * valid EU868 configuration without any further setup.
+     */
     struct A3MESHConfig
     {
-        // LoRa pins
+        /*!< SPI chip-select (NSS) GPIO pin connected to the SX127x. */
         uint8_t nss_pin = NSS_GPIO;
+
+        /*!< Hardware reset GPIO pin connected to the SX127x. */
         uint8_t rst_pin = RST_GPIO;
+
+        /*!< DIO0 interrupt GPIO pin connected to the SX127x. */
         uint8_t dio0_pin = DIO0_GPIO;
 
+        /*!< RF centre frequency in Hz (e.g. 868000000 for EU868). */
         long frequency = EU868_FREQUENCY;
+
+        /*!< Signal bandwidth in Hz (e.g. 125E3 for 125 kHz). */
         float bandwidth = BANDWIDTH_125_KHZ;
-        uint8_t sf = A3MESH_SF; // LoRa spreading factor. Allowed values range from 6 to 12.
-        uint8_t cr = A3MESH_CR; // LoRa coding rate denominator. Allowed values range from 5 to 8.
-        uint8_t sync_word = A3MESH_SYNC_WORD; // LoRa sync word. Can be used to distinguish different networks. Note that value 0x34 is reserved for LoRaWAN networks.
-        int8_t power = A3MESH_POWER; // Transmission output power in dBm. Allowed values range from 2 to 17 dBm.
-        uint16_t preamble_len = A3MESH_PREAMBLE_LENGTH; // Length of LoRa transmission preamble in symbols. The actual preamble length is 4.25 symbols longer than the set number. Allowed values range from 6 to 65535.
+
+        /*!< LoRa spreading factor [6–12]. Higher values increase range at the
+         *   cost of lower data rate and longer time-on-air. */
+        uint8_t sf = A3MESH_SF;
+
+        /*!< Coding rate denominator [1–4] where 1 → 4/5, 2 → 4/6, etc.
+         *   Higher values add more FEC overhead and improve resilience. */
+        uint8_t cr = A3MESH_CR;
+
+        /*!< LoRa sync word used to distinguish this network from others.
+         *   Value 0x34 is reserved for LoRaWAN and must not be used here. */
+        uint8_t sync_word = A3MESH_SYNC_WORD;
+
+        /*!< TX output power in dBm [2–17]. */
+        int8_t power = A3MESH_POWER;
+
+        /*!< Preamble length in symbols [6–65535].
+         *   The effective preamble is 4.25 symbols longer than this value. */
+        uint16_t preamble_len = A3MESH_PREAMBLE_LENGTH;
     };
 
 } // namespace lib::lora

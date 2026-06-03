@@ -7,7 +7,7 @@
 
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
-#define BLE_MSG_STARTS_WITH(str, prefix) (strncmp(str, prefix, strlen(prefix)) == 0)
+#define BLE_MSG_STARTS_WITH(str, prefix) (strncmp(str, prefix, sizeof(prefix) - 1) == 0)
 
 // ============================
 // === GENERAL CONFIGURATION ===
@@ -89,11 +89,14 @@
 #define MAX_NEIGHBORS               10
 #define NODE_TIMEOUT                180000           // Time in ms after which a neighbor is considered lost
 #define MAX_TTL                     0x05
-#define A3MESH_MAX_PAYLOAD          235             // LORA_MAX_PACKET_SIZE - (size of header + fixed fields in packet structure)
+#define MIN_TTL                     0x01
+#define A3MESH_MAX_PAYLOAD          233             // LORA_MAX_PACKET_SIZE - (HEADER_SIZE + FIXED_FIELDS_SIZE); reduced by 2 for the crc field
 #define DUP_CACHE_SIZE              50              // Number of recently seen packets to keep in cache for duplicate detection
 #define DUP_TIMEOUT                 30000           // Time in ms to consider a packet as duplicate
 #define MAX_PENDING_FORWARDS        8               // Max simultaneous forwards awaiting passive-ACK confirmation
-
+#define BROADCAST_NODE_ID            0xFFFFFFFF      // Special node ID representing broadcast (used in pkt.dst)
+#define DIRECT_UNICAST_FLAG             0x01            // Packet flag indicating a direct unicast (as opposed to a broadcast or multi-hop message)
+#define BROADCAST_FLAG                  0x00            // Packet flag indicating a broadcast message
 
 // ============================================
 // === DEMO MODE PARAMETERS (lab / TFG demo) ===
