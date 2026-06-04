@@ -8,6 +8,7 @@
 #include "BLETasks.h"
 #include "A3MESHManagerTasks.h"
 #include "PassiveACK.h"
+#include "CryptoManager.hh"
 
 // ======================
 // === Global Objects ===
@@ -16,6 +17,24 @@
 lib::ble::BLEDriver ble;
 lib::lora::LoRaDriver lora;
 lib::mesh::A3MESHManager a3mesh;
+lib::crypto::CryptoManager crypto;
+
+// Parse a lowercase/uppercase hex string of exactly (out_len*2) chars into bytes.
+static bool parse_hex_bytes(const char *hex, uint8_t *out, size_t out_len)
+{
+    for (size_t i = 0; i < out_len; i++) {
+        auto h2n = [](char c) -> int8_t {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            return -1;
+        };
+        int8_t hi = h2n(hex[2 * i]), lo = h2n(hex[2 * i + 1]);
+        if (hi < 0 || lo < 0) return false;
+        out[i] = (uint8_t)((hi << 4) | lo);
+    }
+    return true;
+}
 
 // PassiveACK.h wrappers — implemented here so lower-level libs
 // can call them without depending on the mesh include chain.
@@ -228,6 +247,7 @@ MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
     return (ctx.copies == 1) ? MeshRxState::k_rx_local_delivery : MeshRxState::k_rx_done;
   }
 
+  MESH_LOG("[A3MESH] Not for me; But the payload is: %.*s\r\n", ctx.pkt.payload_len, ctx.pkt.payload);
   ctx.should_forward = a3mesh.should_forward(ctx.pkt, ctx.rx_msg->rssi, ctx.copies);
 
   if (ctx.should_forward)
@@ -263,23 +283,48 @@ MeshRxState handleLocalDelivery(a3mesh_rx_ctx_t &ctx)
   }
   else if (ctx.header.type == lib::packet::k_data_encrypted)
   {
-    if (ctx.pkt.type == lib::packet::k_enc_group && ctx.pkt.payload_len > 4)
+    uint8_t plain[A3MESH_MAX_PAYLOAD];
+    lib::crypto::CryptoError cerr;
+    uint32_t group_id = 0;
+
+    if (ctx.pkt.type == lib::packet::k_enc_node2node)
     {
-      uint32_t group_id =
-          ((uint32_t)ctx.pkt.payload[0])        |
-          ((uint32_t)ctx.pkt.payload[1] << 8)   |
-          ((uint32_t)ctx.pkt.payload[2] << 16)  |
-          ((uint32_t)ctx.pkt.payload[3] << 24);
-      len = snprintf(bleBuffer, sizeof(bleBuffer),
-          "+RCVGRP=%08x,%08x,%08x,%.*s\r\n",
-          group_id, ctx.pkt.src, ctx.pkt.node_id,
-          (int)(ctx.pkt.payload_len - 4), ctx.pkt.payload + 4);
-    }
-    else if (ctx.pkt.type == lib::packet::k_enc_node2node)
-    {
+      cerr = crypto.decrypt_n2n(ctx.pkt.src, ctx.pkt, plain, sizeof(plain));
+      if (cerr != lib::crypto::CryptoError::OK)
+      {
+        MESH_LOG("[CRYPTO] n2n decrypt failed: %d\r\n", (int)cerr);
+        return MeshRxState::k_rx_drop;
+      }
       len = snprintf(bleBuffer, sizeof(bleBuffer),
           "+RCVE2E=%08x,%08x,%.*s\r\n",
           ctx.pkt.src, ctx.pkt.node_id,
+          ctx.pkt.payload_len, ctx.pkt.payload);
+    }
+    else if (ctx.pkt.type == lib::packet::k_enc_group)
+    {
+      cerr = crypto.decrypt_grp(ctx.pkt.src, ctx.pkt, plain, sizeof(plain), group_id);
+      if (cerr != lib::crypto::CryptoError::OK)
+      {
+        MESH_LOG("[CRYPTO] grp decrypt failed: %d\r\n", (int)cerr);
+        return MeshRxState::k_rx_drop;
+      }
+      len = snprintf(bleBuffer, sizeof(bleBuffer),
+          "+RCVGRP=%08x,%08x,%08x,%.*s\r\n",
+          group_id, ctx.pkt.src, ctx.pkt.node_id,
+          ctx.pkt.payload_len, ctx.pkt.payload);
+    }
+    else if (ctx.pkt.type == lib::packet::k_enc_network)
+    {
+      cerr = crypto.decrypt_net(ctx.pkt.src, ctx.pkt, plain, sizeof(plain));
+      if (cerr != lib::crypto::CryptoError::OK)
+      {
+        MESH_LOG("[CRYPTO] net decrypt failed: %d\r\n", (int)cerr);
+        return MeshRxState::k_rx_drop;
+      }
+      // Deliver as a plain RCV so the app treats it transparently
+      len = snprintf(bleBuffer, sizeof(bleBuffer),
+          "+RCV=%08x,%08x,%08x,%.*s\r\n",
+          ctx.pkt.src, ctx.pkt.node_id, ctx.pkt.dst,
           ctx.pkt.payload_len, ctx.pkt.payload);
     }
     else
@@ -290,8 +335,8 @@ MeshRxState handleLocalDelivery(a3mesh_rx_ctx_t &ctx)
   else
   {
     len = snprintf(bleBuffer, sizeof(bleBuffer),
-        "+RCV=%08x,%08x,%.*s\r\n",
-        ctx.pkt.src, ctx.pkt.node_id,
+        "+RCV=%08x,%08x,%08x,%.*s\r\n",
+        ctx.pkt.src, ctx.pkt.node_id, ctx.pkt.dst,
         ctx.pkt.payload_len, ctx.pkt.payload);
   }
 
@@ -591,32 +636,40 @@ void BLE2LoRaTask(void *pvParameters)
 
     // -------------------------
     // SENDE2E command
-    // Format: AT+SENDE2E=<dst_hex>,<ciphertext>\r\n
-    // Payload already encrypted by the app (node2node key).
+    // Format: AT+SENDE2E=<dst_hex>,<plaintext>\r\n
+    // Firmware encrypts with the provisioned peer key for dst.
     // -------------------------
     if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SENDE2E="))
     {
       uint32_t dst = 0;
-      char cipher[A3MESH_MAX_PAYLOAD + 1];
+      char msg[A3MESH_MAX_PAYLOAD + 1];
       const char *args = rx_buffer + 11;
 
       if (sscanf(args,
                   "%08x,%" STR(A3MESH_MAX_PAYLOAD) "[^\r\n]",
-                  &dst, cipher) != 2)
+                  &dst, msg) != 2)
       {
         xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
         continue;
       }
 
       header.type = lib::packet::k_data_encrypted;
-      pkt.type = lib::packet::k_enc_node2node;
-      pkt.ttl = MAX_TTL;
-      pkt.pkt_id = a3mesh.get_next_pkt_id();
-      pkt.dst = dst;
-      pkt.flags = (a3mesh.is_neighbor(dst)) ? DIRECT_UNICAST_FLAG : BROADCAST_FLAG;
-      pkt.payload_len = (uint8_t)strlen(cipher);
+      pkt.type    = lib::packet::k_enc_node2node;
+      pkt.ttl     = MAX_TTL;
+      pkt.pkt_id  = a3mesh.get_next_pkt_id();
+      pkt.dst     = dst;
+      pkt.flags   = (a3mesh.is_neighbor(dst)) ? DIRECT_UNICAST_FLAG : BROADCAST_FLAG;
 
-      memcpy(pkt.payload, cipher, pkt.payload_len);
+      lib::crypto::CryptoError cerr = crypto.encrypt_n2n(
+          node_id, dst,
+          (const uint8_t *)msg, strlen(msg),
+          pkt);
+
+      if (cerr != lib::crypto::CryptoError::OK)
+      {
+        xQueueSend(xBLETxQueue, "+ERR=5\r\n", 0); // +ERR=5 = crypto error / no key
+        continue;
+      }
 
       tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(header, pkt, tx_msg.tx_data);
 
@@ -630,45 +683,40 @@ void BLE2LoRaTask(void *pvParameters)
 
     // -------------------------
     // SENDGRP command
-    // Format: AT+SENDGRP=<group_id_hex>,<ciphertext>\r\n
-    // Payload already encrypted by the app (group key).
-    // The group_id is prepended as 4 LE bytes in the LoRa payload.
+    // Format: AT+SENDGRP=<group_id_hex>,<plaintext>\r\n
+    // Firmware encrypts with the provisioned group key.
     // -------------------------
     if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SENDGRP="))
     {
       uint32_t group_id = 0;
-      char cipher[A3MESH_MAX_PAYLOAD + 1];
+      char msg[A3MESH_MAX_PAYLOAD + 1];
       const char *args = rx_buffer + 11;
 
       if (sscanf(args,
                   "%08x,%" STR(A3MESH_MAX_PAYLOAD) "[^\r\n]",
-                  &group_id, cipher) != 2)
-      {
-        xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
-        continue;
-      }
-
-      size_t cipher_len = strlen(cipher);
-      if (cipher_len + 4 > A3MESH_MAX_PAYLOAD)
+                  &group_id, msg) != 2)
       {
         xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
         continue;
       }
 
       header.type = lib::packet::k_data_encrypted;
-      pkt.type = lib::packet::k_enc_group;
-      pkt.ttl = MAX_TTL;
-      pkt.pkt_id = a3mesh.get_next_pkt_id();
-      pkt.dst = BROADCAST_NODE_ID;
-      pkt.flags = BROADCAST_FLAG;
+      pkt.type    = lib::packet::k_enc_group;
+      pkt.ttl     = MAX_TTL;
+      pkt.pkt_id  = a3mesh.get_next_pkt_id();
+      pkt.dst     = BROADCAST_NODE_ID;
+      pkt.flags   = BROADCAST_FLAG;
 
-      // Payload = [group_id LE 4B][ciphertext]
-      pkt.payload[0] = (group_id >> 0)  & 0xFF;
-      pkt.payload[1] = (group_id >> 8)  & 0xFF;
-      pkt.payload[2] = (group_id >> 16) & 0xFF;
-      pkt.payload[3] = (group_id >> 24) & 0xFF;
-      memcpy(pkt.payload + 4, cipher, cipher_len);
-      pkt.payload_len = (uint8_t)(4 + cipher_len);
+      lib::crypto::CryptoError cerr = crypto.encrypt_grp(
+          node_id, group_id,
+          (const uint8_t *)msg, strlen(msg),
+          pkt);
+
+      if (cerr != lib::crypto::CryptoError::OK)
+      {
+        xQueueSend(xBLETxQueue, "+ERR=5\r\n", 0);
+        continue;
+      }
 
       tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(header, pkt, tx_msg.tx_data);
 
@@ -676,6 +724,133 @@ void BLE2LoRaTask(void *pvParameters)
         xQueueSend(xBLETxQueue, "+OK\r\n", 0);
       else
         xQueueSend(xBLETxQueue, "+ERR=4\r\n", 0);
+      continue;
+    }
+
+
+    // -------------------------
+    // SENDNET command
+    // Format: AT+SENDNET=<dst_hex>,<plaintext>\r\n
+    // Firmware encrypts with the shared network key.
+    // -------------------------
+    if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SENDNET="))
+    {
+      uint32_t dst = 0;
+      char msg[A3MESH_MAX_PAYLOAD + 1];
+      const char *args = rx_buffer + 11;
+
+      if (sscanf(args,
+                  "%08x,%" STR(A3MESH_MAX_PAYLOAD) "[^\r\n]",
+                  &dst, msg) != 2)
+      {
+        xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
+        continue;
+      }
+
+      header.type = lib::packet::k_data_encrypted;
+      pkt.type    = lib::packet::k_enc_network;
+      pkt.ttl     = MAX_TTL;
+      pkt.pkt_id  = a3mesh.get_next_pkt_id();
+      pkt.dst     = dst;
+      pkt.flags   = (a3mesh.is_neighbor(dst)) ? DIRECT_UNICAST_FLAG : BROADCAST_FLAG;
+
+      lib::crypto::CryptoError cerr = crypto.encrypt_net(
+          node_id,
+          (const uint8_t *)msg, strlen(msg),
+          pkt);
+
+      if (cerr != lib::crypto::CryptoError::OK)
+      {
+        xQueueSend(xBLETxQueue, "+ERR=5\r\n", 0);
+        continue;
+      }
+
+      tx_msg.len = lib::packet::A3MESHPacket::serialize_header_pkt(header, pkt, tx_msg.tx_data);
+
+      if (xQueueSend(xLoRaTxQueue, &tx_msg, 0) == pdTRUE)
+        xQueueSend(xBLETxQueue, "+OK\r\n", 0);
+      else
+        xQueueSend(xBLETxQueue, "+ERR=4\r\n", 0);
+      continue;
+    }
+
+
+    // -------------------------
+    // Key management commands
+    // AT+SETNETKEY=<64hex>              — set 32-byte shared network key
+    // AT+SETPEERKEY=<08hex>,<64hex>     — set node-to-node key for peer
+    // AT+SETGRPKEY=<08hex>,<64hex>      — set group key for group_id
+    // AT+CLRKEYS                        — wipe all stored keys
+    // -------------------------
+    if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SETNETKEY="))
+    {
+      const char *hex = rx_buffer + 13;
+      uint8_t key[lib::crypto::CRYPTO_KEY_SIZE];
+      if (!parse_hex_bytes(hex, key, sizeof(key)))
+      {
+        xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
+        continue;
+      }
+      crypto.keys.set_net_key(key);
+      xQueueSend(xBLETxQueue, "+OK\r\n", 0);
+      continue;
+    }
+
+    if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SETPEERKEY="))
+    {
+      const char *args = rx_buffer + 14;
+      uint32_t peer_id = 0;
+      char hex[lib::crypto::CRYPTO_KEY_SIZE * 2 + 2];
+      if (sscanf(args, "%08x,%64s", &peer_id, hex) != 2)
+      {
+        xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
+        continue;
+      }
+      uint8_t key[lib::crypto::CRYPTO_KEY_SIZE];
+      if (!parse_hex_bytes(hex, key, sizeof(key)))
+      {
+        xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
+        continue;
+      }
+      if (!crypto.keys.set_peer_key(peer_id, key))
+      {
+        xQueueSend(xBLETxQueue, "+ERR=6\r\n", 0); // key table full
+        continue;
+      }
+      xQueueSend(xBLETxQueue, "+OK\r\n", 0);
+      continue;
+    }
+
+    if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SETGRPKEY="))
+    {
+      const char *args = rx_buffer + 13;
+      uint32_t group_id = 0;
+      char hex[lib::crypto::CRYPTO_KEY_SIZE * 2 + 2];
+      if (sscanf(args, "%08x,%64s", &group_id, hex) != 2)
+      {
+        xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
+        continue;
+      }
+      uint8_t key[lib::crypto::CRYPTO_KEY_SIZE];
+      if (!parse_hex_bytes(hex, key, sizeof(key)))
+      {
+        xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
+        continue;
+      }
+      if (!crypto.keys.set_group_key(group_id, key))
+      {
+        xQueueSend(xBLETxQueue, "+ERR=6\r\n", 0);
+        continue;
+      }
+      xQueueSend(xBLETxQueue, "+OK\r\n", 0);
+      continue;
+    }
+
+    if (strcmp(rx_buffer, "AT+CLRKEYS\r\n") == 0)
+    {
+      crypto.keys.clear_all();
+      crypto.replay.reset_all();
+      xQueueSend(xBLETxQueue, "+OK\r\n", 0);
       continue;
     }
 
@@ -836,10 +1011,10 @@ bool setup_A3MESH()
 
 
   // --------- Init Core Tasks ---------
-  if (xTaskCreatePinnedToCore(BLE2LoRaTask, "BLE2LoRaTask", 4096, NULL, 1, NULL, 1) != pdPASS) return false;
+  if (xTaskCreatePinnedToCore(BLE2LoRaTask, "BLE2LoRaTask", 8192, NULL, 1, NULL, 1) != pdPASS) return false;
   MESH_LOG("[SYS] BLE2LORA started!\r\n");
 
-  if (xTaskCreatePinnedToCore(LoRa2BLETask, "LoRa2BLETask", 4096, NULL, 1, NULL, 1) != pdPASS) return false;
+  if (xTaskCreatePinnedToCore(LoRa2BLETask, "LoRa2BLETask", 8192, NULL, 1, NULL, 1) != pdPASS) return false;
   MESH_LOG("[SYS] LORA2BLE started!\r\n");
 
 

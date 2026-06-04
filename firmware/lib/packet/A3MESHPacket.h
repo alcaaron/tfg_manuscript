@@ -26,6 +26,7 @@ namespace lib::packet
         k_enc_none      = 0, /*!< No encryption (plain-text). */
         k_enc_group,         /*!< Group key encryption; group_id is prepended to payload. */
         k_enc_node2node,     /*!< Node-to-node (end-to-end) key encryption. */
+        k_enc_network,       /*!< Shared network key encryption (mesh-wide). */
     } a3mesh_enc_type_t;
 
     /*!< Fixed size of the A3MESH_header_t in bytes. */

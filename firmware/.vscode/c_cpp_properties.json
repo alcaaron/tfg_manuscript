@@ -9,6 +9,7 @@
             "name": "PlatformIO",
             "includePath": [
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/src",
+                "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/crypto",
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/mesh",
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/lora",
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/ble",
@@ -253,6 +254,7 @@
                 "limitSymbolsToIncludedHeaders": true,
                 "path": [
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/src",
+                    "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/crypto",
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/mesh",
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/lora",
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/ble",
