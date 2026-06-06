@@ -382,6 +382,47 @@ round-pad=false]{siunitx}[>v3]
   \newpage
 }
 
+\newcommand{\tfgitic@declaracioIA}{
+  \begin{titlepage}
+    \hbox{}
+    \vskip 3cm
+    \begin{center}
+      \textbf{\Large Declaration on the Use of Generative AI Tools}
+    \end{center}
+    \bigskip\bigskip\noindent
+    I, \tfgitic@author{}, \tfgitic@authorname{} of this \if@master Master's Thesis\else Capstone Project\fi,
+    \par\bigskip\noindent
+    DECLARE
+    \par\bigskip\noindent
+    That various generative artificial intelligence tools were utilized to support both the technical development and the writing of this document, specifically ChatGPT (OpenAI, GPT-5.5) and Claude Code (Anthropic).
+
+    These tools were primarily applied to the following aspects of the project:
+
+    \begin{itemize}
+      \item Assisting with the phrasing, clarity, and structural organization of several sections throughout the document (ChatGPT).
+      \item Developing components of the mobile application (Claude Code).
+      \item Generating and refining C++ code fragments (Claude Code).
+    \end{itemize}
+
+    All content generated with the assistance of AI tools has been thoroughly reviewed, verified, and edited by the author prior to its inclusion in the final version of this document.
+
+    Consequently, the final content of this work accurately represents the technical and intellectual contributions made by the author.
+    
+    The author declares under their sole responsibility that:
+
+    \begin{itemize}
+    \item The content of this work is truthful, complete, and accurate.
+    \item Generative artificial intelligence tools have been used transparently and ethically.
+    \item Full responsibility for the ultimate authorship and content of this work is strictly assumed.
+    \end{itemize}
+    
+    \par\bigskip\noindent
+    \tfgitic@location, \today{}
+    \par\vfill
+  \end{titlepage}
+  \newpage
+}
+
 
 % estil de pagina
 \pagestyle{scrheadings}
@@ -435,6 +476,7 @@ round-pad=false]{siunitx}[>v3]
   \maketitle{}
   \frontmatter
   \tfgitic@declaracio
+  \tfgitic@declaracioIA
   \tfgitic@dedicacio
   \if@catalanlang
     \chapter{Resum}

@@ -40,6 +40,7 @@
 % =============================================================================
 
 \part{Introduction}
+\label{part:introduction}
 
 % -----------------------------------------------------------------------------
 % TARGET: 4-5 pages
@@ -69,19 +70,22 @@
 %
 % Good figure:
 % - Centralized vs decentralized communication diagram
+During the past few years, the demand on centralized infrastructures has risen considerably. The majority of modern messaging systems rely heavily on cellular networks, internet access, and cloud services. While these infrastructures offer near-global connectivity, they also introduce a Single Point of Failure (SPOF) in the event of natural disasters, blackouts, or network congestion, as well as in remote areas where no coverage is available.
 
-\section{Problem Statement}
-% ~0.5-1 page
-%
-% Explain:
-% - Existing systems limitations
-% - Flooding inefficiency
-% - Energy constraints
-% - User adoption problems
-% - Complexity of current mesh systems
-%
-% Clearly define:
-% "The problem this thesis solves"
+Recent events have exposed the fragility of these infrastructures in emergency scenarios. For instance, a major blackout on April 18th, 2025, clearly demonstrated this vulnerability. During fires, floods, earthquakes, or massive power outages, cellular networks can be rendered useless or congested, hindering coordination and information exchange. As a consequence, interest in off-grid communication systems, which enable operations without any prior infrastructure dependency, has been significantly boosted.
+
+Mesh networks play a key role in this context because every node can act simultaneously as a transmitter, receiver, and relay, allowing messages to spread between devices via multiple hops. This approach avoids SPOFs and increases tolerance to partial network failures.
+
+Among the wide range of wireless technologies available, LoRa (Long Range) has emerged as an especially suitable option for low-power, long-range communications \cite{dsme_lora_2022}. These characteristics make this technology ideal for off-grid systems, battery-powered devices, and networks deployed in resource-constrained environments.
+
+Furthermore, open-source projects such as Meshtastic reflect growing community interest in LoRa-based off-grid communications \cite{meshtastic}. These systems allow sending text messages and data without the need for cellular coverage or internet access, using low-cost and low-power devices.
+
+This interest extends beyond tech enthusiasts; the telecommunication industry is also exploring hybrid and resilient solutions designed to maintain connectivity even outside traditional coverage. During the 2026 edition of the Mobile World Congress (MWC), companies such as Viasat and Qualcomm presented satellite communication technologies and alternative connectivity systems for vehicles and mobile phones \cite{viasat_mwc_2026}, evidencing the increasing relevance of resilient and off-grid communications.
+
+Nevertheless, despite the technical advantages of these systems, significant accessibility barriers remain for non-technical users. Since the onboarding process of current projects requires advanced configuration knowledge, a primary objective of this thesis is to develop a mesh communication platform that is not only efficient and resilient, but also accessible and intuitive for ordinary users. To achieve this, smartphone integration and a user experience similar to a conventional messaging app will be key characteristics of this project.
+
+Driven by this motivation, this work presents the development of A3MESH, a decentralized communication platform based on LoRa and BLE (Bluetooth Low Energy). It is designed to provide resilient, energy-efficient, and easily deployable communication in off-grid or emergency scenarios.
+
 
 \section{Objectives}
 % ~0.5 page
@@ -95,6 +99,29 @@
 % - Implement adaptive gossip routing
 % - Develop Android integration
 % - Validate through simulation and real testing
+The main objective of this thesis is to design and develop a decentralized low-power mesh communication platform capable of operating without external infrastructure while maintaining scalability, energy efficiency, and accessibility for non-technical users.
+
+To achieve this objective, the project combines hardware design, firmware development, routing optimization, mobile application integration, and real-world validation into a unified communication ecosystem.
+
+The specific objectives of this work are summarized as follows:
+
+\begin{itemize}
+\item Design a portable hardware platform based on LoRa and Bluetooth Low Energy technologies capable of supporting infrastructure-free mesh communication.
+
+\item Develop a modular firmware architecture implementing packet forwarding, neighbor discovery, power management, and communication pipelines between LoRa and BLE interfaces.
+
+\item Investigate the limitations of traditional flooding-based mesh propagation mechanisms and evaluate alternative routing approaches through simulation.
+
+\item Design and implement a routing algorithm capable of dynamically adjusting forwarding behavior according to network conditions.
+
+\item Create a mobile application providing an intuitive messaging-oriented interface for interacting with mesh nodes through BLE connectivity.
+
+\item Improve user accessibility by abstracting the underlying networking complexity and providing a user experience similar to conventional messaging applications.
+
+\item Design a compact enclosure and mechanical integration solution suitable for daily portable use alongside smartphones.
+
+\item Validate the proposed system through simulation results, laboratory testing, and real-world communication experiments.
+\end{itemize}
 
 \section{Scope and Limitations}
 % ~0.5 page
@@ -108,6 +135,21 @@
 % - Android-only support
 % - Prototype-level hardware
 % - Limited large-scale field testing
+This thesis focuses on the design, implementation, and validation of a decentralized mesh communication platform based on LoRa and Bluetooth Low Energy technologies. The project includes the development of custom hardware, embedded firmware, a routing simulation environment, and a smartphone-oriented mobile application integrated into a complete end-to-end communication system.
+
+The scope of the work covers several engineering areas, including low-power wireless communication, mesh networking algorithms, embedded systems, mobile software development, and mechanical integration.
+
+The implemented system is intended for infrastructure-free communication scenarios such as remote environments, temporary deployments, outdoor activities, and emergency situations where conventional communication infrastructure may be unavailable or unreliable. The proposed platform allows smartphones to exchange messages through nearby mesh nodes using BLE connectivity combined with LoRa-based multi-hop communication.
+
+However, several limitations must also be considered. First, the system has been developed as a prototype-oriented research platform rather than as a commercial product. Consequently, aspects such as industrial certification, large-scale manufacturing optimization, and extensive environmental qualification are outside the scope of this thesis.
+
+Additionally, the mobile application has been developed exclusively for Android devices. Cross-platform compatibility and iOS support were not considered due to time constraints and the primary research focus being centered on mesh networking and embedded communication systems.
+
+The proposed platform also does not rely on Internet gateways, cloud synchronization, or existing communication infrastructure. While this decision improves independence and resilience, it also limits interoperability with traditional messaging services and prevents communication beyond the mesh network itself.
+
+Although the routing algorithm has been extensively evaluated through simulation and validated through real-world testing, large-scale field deployments involving hundreds or thousands of physical nodes were not feasible within the scope of this project. Therefore, scalability conclusions are partially based on simulated environments and controlled experimental conditions.
+
+Finally, while the system incorporates encryption mechanisms and trust-based communication concepts, it is not intended to provide military-grade security or formally verified cryptographic guarantees. Security-related features are designed to improve practical privacy and usability within the context of low-power decentralized communication systems.
 
 \section{Contributions}
 % ~0.5 page
@@ -119,15 +161,52 @@
 % - Evolutionary optimization approach
 % - Complete HW/FW/SW integration
 % - User-friendly communication platform
+% - Use of the Design Note DN024 from TI a PCB antenna
+The main contributions of this thesis are listed below:
+
+\begin{itemize}
+\item The design and implementation of A3Mesh, a complete decentralized communication platform integrating custom hardware, embedded firmware, routing algorithms, and a smartphone-oriented mobile application into a unified ecosystem.
+
+\item The development of an adaptive smart gossip routing algorithm capable of dynamically adjusting packet forwarding behavior according to network conditions in order to improve scalability, reduce congestion, and minimize unnecessary retransmissions compared to traditional flooding-based approaches.
+
+\item The creation of a custom network simulation environment specifically designed to evaluate mesh communication performance under different routing strategies, network densities, and propagation conditions.
+
+\item The application of evolutionary optimization techniques \cite{eiben_2003} to automatically tune the forwarding parameters of the proposed smart gossip algorithm, enabling efficient exploration of the parameter space and improving overall network performance.
+
+\item The implementation of a modular layered firmware architecture supporting LoRa communication, Bluetooth Low Energy integration, packet forwarding, neighbor discovery, power management, and bidirectional communication pipelines between mobile devices and the mesh network.
+
+\item The development of an Android-based messaging platform designed to abstract the complexity of mesh networking and provide a user experience similar to conventional messaging applications, improving accessibility for non-technical users.
+
+\item The design of a compact portable hardware platform optimized for low-power operation and infrastructure-free communication scenarios.
+
+\item The integration of a PCB antenna design derived from Texas Instruments Design Note DN024 \cite{ti_dn024}, enabling compact RF integration while maintaining acceptable communication performance for portable deployments.
+
+\item The validation of the proposed system through simulation-based evaluation, laboratory measurements, and real-world communication experiments involving complete hardware and software integration.
+\end{itemize}
+
 
 \section{Thesis Structure}
 % ~0.5 page
 %
 % Short summary of each chapter.
 
+This thesis is organized into four main parts covering the theoretical background, system design, implementation, and evaluation of the proposed decentralized communication platform.
+
+Part \ref{part:introduction} introduces the motivation behind the project, defines the problem addressed by the thesis, presents the main objectives, and outlines the scope and contributions of the proposed work.
+
+Part \ref{part:state_of_the_art} reviews the technological and theoretical background related to decentralized mesh communication systems. This includes an overview of LoRa and Bluetooth Low Energy technologies, existing infrastructure-free communication platforms, and routing approaches.
+
+Part \ref{part:thesis_body} contains the core technical development of the thesis. It begins by presenting the overall system architecture and communication model. The following chapters describe the development of the network simulator and the proposed smart gossip routing algorithm, including the evolutionary optimization process used for parameter tuning. The hardware design chapter explains the development of the custom low-power communication board, while the firmware chapter details the layered embedded architecture implementing mesh networking functionality, communication pipelines, and power management mechanisms. The mobile application chapter describes the Android-based user interface and smartphone integration approach. Additionally, the mechanical integration chapter presents the enclosure and portability considerations, while the development methodology chapter summarizes the engineering workflow and project management strategy adopted throughout the project. Finally, the experimental evaluation chapter analyzes the performance of the proposed system through simulation and real-world testing.
+
+Part \ref{part:conclusions} summarizes the main conclusions obtained during the development of the project, discusses the achieved objectives and contributions, and proposes possible future improvements and research directions.
+
+The document also includes several appendices containing complementary technical information such as AT command references, packet structures, PCB schematics, simulation parameters, and repository organization details.
+
+
 % =============================================================================
 
 \part{State of the Art}
+\label{part:state_of_the_art}
 
 % -----------------------------------------------------------------------------
 % TARGET: 7-9 pages
@@ -214,6 +293,7 @@
 % =============================================================================
 
 \part{Thesis Body}
+\label{part:thesis_body}
 
 % =============================================================================
 % SYSTEM OVERVIEW
@@ -711,6 +791,7 @@
 % =============================================================================
 
 \part{Conclusions}
+\label{part:conclusions}
 
 % TARGET: 3-4 pages
 
@@ -731,6 +812,10 @@
 % - Better hardware
 % - iOS support
 % - Security extensions
+
+% =============================================================================
+
+\printbibliography
 
 % =============================================================================
 % APPENDICES
