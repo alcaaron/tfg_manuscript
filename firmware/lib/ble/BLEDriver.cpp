@@ -39,7 +39,22 @@ namespace lib::ble
 
     bool BLEDriver::setup()
     {
-        BLEDevice::init(BLE_DEVICE_NAME);
+        uint8_t mac[6];
+        esp_read_mac(mac, ESP_MAC_BT);
+
+        char suffix[16];
+        snprintf(
+            suffix,
+            sizeof(suffix),
+            "_%02X:%02X:%02X",
+            mac[3],
+            mac[4],
+            mac[5]
+        );
+
+        String deviceName = String(BLE_DEVICE_NAME) + suffix;
+
+        BLEDevice::init(deviceName.c_str());
 
         // Crear servidor
         BLEServer *pServer = BLEDevice::createServer();
