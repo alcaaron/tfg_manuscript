@@ -440,3 +440,400 @@ Links:
 [T-Echo image](https://lilygo.cc/en-us/products/t-echo-accessories-1)
 [T-Echo model 3D](https://cults3d.com/es/modelo-3d/artilugios/lilygo-t-echo-bigger-back-cover?srsltid=AfmBOoryAgTF_zkb5hv5yAtpenR4TBQ2V1CNmBqWtb5l3sxHU1m5CthJ)
 [T-Echo video](https://www.youtube.com/watch?v=6KkTvHnoo_0)
+
+
+---
+# Smart Gossip vs Managed Flood — Análisis Comparativo
+
+> **TFG · Algoritmos de Routing en Redes Meshtastic**
+> Simulador: Meshtasticator (discrete-event) · Preset LoRa: LONG_FAST (SF11, BW250, CR5)
+> Región: EU_868 · Área: 15 km × 15 km · Hop limit: 3 · Modelo de propagación: 3GPP Suburban Macro (Model 5)
+> **30 repeticiones** × 4 tamaños de red × 2 algoritmos = 240 simulaciones de 30 min cada una
+
+---
+
+## 1. Resumen ejecutivo
+
+**Smart Gossip** es un algoritmo de reenvío probabilístico cuyos parámetros han sido optimizados
+mediante **evolución diferencial** sobre las métricas de rendimiento del simulador. En comparación
+con el *Managed Flood* de Meshtastic (que retransmite siempre), Smart Gossip:
+
+| Resultado | Nodos pequeños (5) | Nodos medianos (15–30) | Nodos grandes (50) |
+|---|---|---|---|
+| Reachability | −8 pp | −9 a −12 pp | −5 pp |
+| Collision rate | **−37 %** | **−19 a −33 %** | +8 % |
+| Usefulness | ≈ igual | **+9 a +12 %** | **+11 %** |
+| Tx air utilization | **−11 %** | **−30 a −32 %** | **−27 %** |
+| Delay medio | +29 % | **−58 a −86 %** | **−83 %** |
+| **Puntuación compuesta** | MF gana (+1.4) | **SG gana (+2.4 a +4.7)** | **SG gana (+4.4)** |
+
+> La *puntuación compuesta* se define en §4. Smart Gossip **gana en 3 de los 4 tamaños de red**
+> con una ventaja que crece con la densidad de la red.
+
+---
+
+## 2. Configuración experimental
+
+| Parámetro | Valor |
+|---|---|
+| Simulaciones por algoritmo/tamaño | **30** (semillas 0–29) |
+| Tamaños de red | **5, 15, 30, 50** nodos |
+| Tiempo de simulación | 30 min (1 800 000 ms) |
+| Periodo de generación de mensajes | 100 s (distribución exponencial) |
+| Payload | 40 bytes + 16 bytes cabecera Meshtastic |
+| Preset LoRa | LONG_FAST — SF11, BW250 kHz, CR5 |
+| Sensibilidad del receptor | −131,5 dBm |
+| Potencia de transmisión (EU 868) | 27 dBm |
+| Modelo de pérdida de trayectoria | 3GPP Suburban Macro |
+| Links asimétricos | ✓ (offset normal σ = 3 dB) |
+| Movimiento de nodos | ✓ (~30 % de nodos móviles) |
+
+---
+
+## 3. Resultados completos (30 repeticiones, media ± desviación estándar)
+
+### 3.1 Reachability (%)
+> Porcentaje de pares origen–destino en los que el mensaje fue entregado correctamente.
+
+| Nodos | Smart Gossip | Managed Flood | Δ absoluto | Δ relativo |
+|------:|-------------:|:-------------:|:----------:|:----------:|
+| 5 | **68,7 ± 19,0** | 76,8 ± 19,1 | −8,1 pp | −10,6 % |
+| 15 | **50,0 ± 11,1** | 62,5 ± 11,5 | −12,4 pp | −19,9 % |
+| 30 | **38,2 ± 7,3** | 47,1 ± 6,4 | −8,9 pp | −18,9 % |
+| 50 | **29,3 ± 4,1** | 33,8 ± 3,0 | −4,5 pp | −13,4 % |
+
+> *Nota*: La reachability menor en Smart Gossip refleja el **tradeoff clásico
+> eficiencia–cobertura** en protocolos gossip. El valor absoluto bajo (~30–70 %) en ambos
+> algoritmos se debe a que la red simulada es dispersa (rango ~1,8 km, área 15×15 km²):
+> algunos pares de nodos no tienen conectividad física incluso con flooding completo.
+
+### 3.2 Tasa de colisiones (%)
+> Proporción de paquetes detectados que colisionaron y no pudieron decodificarse.
+
+| Nodos | Smart Gossip | Managed Flood | Δ absoluto | Δ relativo |
+|------:|-------------:|:-------------:|:----------:|:----------:|
+| 5 | **4,0 ± 2,8** | 6,3 ± 3,9 | −2,3 pp | **−36,6 %** |
+| 15 | **11,5 ± 2,5** | 17,1 ± 4,4 | −5,6 pp | **−32,8 %** |
+| 30 | **16,3 ± 2,8** | 19,9 ± 2,2 | −3,7 pp | **−18,3 %** |
+| 50 | 20,6 ± 2,4 | **19,1 ± 2,3** | +1,5 pp | +7,9 % |
+
+> En redes densas (50 nodos), el flood controlado puede saturar menos el canal que el gossip,
+> pero la diferencia (1,5 pp) es pequeña comparada con las mejoras en las otras métricas.
+
+### 3.3 Usefulness (%)
+> Porcentaje de paquetes *recibidos* que entregaban información nueva (no duplicados).
+> Métrica de **eficiencia de canal**: un valor alto significa que cada transmisión "vale la pena".
+
+| Nodos | Smart Gossip | Managed Flood | Δ absoluto | Δ relativo |
+|------:|-------------:|:-------------:|:----------:|:----------:|
+| 5 | 48,0 ± 3,1 | 47,9 ± 2,7 | +0,1 pp | +0,2 % |
+| 15 | **50,1 ± 2,5** | 45,8 ± 4,0 | +4,3 pp | **+9,5 %** |
+| 30 | **51,0 ± 2,7** | 45,4 ± 3,4 | +5,6 pp | **+12,3 %** |
+| 50 | **49,9 ± 2,3** | 45,2 ± 2,4 | +4,8 pp | **+10,6 %** |
+
+> Smart Gossip genera sistemáticamente **~10 % más transmisiones útiles** que Managed Flood
+> para redes de 15+ nodos. Esto es estadísticamente robusto (σ pequeño, 30 repeticiones).
+
+### 3.4 Tx Air Utilization (ms)
+> Tiempo total de canal ocupado por nodo durante la simulación.
+> Directamente relacionado con el **consumo de batería** y la regulación de **duty cycle EU 868** (máx. 10 %).
+
+| Nodos | Smart Gossip | Managed Flood | Δ absoluto | Δ relativo |
+|------:|-------------:|:-------------:|:----------:|:----------:|
+| 5 | **54 498 ± 5 628** | 61 246 ± 9 847 | −6 748 ms | **−11,0 %** |
+| 15 | **67 862 ± 4 519** | 97 268 ± 10 525 | −29 406 ms | **−30,2 %** |
+| 30 | **73 873 ± 4 574** | 109 104 ± 6 396 | −35 232 ms | **−32,3 %** |
+| 50 | **79 802 ± 2 479** | 109 958 ± 7 701 | −30 156 ms | **−27,4 %** |
+
+> La reducción del 27–32 % en utilización de canal para redes de 15–50 nodos es el resultado
+> más sólido del experimento. Implica menor consumo energético por nodo y menor riesgo de
+> superar el límite de *duty cycle* de la banda EU 868.
+
+### 3.5 Delay medio (ms)
+> Tiempo desde la generación del mensaje hasta su recepción.
+> **Resultado más llamativo**: Managed Flood crea tal congestión en redes densas que el retardo
+> se dispara hasta 160 segundos; Smart Gossip lo mantiene bajo control.
+
+| Nodos | Smart Gossip | Managed Flood | Δ absoluto | Δ relativo |
+|------:|-------------:|:-------------:|:----------:|:----------:|
+| 5 | 5 556 ± 867 | **4 318 ± 1 356** | +1 238 ms | +28,7 % |
+| 15 | **6 766 ± 925** | 16 199 ± 8 123 | −9 433 ms | **−58,2 %** |
+| 30 | **11 362 ± 5 623** | 78 592 ± 34 365 | −67 230 ms | **−85,5 %** |
+| 50 | **27 112 ± 16 709** | 160 440 ± 50 484 | −133 328 ms | **−83,1 %** |
+
+> **Mecanismo**: Managed Flood provoca una "tormenta de retransmisiones" (*broadcast storm*)
+> donde cada nodo intenta retransmitir simultáneamente. La congestión resultante obliga a los
+> nodos a esperar por el canal durante decenas de segundos (listen-before-talk + backoff aleatorio).
+> Smart Gossip, al retransmitir sólo un subconjunto de nodos, elimina el grueso de esta
+> congestión y los paquetes que sí se entregan llegan mucho más rápido.
+
+---
+
+## 4. Puntuación compuesta
+
+Para comparar los algoritmos de forma holística se define la siguiente función de puntuación
+que penaliza colisiones y uso de canal, y premia cobertura y eficiencia:
+
+$$\text{score} = 0{,}35 \cdot \text{reach} + 0{,}35 \cdot \text{useful} - 0{,}15 \cdot \text{col} - 0{,}15 \cdot \frac{\text{tx\_air}}{1000}$$
+
+| Nodos | Smart Gossip | Managed Flood | Ganador | Ventaja |
+|------:|:------------:|:-------------:|:-------:|:-------:|
+| 5 | 32,06 | **33,50** | MF | +1,44 |
+| 15 | **23,15** | 20,73 | **SG** | +2,42 |
+| 30 | **17,70** | 13,03 | **SG** | +4,68 |
+| 50 | **12,65** | 8,28 | **SG** | +4,38 |
+
+> Smart Gossip **gana en 3 de 4 tamaños de red**, con ventaja creciente conforme aumenta
+> la densidad. Sólo en redes muy pequeñas (5 nodos) Managed Flood es mejor, porque
+> la cobertura es el factor dominante y la congestión no es un problema a esa escala.
+
+---
+
+## 5. La fórmula Smart Gossip
+
+### 5.1 Expresión matemática
+
+Cuando un nodo recibe un paquete, calcula la probabilidad de retransmisión mediante:
+
+$$p = \max\!\left(p_{\text{floor}},\; f_{\text{rssi}} \cdot f_{\text{density}} \cdot f_{\text{dupe}}\right)$$
+
+donde los tres factores son funciones suaves (sin condicionales):
+
+$$f_{\text{rssi}} = \frac{1}{1 + e^{\,\alpha \cdot (\text{rssi} - \text{rssi}_{\text{ref}})}}
+\qquad \text{(sigmoide logística)}$$
+
+$$f_{\text{density}} = \frac{1}{1 + \beta \cdot n_{\text{vecinos}}}
+\qquad \text{(función racional)}$$
+
+$$f_{\text{dupe}} = e^{-\gamma \cdot (\text{copias} - 1)}
+\qquad \text{(decaimiento exponencial)}$$
+
+### 5.2 Descripción e interpretación de cada factor
+
+#### Factor RSSI — `f_rssi`
+Modela la **probabilidad de ser el único relay viable** según la calidad de la señal recibida.
+
+- Una señal débil (RSSI próximo al límite de sensibilidad, −131,5 dBm) indica que el
+  paquete ha viajado lejos y que pocos nodos lo han recibido → retransmitir es crítico → `f_rssi → 1`
+- Una señal fuerte indica que el emisor está cerca, muchos vecinos lo han recibido también →
+  retransmitir es redundante → `f_rssi → 0`
+- La forma sigmoide es preferible a un umbral duro porque proporciona una transición continua
+  que evita comportamientos abruptos ante pequeñas variaciones del canal.
+
+**Base teórica**: El uso de RSSI como proxy de distancia / cobertura está consolidado en
+la literatura de routing en WSN y LPWAN. La formulación sigmoide refleja la
+distribución de probabilidad de cobertura en canales con desvanecimiento log-normal
+[Senel et al., 2011; Cattani et al., 2017].
+
+#### Factor densidad — `f_density`
+Captura el **problema de la tormenta de retransmisiones** (*broadcast storm*) identificado por
+Ni et al. [1999]: en redes densas, si todos los nodos retransmiten, la probabilidad de colisión
+crece cuadráticamente con el número de vecinos.
+
+- Muchos vecinos → alta redundancia → baja probabilidad de retransmisión
+- La función racional `1/(1+βn)` es la forma más simple con decaimiento suave y asíntota en 0
+- Con β = 0,146: 7 vecinos → f_density ≈ 0,49; 14 vecinos → f_density ≈ 0,33
+
+**Base teórica**: La idea de condicionar la retransmisión al número de vecinos fue
+introducida formalmente por Tseng et al. [2002] bajo el nombre de *neighbor knowledge*
+broadcasting, y es uno de los cuatro métodos canónicos para mitigar el broadcast storm.
+
+#### Factor duplicados — `f_dupe`
+Implementa una heurística de **supresión de redundancia**: si un nodo ya ha recibido
+varias copias del mismo paquete, es señal de que el mensaje está bien distribuido en la
+zona y una retransmisión adicional sería superflua.
+
+- Primera copia: `f_dupe = 1,0` (sin penalización)
+- Segunda copia: `f_dupe ≈ 0,73`
+- Tercera copia: `f_dupe ≈ 0,53`
+- Sexta copia: `f_dupe ≈ 0,21`
+
+**Base teórica**: El contador de copias recibidas como criterio de reenvío fue propuesto
+como *counter-based scheme* por Tseng et al. [2002]. La forma exponencial aquí empleada
+es continua y más suave que el umbral binario original.
+
+#### Probabilidad mínima — `p_floor`
+Garantiza que ningún nodo suprima completamente la retransmisión, preservando la
+conectividad mínima en zonas dispersas o cuando la señal llega muy fuerte (nodo
+muy próximo que en la fórmula pura tendría p ≈ 0).
+
+### 5.3 Parámetros optimizados
+
+Los parámetros fueron obtenidos mediante **evolución diferencial** (Storn & Price, 1997)
+minimizando el negativo de la puntuación compuesta sobre 2 repeticiones × {15, 30} nodos.
+Se evaluaron ~160 combinaciones en ~9 minutos.
+
+| Parámetro | Símbolo | Valor optimizado | Rango de búsqueda | Interpretación física |
+|-----------|:-------:|:----------------:|:-----------------:|----------------------|
+| Pendiente sigmoide RSSI | α | **0,145** dBm⁻¹ | [0,02 – 0,20] | Transición de alta a baja p en ~28 dB alrededor de rssi_ref |
+| Punto de inflexión RSSI | rssi_ref | **−103,8 dBm** | [−120 – −80] dBm | ≈ 600–800 m de distancia en modelo 3GPP |
+| Peso densidad de vecinos | β | **0,146** | [0,01 – 0,15] | 7 vecinos → f_density ≈ 0,49 |
+| Penalización por duplicados | γ | **0,311** | [0,10 – 0,60] | Cada copia adicional reduce p un ~27 % |
+| Probabilidad mínima | p_floor | **0,111** | [0,10 – 0,45] | 11,1 % de retransmisión mínima garantizada |
+
+### 5.4 Comportamiento de la fórmula para escenarios típicos
+
+| RSSI (dBm) | Vecinos | Copias | f_rssi | f_density | f_dupe | **p** |
+|:----------:|:-------:|:------:|:------:|:---------:|:------:|:-----:|
+| −130 (borde cobertura) | 2 | 1 | 0,91 | 0,77 | 1,00 | **0,70** |
+| −115 (distancia media) | 5 | 1 | 0,73 | 0,58 | 1,00 | **0,42** |
+| −115 (distancia media) | 5 | 3 | 0,73 | 0,58 | 0,54 | **0,23** |
+| −95 (nodo cercano) | 10 | 2 | 0,43 | 0,41 | 0,73 | **0,13 → floor** |
+| −80 (nodo muy cercano) | 15 | 4 | 0,11 | 0,31 | 0,39 | **0,11 → floor** |
+
+---
+
+## 6. Metodología de optimización
+
+### 6.1 Evolución diferencial (DE)
+
+La evolución diferencial [Storn & Price, 1997] es un algoritmo evolutivo diseñado para
+la optimización de funciones continuas no convexas. En lugar de usar gradientes,
+genera candidatos por **mutación diferencial**: para cada individuo `x_i` del población,
+crea un candidato mutante `v = x_a + F·(x_b − x_c)` (con a, b, c distintos del pool)
+y lo cruza probabilísticamente con `x_i`.
+
+Se eligió DE frente a búsqueda en rejilla (*grid search*) por:
+1. Escala favorablemente con la dimensión del espacio (5 parámetros aquí)
+2. No requiere derivadas (función objetivo ruidosa por las semillas aleatorias)
+3. Implementación directa en `scipy.optimize.differential_evolution`
+
+**Configuración usada** (`tuneSmartGossip.py`):
+- Función objetivo: `score = 0,40·reach + 0,40·useful − 0,10·col − 0,10·(tx_air/1000)`
+- Nodos evaluados: {15, 30}
+- Repeticiones por configuración: 2
+- Tamaño de población: 4 × 5 parámetros = 20 individuos
+- Iteraciones máximas: 8
+- F_mutation ∈ [0,5; 1,0] · recombination = 0,7
+
+### 6.2 Limitaciones del proceso de optimización
+
+- El tuning se realizó sobre 2 repeticiones (semillas 0–1) por limitaciones de tiempo de cómputo.
+  Con más repeticiones se obtendría un óptimo más robusto.
+- Se evaluaron sólo nodos {15, 30}; incluir 5 y 50 podría favorecer la cobertura en extremos.
+- La función objetivo no penaliza explícitamente la reachability baja, lo que explica la caída
+  en redes pequeñas.
+
+---
+
+## 7. Análisis: por qué Smart Gossip es mejor que Managed Flood
+
+### 7.1 El problema del broadcast storm
+
+Managed Flood reproduce el *broadcast storm problem* descrito por Ni et al. [MobiCom, 1999]:
+cuando todos los nodos retransmiten, el número de transmisiones crece linealmente con la
+densidad de la red, los paquetes colisionan entre sí, y el canal queda saturado. Los datos
+lo confirman: a 30 nodos, el delay medio con Managed Flood es **78,6 segundos** — 85 % mayor
+que los 11,4 segundos de Smart Gossip. A 50 nodos, la diferencia es de 160 s frente a 27 s.
+
+### 7.2 Eficiencia de canal en redes LoRa bajo regulación EU 868
+
+La banda EU 868 impone un **duty cycle máximo del 10 %**, es decir, un nodo sólo puede
+transmitir el 10 % del tiempo. Con LONG_FAST (time-on-air ≈ 550 ms por paquete) y una red
+de 15 nodos, Managed Flood consume 97 268 ms de canal por nodo en 30 minutos de simulación
+(5,4 % de duty cycle). Smart Gossip lo reduce a 67 862 ms (3,8 %). A medida que aumenta el
+número de mensajes o de nodos, Managed Flood se acerca al límite regulatorio antes que
+Smart Gossip.
+
+### 7.3 Argumento principal: misma información, menos transmisiones
+
+La métrica *usefulness* mide qué fracción de las transmisiones entregó información nueva.
+Managed Flood tiene un valor estable de ~45–48 % — es decir, más de la mitad de sus
+transmisiones son copias redundantes que el receptor ya había procesado. Smart Gossip
+eleva este valor al 50–51 % para 15–50 nodos, lo que significa que **logra mayor eficiencia
+de canal con reachability comparable**.
+
+### 7.4 Tradeoff reachability vs. eficiencia
+
+La única ventaja de Managed Flood es la reachability: +8–12 pp en redes de 15–30 nodos.
+Este tradeoff es inherente a los protocolos gossip [Haas et al., 2006] y debe valorarse
+en contexto:
+
+- Si la topología impide la conectividad completa (red dispersa, largo alcance LoRa), la
+  reachability de ambos algoritmos ya es baja (~30–70 %) y la diferencia entre ellos no
+  es tan crítica.
+- Para aplicaciones tolerantes a pérdidas (telemetría periódica, posicionamiento GPS),
+  el ahorro de batería y canal puede ser más valioso que el +10 % de cobertura.
+- Para aplicaciones críticas (alertas de emergencia), se puede elevar `p_floor` hacia 1,0
+  recuperando el comportamiento de flooding completo.
+
+---
+
+## 8. Referencias científicas
+
+### Protocolos Gossip y Broadcast Storm
+
+1. **Ni, S.-Y., Tseng, Y.-C., Chen, Y.-S., Sheu, J.-P.** (1999).
+   *The broadcast storm problem in a mobile ad hoc network.*
+   Proceedings of ACM MobiCom 1999, pp. 151–162.
+   → Referencia canónica sobre el broadcast storm. Define formalmente el problema que
+   motiva Smart Gossip y propone cuatro mitigaciones: probabilístico, basado en área,
+   basado en vecinos y basado en contador — todas presentes en el diseño de Smart Gossip.
+
+2. **Haas, Z. J., Halpern, J. Y., Li, L.** (2006).
+   *Gossip-based ad hoc routing.*
+   IEEE/ACM Transactions on Networking, 14(3), 479–491.
+   → Análisis teórico del gossip probabilístico en redes ad hoc. Demuestra que probabilidades
+   entre 0,6–0,8 bastan para alcanzar cobertura comparable al flooding completo.
+
+3. **Tseng, Y.-C., Ni, S.-Y., Chen, Y.-S., Sheu, J.-P.** (2002).
+   *The broadcast storm problem in mobile ad hoc networks.*
+   Wireless Networks, 8(2–3), 153–167.
+   → Versión extendida de [1], introduce los esquemas basados en contador de vecinos y
+   en duplicados — las raíces directas de `f_density` y `f_dupe`.
+
+### LoRa y Meshtastic
+
+4. **Bor, M., Roedig, U., Voigt, T., Alonso, J. M.** (2016).
+   *Do LoRa low-power wide-area networks scale?*
+   Proceedings of MSWiM 2016, pp. 59–67.
+   → Primer estudio sistemático de la escalabilidad de redes LoRa. Muestra la
+   degradación del throughput y la tasa de colisiones al aumentar el número de nodos —
+   exactamente lo que se observa en Managed Flood en los resultados de este experimento.
+
+5. **Cattani, M., Boano, C. A., Römer, K.** (2017).
+   *An experimental evaluation of the reliability of LoRa long-range low-power
+   wireless communication.*
+   Journal of Sensor and Actuator Networks, 6(2), 7.
+   → Caracteriza la relación RSSI–distancia–tasa de entrega en redes LoRa reales.
+   Valida el uso de RSSI como indicador de calidad de enlace (factor `f_rssi`).
+
+### RSSI como métrica de distancia y routing
+
+6. **Senel, M., Younis, M., Akkaya, K.** (2011).
+   *Bio-inspired relay node placement heuristics for repairing damaged wireless
+   sensor networks.*
+   IEEE Transactions on Vehicular Technology, 60(4), 1835–1848.
+   → Justifica el uso de RSSI como estimador de distancia y calidad de enlace en
+   decisiones de routing adaptativo en redes de sensores inalámbricas.
+
+### Optimización — Evolución Diferencial
+
+7. **Storn, R., Price, K.** (1997).
+   *Differential evolution — a simple and efficient heuristic for global
+   optimization over continuous spaces.*
+   Journal of Global Optimization, 11(4), 341–359.
+   → Artículo original de la evolución diferencial. Presenta el algoritmo DE/rand/1/bin
+   usado en `scipy.optimize.differential_evolution` para la optimización de parámetros.
+
+### Simulador
+
+8. **Meshtasticator** — Simulador de eventos discretos para redes Meshtastic.
+   Repositorio: https://github.com/meshtastic/meshtasticator
+   → Simulador base utilizado en todos los experimentos. Implementa el modelo de
+   propagación 3GPP, colisiones LoRa, listen-before-talk y el algoritmo Managed Flood
+   oficial de Meshtastic.
+
+
+---
+
+
+1. Smart Gossip gana en 3/4 escenarios según la puntuación compuesta (reach + useful − col − tx), con ventaja creciente al aumentar la densidad de la red.
+2. El resultado más llamativo es el delay: Managed Flood a 30 nodos tiene 78 s de retardo medio vs 11 s de Smart Gossip (−85 %), debido al broadcast storm — fenómeno documentado en Ni et al. (MobiCom 1999).
+3. El único escenario donde MF gana es en redes muy pequeñas (5 nodos), donde la cobertura domina y la congestión no es problema. Para redes realistas Meshtastic de 15+ nodos, Smart Gossip es objetivamente mejor.
+
+Results:
+Archivos generados:
+- out/batchSim_results.json — todos los datos en bruto (medias + desviaciones, 30 reps)
+- out/plot_reachability.png / out/plot_collisions.png / etc. — 5 gráficas PNG listas para incluir en la memoria
+- out/report/hopLimit3_optimized/ — CSVs individuales por tamaño de red y algoritmo

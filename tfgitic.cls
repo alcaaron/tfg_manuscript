@@ -376,14 +376,7 @@ round-pad=false]{siunitx}[>v3]
     the procedure for plagiarism prevention.
     \par\bigskip\noindent
     \tfgitic@location, \today{}
-    \par\vfill
-  \end{titlepage}
-  \fi
-  \newpage
-}
-
-\newcommand{\tfgitic@declaracioIA}{
-  \begin{titlepage}
+    \par\vfill\newpage
     \hbox{}
     \vskip 3cm
     \begin{center}
@@ -406,6 +399,7 @@ round-pad=false]{siunitx}[>v3]
 
     All content generated with the assistance of AI tools has been thoroughly reviewed, verified, and edited by the author prior to its inclusion in the final version of this document.
 
+    
     Consequently, the final content of this work accurately represents the technical and intellectual contributions made by the author.
     
     The author declares under their sole responsibility that:
@@ -420,8 +414,16 @@ round-pad=false]{siunitx}[>v3]
     \tfgitic@location, \today{}
     \par\vfill
   \end{titlepage}
-  \newpage
+
+  \fi
 }
+
+% \newcommand{\tfgitic@declaracioIA}{
+%   \begin{titlepage}
+
+%   \end{titlepage}
+%   \newpage
+% }
 
 
 % estil de pagina
@@ -476,7 +478,7 @@ round-pad=false]{siunitx}[>v3]
   \maketitle{}
   \frontmatter
   \tfgitic@declaracio
-  \tfgitic@declaracioIA
+  % \tfgitic@declaracioIA
   \tfgitic@dedicacio
   \if@catalanlang
     \chapter{Resum}
