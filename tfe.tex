@@ -499,16 +499,10 @@ This body of work, however, was developed and evaluated almost exclusively for I
 
 % TARGET: 4-5 pages
 
-\chapter{System Overview and Architecture}
-
-\section{System Vision}
-% Explain:
-% - Overall project idea
-% - Intended use cases
-% - Emergency communication philosophy
-% - User-oriented design
+\chapter{System Architecture}
 
 \section{General Architecture}
+\label{sec:general_architecture}
 % IMPORTANT FIGURE
 %
 % Add:
@@ -520,15 +514,39 @@ This body of work, however, was developed and evaluated almost exclusively for I
 % - ESP32
 % - LoRa mesh
 % - Data flow
+The architecture of the platform comprises four principal components: the mobile application, the BLE communication interface, the ESP32-based gateway node, and the LoRa mesh network.
+ 
+From the end user's perspective, the mobile application constitutes a user-friendly front end designed to mediate all interaction with the mesh network. Through it, users can send and receive messages, manage contacts, and configure network parameters. This component provides the accessibility and usability layer of the system, enabling users without any technical background to participate in the mesh network in a simple and intuitive manner.
+ 
+Since smartphones lack native LoRa radio capabilities, an intermediary channel between the handset and the mesh network is required. This role is fulfilled by Bluetooth Low Energy (BLE), a technology whose low power consumption, near-universal smartphone support, and efficiency in transferring small payloads make it ideally suited to this purpose.
+ 
+To structure this communication, an AT-command-based interface has been implemented, through which the mobile application issues instructions to the node firmware. The ESP32 microcontroller, which provides native BLE support, is responsible for parsing these commands and translating them into concrete actions, either within the mesh network or on the node itself. By means of this interface, the mobile application can transmit messages to the ESP32 node, receive messages originating from the mesh network, and configure network parameters, among other operations exposed by the firmware.
+ 
+All of these processes are orchestrated by the ESP32 microcontroller, which coordinates BLE communications, packet processing, routing logic, encryption mechanisms, and the management of the LoRa radio.
+ 
+Finally, the outermost layer of the architecture is the LoRa mesh network, which provides long-range wireless communication between nodes. This network constitutes the backbone of the system, allowing nodes to communicate with one another without any centralised infrastructure
+
 
 \section{Node Interaction Model}
+\label{sec:node_interaction_model}
 % Explain:
 % - Neighbor interaction
 % - Discovery
 % - Message forwarding
 % - Broadcast behavior
+The mesh layer is built on a deliberately egalitarian premise: all nodes are functionally identical peers. There are no coordinators, no dedicated repeaters and no infrastructure roles of any kind;
+every node is simultaneously an end point for its own user and a potential relay for the traffic of others.
+This design choice follow directly from the resilience objectives of the system and stands in explicit contrast to the role-based architecture of MeshCore discussed in Section~\ref{subsec:localmesh}.
+
+\paragraph{Neighbor awareness.} Each node maintains a local notion of its \emph{neighborhood}: the set of nodes whose transmissions it can hear directly. Crucially, this awareness is acquired \emph{passively}. Since every LoRa transmission is inherently a broadcast, a node learns of the existence, identity and link quality of its neighbors simply by overhearing the traffic that already flows through the channel.
+
+\paragraph{Message propagation.} Communication beyond direct radio range is achieved through multi-hop forwarding: intermediate nodes rebroadcast packets so that they progressively cover the network. All transmissions at the radio level are broadcasts; the distinction between a directed message and a network-wide announcement exists only at the logical level, encoded in the packet's addressing fields. A node receiving a packet that is not addressed to it does not discard it, but evaluates whether to act as a relay.
+
+\paragraph{Forwarding decision.} The defining characteristic of A3MESH's interaction model is that this relaying decision is \emph{probabilistic and adaptive} rather than deterministic. Instead of rebroadcasting every new packet unconditionally---the flooding approach whose pathologies were analysed in Section~\ref{sec:gossip}---each node forwards with a probability modulated by locally observable signals, such as the quality of the link over which the packet arrived and the level of redundancy it observes in its vicinity. Nodes in dense regions, where many candidate relays exist, suppress most of their retransmissions; nodes in sparse regions, where they may constitute the only bridge between network segments, forward with near certainty. The network as a whole thereby self-regulates its channel occupancy without any global coordination. The design of this forwarding policy, its mathematical formulation and its optimisation constitute the central contribution of this thesis and are developed in Chapter~\ref{ch:simulation}; its realisation in firmware is described in Chapter~\ref{ch:firmware}.
+
 
 \section{Communication Flow}
+\label{sec:communication_flow}
 % Add:
 % - Sequence diagrams
 %
@@ -536,28 +554,57 @@ This body of work, however, was developed and evaluated almost exclusively for I
 % - Message lifecycle
 % - App -> BLE -> LoRa -> Mesh -> BLE -> App
 
+This section traces the complete lifecycle of a user message through the system, from the sender's smartphone to the recipient's, tying together the four architectural components introduced in Section~\ref{sec:general_architecture}. Figure~\ref{fig:sequence_message} presents the corresponding sequence diagram.
+% \begin{figure}[htbp]
+%     \centering
+%     % \includegraphics[width=\textwidth]{figures/sequence_message.pdf}
+%     \caption{End-to-end sequence diagram of a message exchanged between two users, traversing the BLE link, the originating node, the LoRa mesh and the destination node.}
+%     \label{fig:sequence_message}
+% \end{figure}
+
+\paragraph{Origination.} The lifecycle begins in the mobile application, where the user composes a message addressed to a contact. The application encodes the request as an AT command and writes it to the corresponding GATT characteristic of its paired node over BLE. From the user's perspective the interaction ends here: the experience is intentionally indistinguishable from that of a conventional messaging application.
+
+\paragraph{Ingestion at the originating node.} The node's firmware parses the AT command, validates it, and constructs a mesh packet: the payload is encrypted, the addressing fields, sequence number and time-to-live (TTL) counter are populated, and the resulting frame is serialised for transmission. The node then transmits the packet over the LoRa radio as a broadcast, subject to the channel-access and duty-cycle constraints enforced by the firmware.
+
+\paragraph{Mesh traversal.} Every node within radio range receives the frame. Each receiver first checks the packet against its duplicate cache; previously seen packets are silently discarded, which guarantees that no packet is relayed more than once by the same node. For a new packet, the node performs two independent actions. First, it checks whether the packet is addressed to itself, in which case it is passed up to the local delivery path. Second---and regardless of addressing---it evaluates the adaptive forwarding decision described in Section~\ref{sec:node_interaction_model}: with the computed probability, it schedules a rebroadcast after a randomised back-off that desynchronises concurrent relays; otherwise it remains silent. Each rebroadcast decrements the TTL, which bounds the propagation horizon and prevents indefinite circulation. The packet thus expands through the network in stochastic waves, hop by hop, until it reaches the destination, the TTL expires, or the gossip extinguishes naturally once coverage is achieved.
+
+\paragraph{Delivery.} When the packet reaches a node whose identity matches the destination address, the firmware decrypts and validates the payload, stores the message, and notifies the paired smartphone through a BLE notification on the corresponding GATT characteristic. The recipient's application then decodes the notification and renders the message in the conversation view. % If the destination smartphone is momentarily disconnected, the node retains the message and delivers it upon reconnection, so that the user's handset need not be permanently linked for the system to operate.
+
+It must be emphasised that this description captures the system-level journey of a message; the internal mechanics of each stage---the queueing and task structure of the BLE-to-LoRa pipelines, the channel-access procedure, and the encryption scheme---are implementation concerns addressed in Chapter~\ref{ch:firmware}.
+
+
 \section{Design Requirements}
+\label{sec:design_requirements}
+The architecture described above is shaped by four system-level requirements. They are stated here together with their rationale and target figures; the subsequent chapters derive from them the concrete engineering requirements of each subsystem (Chapter~\ref{ch:hardware} for the hardware platform, Chapter~\ref{ch:firmware} for the firmware, and Chapter~\ref{ch:mobileapp} for the mobile application), and Chapter~\ref{ch:results} evaluates the extent to which they are met.
 
 \subsection{Low Power Consumption}
+\label{subsec:req_power}
 % Explain power constraints and goals
+A3MESH nodes are battery-powered devices intended for scenarios---emergencies, remote deployments, prolonged infrastructure outages---in which recharging opportunities cannot be assumed. Energy is therefore the most binding resource of the entire design, and the requirement is twofold. At the device level, a node must sustain multiple days of autonomous operation on a single battery charge, which demands aggressive duty cycling of both radios, exploitation of the ESP32 sleep modes and a power subsystem with high conversion efficiency. At the network level, the forwarding protocol itself must be energy-aware: every retransmission suppressed by the gossip policy is energy saved not by one node but by the network as a whole. This dual perspective---energy as a hardware constraint and as a protocol design criterion---recurs throughout this work.
 
 \subsection{Scalability}
+\label{subsec:req_scalability}
 % Explain node density concerns
+The system must remain functional as node density grows, precisely the regime in which flood-based LoRa meshes degrade. The underlying tension is structural: the LoRa channel is a single shared medium with long frame airtimes, no effective carrier sensing over kilometre-scale links and a hard duty-cycle ceiling, so aggregate channel occupancy---not computation or memory---is the binding resource. The requirement is therefore formulated in terms of \emph{graceful degradation}: channel load must grow with offered traffic rather than with the number of deployed nodes, and the addition of nodes to a region should improve, not erode, its connectivity. This requirement is the principal motivation for abandoning deterministic flooding in favour of the adaptive gossip policy, and it is evaluated quantitatively through the congestion metrics of Chapter~\ref{ch:simulation}.
 
 \subsection{Reliability}
+\label{subsec:req_reliability}
 % Explain delivery reliability goals
+A messaging system intended for emergency use must deliver messages with high probability under adverse conditions: lossy links, node failures, mobility and network partitions. Probabilistic forwarding introduces an inherent tension here, since every suppressed retransmission is also a lost redundancy opportunity. The requirement is therefore expressed as a target operating point: the forwarding policy must achieve a packet delivery ratio statistically indistinguishable from that of pure flooding---in particular in sparse topologies, where premature gossip die-out is the dominant failure mode---while consuming a substantially smaller airtime budget. Reliability is thus not pursued through end-to-end acknowledgements and retransmissions, which would multiply airtime consumption, but through the controlled redundancy that the gossip mechanism itself provides. The delivery-ratio metric defined in Chapter~\ref{ch:simulation} quantifies compliance with this requirement.
 
 \subsection{User Accessibility}
+\label{subsec:req_accessibility}
 % Explain ease-of-use philosophy
+Finally, the system must be operable by users with no technical background whatsoever. In the intended scenarios, the people who most need resilient communication are not radio amateurs or engineers, and any configuration step---flashing firmware, selecting spreading factors, managing identifiers---constitutes a barrier that excludes them. This requirement drives the upper layers of the architecture: the smartphone, a device users already own and understand, is the sole human interface; the BLE link and pairing process require no networking knowledge; the mesh is self-configuring, with discovery, forwarding and adaptation occurring autonomously; and the application deliberately reproduces the interaction patterns of mainstream messaging applications. Accessibility also constrains the physical design, as reflected in the ergonomic and enclosure decisions of the mechanical integration chapter. In short, all technical complexity of the system is required to remain invisible below the application layer.
 
 % =============================================================================
 % SIMULATOR
 % =============================================================================
 
 % TARGET: 10-14 pages
-% MOST IMPORTANT CHAPTER
 
 \chapter{Network Simulation and Routing Algorithm Design}
+\label{ch:simulation}
 
 \section{Purpose of the Simulator}
 % Explain:
@@ -738,9 +785,8 @@ This body of work, however, was developed and evaluated almost exclusively for I
 % =============================================================================
 
 % TARGET: 10-12 pages
-% SECOND MOST IMPORTANT CHAPTER
-
 \chapter{Firmware Architecture and Implementation}
+\label{ch:firmware}
 
 \section{Firmware Design Philosophy}
 % Explain:
