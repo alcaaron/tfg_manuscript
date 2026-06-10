@@ -227,8 +227,42 @@ The document also includes several appendices containing complementary technical
 %
 % Add:
 % - Simple mesh topology figure
+Mesh communication systems are decentralized network architectures in which devices, commonly referred to as nodes, 
+cooperate to exchange information without relying on a fixed centralized infrastructure \cite{mesh_survey,ad_hoc_networks}. Unlike traditional communication 
+models based on access points, cellular towers, or centralized servers, mesh networks distribute communication responsibilities 
+among all participating nodes, allowing the network to operate autonomously even when part of the infrastructure is unavailable or damaged.
+
+To do so, mesh networks utilize multi-hop communication, where messages are forwarded from one node to another until they reach their destination. 
+This approach allows for extended coverage beyond the direct communication range of individual nodes \cite{ad_hoc_networks}, as messages can be relayed through intermediate devices.
+
+The operation of multi-hop communication can be understood as a collaborative forwarding process. When a node receives a packet that is not intended for itself, 
+it may retransmit the packet to neighboring nodes according to a predefined routing or forwarding strategy. Depending on the network architecture, these strategies 
+may rely on deterministic routing tables, probabilistic forwarding mechanisms, flooding approaches, or adaptive routing algorithms.
+Another important advantage is scalability and deployment flexibility. New nodes can be added dynamically to increase network coverage without requiring significant 
+infrastructure modifications. Additionally, mesh systems can often self-organize and self-heal by adapting communication paths according to network topology changes.
+
+On the one hand, this makes mesh networks particularly suitable for scenarios such as disaster recovery, remote areas, and temporary deployments where traditional 
+infrastructure may be unavailable or unreliable. 
+
+On the other hand, one of the most significant problems is routing efficiency. As the number of nodes increases, packet forwarding can generate excessive redundancy, 
+channel congestion, collisions, and increased energy consumption. This problem becomes particularly severe in low-power wireless systems where devices are 
+battery-powered and communication bandwidth is limited.
+
+Traditional flooding-based approaches represent a simple solution to guarantee high message delivery probability, since every node retransmits received packets.
+Nevertheless, this strategy scales poorly in dense networks due to the exponential growth of retransmissions. 
+Consequently, modern mesh systems often require more sophisticated routing or forwarding techniques capable of balancing reliability, scalability, and energy efficiency.
+
+Another important limitation is network latency and topology instability. Since communication depends on intermediate nodes, failures or mobility may affect 
+message propagation paths and reduce delivery reliability. Furthermore, distributed systems generally require more complex coordination mechanisms 
+compared to centralized architectures.
+
+Although centralized communication systems, such as cellular or cloud-based messaging platforms, provide several advantages including global connectivity, 
+optimized routing, centralized management, and simplified synchronization, they are fundamentally dependent on infrastructure availability and external service providers.
+
+In contrast, distributed mesh systems sacrifice part of this global connectivity and simplicity in exchange for increased autonomy, resilience, and infrastructure independence.
 
 \section{LoRa and LPWAN Technologies}
+\label{sec:lora-lpwan}
 % ~2 pages
 %
 % Explain:
@@ -244,7 +278,94 @@ The document also includes several appendices containing complementary technical
 % - LPWAN comparison
 % - LoRa parameter effects
 
+
+\subsection{Introduction to LPWAN}
+
+The Internet of Things has created a class of communication requirements that traditional wireless technologies were never designed 
+to satisfy: thousands of inexpensive, battery-powered devices, scattered over wide geographical areas, each transmitting only a few 
+bytes of data sporadically. Low-Power Wide-Area Networks (LPWANs) emerged precisely to fill this gap, offering kilometre-scale range 
+and multi-year battery lifetimes at the cost of very low data rates~\cite{raza2017lpwan}. Short-range technologies such as Wi-Fi, 
+Bluetooth and Zigbee provide high throughput but only over tens of metres, while conventional cellular networks offer coverage at the 
+expense of complex protocols, subscription costs and energy budgets incompatible with coin-cell operation~\cite{mekki2019comparative}. 
+LPWAN deliberately accepts the opposite trade-off: it sacrifices throughput in exchange for range and energy efficiency. This makes it 
+the natural choice for smart cities, precision agriculture, distributed sensing, remote monitoring and resilient communications in 
+infrastructure-degraded scenarios. It is important to stress that LPWAN is not a single technology but a \emph{category} of technologies---including LoRa, Sigfox and NB-IoT---that share these optimisation goals~\cite{raza2017lpwan}.
+
+\subsection{LPWAN versus LoRa: Clarifying the Terminology}
+
+Within this landscape, LoRa (Long Range) is one specific LPWAN technology: a proprietary physical-layer (PHY) modulation developed by 
+Semtech~\cite{semtech2015an1200}. A frequent source of confusion is the distinction between LoRa and LoRaWAN. LoRa defines only the radio modulation, 
+whereas LoRaWAN is an open MAC and network-layer specification, maintained by the LoRa Alliance, that builds a star-of-stars architecture with gateways and 
+network servers on top of the LoRa PHY~\cite{lorawan2017spec}. Crucially, LoRa can be used \emph{without} LoRaWAN: the raw PHY is accessible to any system designer, 
+enabling custom protocols above it. This is exactly the approach adopted in A3MESH, which operates directly over the LoRa physical layer to implement a decentralised 
+mesh topology rather than the infrastructure-centric model imposed by LoRaWAN. LoRa should therefore be understood as a flexible physical layer on which 
+non-conventional architectures can be built.
+
+\subsection{Fundamentals of LoRa}
+
+LoRa is based on Chirp Spread Spectrum (CSS) modulation, in which each symbol is encoded as a \emph{chirp}: a signal whose instantaneous frequency sweeps linearly across 
+the entire channel bandwidth~\cite{vangelista2017css}. Unlike narrowband schemes, where all the signal energy is concentrated in a small portion of the spectrum, 
+CSS spreads each symbol over the full bandwidth. This spreading yields a substantial processing gain at the receiver, which correlates the incoming signal against 
+known chirp patterns and effectively integrates the symbol energy over time. The practical consequences are remarkable: strong robustness against thermal noise and 
+narrowband interference, high tolerance to multipath fading and Doppler effects, and---most strikingly---the ability to demodulate signals received 
+\emph{below} the noise floor, with sensitivities down to approximately $-137$~dBm~\cite{semtech2015an1200,augustin2016study}. 
+The long range of LoRa therefore does not come from transmitting at high power, which is in any case limited by regulation, but from extreme receiver 
+sensitivity achieved through spreading and temporal energy integration.
+
+\subsection{Configurable PHY Parameters}
+
+The behaviour of a LoRa link is governed by a small set of PHY parameters that can be tuned per transmission, making the technology unusually adaptable.
+
+\paragraph{Spreading Factor (SF).} The spreading factor, ranging from SF7 to SF12, defines how many chips encode each symbol; 
+the symbol duration is $T_s = 2^{\mathrm{SF}}/BW$~\cite{semtech2015an1200}. Each unit increase in SF roughly doubles the airtime, so its effect on time-on-air, 
+energy consumption and latency is exponential, while sensitivity improves by approximately 2.5~dB per step. Higher SFs thus extend range at the cost of drastically 
+reduced bitrate. Different SFs are quasi-orthogonal, allowing partially concurrent transmissions, although this orthogonality is imperfect in 
+practice~\cite{croce2018orthogonality}. In a mesh context such as A3MESH this trade-off is critical: high SFs improve connectivity between distant nodes but inflate 
+channel occupancy, increasing congestion and the probability of collisions as the network grows~\cite{bor2016scale}.
+
+\paragraph{Bandwidth (BW).} LoRa typically operates with bandwidths of 125, 250 or 500~kHz. Narrower bandwidths capture less thermal noise and therefore improve 
+sensitivity, but they proportionally lengthen symbols and reduce data rate~\cite{augustin2016study}. As with SF, the designer trades speed for robustness.
+
+\paragraph{Coding Rate (CR).} LoRa incorporates Forward Error Correction with coding rates of 4/5, 4/6, 4/7 and 4/8. Higher redundancy improves the 
+receiver's ability to recover corrupted symbols in noisy or interference-prone environments, at the cost of lower effective throughput and longer 
+airtime, i.e.\ reduced spectral efficiency~\cite{semtech2015an1200}.
+
+\paragraph{Other parameters.} Transmission power (typically up to +20~dBm in the European 868~MHz ISM band) directly shapes the link budget, range and energy consumption. 
+The preamble length controls how reliably receivers detect and synchronise to incoming frames, an important lever for duty-cycled listeners. 
+An optional CRC protects payload integrity, and the sync word provides logical separation between co-located networks sharing the same channel~\cite{semtech2015an1200}.
+
+\subsection{Fundamental Trade-offs}
+
+No LoRa configuration simultaneously maximises range, throughput, latency and spectral efficiency. The two extremes of the configuration space illustrate this 
+clearly: SF12 with 125~kHz bandwidth and CR~4/8 yields maximum range and robustness, with airtimes of over a second for modest payloads, whereas SF7 
+with 500~kHz and CR~4/5 maximises throughput and minimises latency but sharply reduces link margin. Airtime is the variable that couples these choices to 
+system-level behaviour: longer frames raise collision probability, degrade scalability and consume the limited 
+duty-cycle budget (typically 1\% in the EU 868~MHz sub-bands under ETSI regulations)~\cite{adelantado2017limits,bor2016scale}. Parameter selection is therefore 
+not a local optimisation of a single link but a network-wide engineering decision.
+
+\subsection{Practical Limitations of LoRa}
+
+A mature assessment must acknowledge LoRa's limitations. Bitrates range only from roughly 0.3 to 27~kbps, and transceivers are half-duplex, 
+unable to receive while transmitting. High airtimes at large SFs amplify the classical hidden-node problem, since carrier sensing is unreliable over 
+kilometre-scale links, and collisions grow rapidly with network density~\cite{bor2016scale,adelantado2017limits}. 
+Regulatory duty-cycle restrictions in ISM bands further cap achievable throughput and limit how often nodes may relay traffic. 
+Finally, LoRa was conceived for star topologies, not mesh networking: it provides no native routing, scheduling or neighbour-discovery mechanisms. 
+These shortcomings do not invalidate the technology, but they imply that an efficient mesh network over LoRa requires additional protocol 
+mechanisms at the MAC and routing layers---precisely the problem A3MESH addresses.
+
+\subsection{Why LoRa for A3MESH}
+
+The requirements of A3MESH map remarkably well onto LoRa's strengths. 
+Alternative technologies fail at least one requirement: Wi-Fi and BLE lack the necessary range; Zigbee meshes well but only over short links; 
+NB-IoT depends entirely on operator-owned cellular infrastructure, an unacceptable single point of failure in disaster scenarios; and Sigfox relies on a proprietary, 
+operator-managed network with severely constrained uplink and almost no downlink capability~\cite{mekki2019comparative}. 
+LoRa, in contrast, operates in licence-free ISM bands without any operator, offers kilometre-scale links at milliwatt power levels, and exposes a highly configurable 
+PHY that permits experimentation with custom mesh protocols. For these reasons---autonomy, range, energy efficiency, regulatory accessibility and PHY flexibility---LoRa 
+was selected as the physical layer of A3MESH, with the understanding that the mesh-specific challenges identified above must be solved by the protocol design presented in 
+the following chapters.
+
 \section{Bluetooth Low Energy}
+\label{sec:ble}
 % ~1 page
 %
 % Explain:
@@ -252,30 +373,88 @@ The document also includes several appendices containing complementary technical
 % - GATT
 % - Low-power advantages
 % - Why BLE fits smartphone integration
+Bluetooth Low Energy (BLE), introduced in version 4.0 of the Bluetooth Core Specification, is a short-range wireless technology designed from the 
+ground up for ultra-low-power operation rather than as a mere optimisation of classic Bluetooth~\cite{bluetooth2023core,gomez2012overview}. 
+Although it shares the brand and the 2.4~GHz ISM band with its predecessor, BLE is a distinct protocol stack: it uses 40 channels of 2~MHz 
+with GFSK modulation, three of which are reserved for advertising, and it replaces the connection-oriented complexity of classic Bluetooth with a 
+lightweight, asynchronous design oriented towards the sporadic exchange of small amounts of data.
+
+\subsection{Architecture}
+
+The BLE stack is organised into three blocks. The \emph{controller} comprises the physical layer and the link layer, which manages device 
+states (advertising, scanning, initiating and connected), adaptive frequency hopping and connection events. The \emph{host} contains the 
+Logical Link Control and Adaptation Protocol (L2CAP), the Attribute Protocol (ATT), the Generic Attribute Profile (GATT), the Security Manager 
+and the Generic Access Profile (GAP), which defines discovery and connection roles such as \emph{central} and \emph{peripheral}. Both blocks 
+communicate through the Host Controller Interface (HCI)~\cite{bluetooth2023core,gomez2012overview}. Communication follows two complementary 
+patterns: connectionless broadcasting over the advertising channels, and point-to-point connections in which the central device polls the 
+peripheral at a negotiated \emph{connection interval}, allowing the radio to remain asleep between events.
+
+\subsection{The Generic Attribute Profile (GATT)}
+
+Data exchange in connected mode is structured by GATT, a client--server model built on top of ATT. A GATT server exposes its state as a 
+hierarchy of \emph{services}, each grouping one or more \emph{characteristics}: typed attributes identified by UUIDs that a client can 
+read, write or subscribe to through \emph{notifications} and \emph{indications}~\cite{bluetooth2023core}. This self-describing structure means 
+that a client can discover at runtime what data a previously unknown device offers, without any out-of-band agreement. In practice, GATT acts as a 
+universal application-layer contract: any BLE-capable device, including every modern smartphone, can interact with a custom peripheral simply by 
+knowing its service and characteristic UUIDs.
+
+\subsection{Low-Power Operation}
+
+BLE achieves multi-year operation on coin-cell batteries through aggressive duty cycling rather than low transmit power alone. Connection events and 
+advertising bursts last only a few milliseconds, after which the radio returns to deep sleep; protocol overhead is minimal, device discovery and 
+connection establishment take milliseconds rather than seconds, and parameters such as the connection interval, slave latency and advertising interval 
+let the designer trade latency for energy~\cite{gomez2012overview,tosi2017performance}. Reported peak currents in the range of tens of milliamperes, 
+combined with sleep currents of a few microamperes, result in average consumptions orders of magnitude below those of Wi-Fi or classic Bluetooth for 
+intermittent traffic~\cite{siekkinen2012energy}.
+
+\subsection{BLE as the Smartphone Bridge in A3MESH}
+
+The decisive argument for BLE in this project is ubiquity: native BLE support is mandatory hardware in virtually all smartphones manufactured in the last 
+decade, and both Android and iOS expose mature GATT APIs to applications, with no need for pairing infrastructure, routers or licensed 
+spectrum~\cite{gomez2012overview}. In A3MESH, BLE therefore plays a role complementary to LoRa: while LoRa provides the long-range 
+backbone between nodes, BLE provides the last metre between each node and its user. The node acts as a GATT peripheral exposing message and 
+configuration characteristics, and the smartphone application, acting as central, becomes the human interface of the mesh without requiring any 
+custom radio hardware on the user's side. The combination of negligible energy cost, standardised application-layer semantics through GATT, 
+and universal smartphone availability makes BLE the natural choice for this local link.
+
+% ============================================================
+% Sections: Existing Solutions (~2 pages) and
+%           Gossip-Based Routing Protocols (~1.5-2 pages)
+% Citation keys match the entries in existing_gossip_references.bib
+% ============================================================
 
 \section{Existing Solutions}
-% ~2 pages
+\label{sec:existing-solutions}
+
+Building multi-hop networks over LoRa is an active area of both academic research and community-driven development. Surveys of the field show that, although LoRaWAN's star-of-stars topology remains dominant, a growing ecosystem of projects explores mesh architectures over the raw LoRa PHY~\cite{pueyo2021beyond,wong2024multihop}. Among them, two open-source systems are particularly relevant to this thesis because they target the same use case as A3MESH---off-grid, infrastructure-less text communication between nodes---and because they embody two opposite points in the routing design space: Meshtastic, based on network-wide flooding, and MeshCore (deployed at scale by initiatives such as LocalMesh), based on structured routing through dedicated repeaters.
 
 \subsection{Meshtastic}
+\label{subsec:meshtastic}
 % Explain:
 % - Architecture
 % - Flooding strategy
 % - Pros/cons
 % - What your system improves
 
-\subsection{Reticulum}
-% Explain:
-% - Philosophy
-% - Routing concepts
-% - Flexibility vs complexity
+Meshtastic is an open-source firmware and application ecosystem that turns inexpensive ESP32-based LoRa boards into an off-grid messaging platform~\cite{meshtastic2024docs}. Its architecture is deliberately egalitarian: every node runs the same stack, pairs with a smartphone over BLE for the user interface, and---by default---participates in packet forwarding. There is no central infrastructure, no network server and no special node required for the network to function, which makes deployment trivially simple.
 
-\subsection{Disaster and Off-Grid Communication Systems}
-% Mention:
-% - Existing emergency communication projects
-% - Academic systems
-% - Main limitations
+Routing in Meshtastic follows a \emph{managed flooding} strategy. A node that originates a message broadcasts it; every node that receives it rebroadcasts it once, until a hop-limit counter (three by default, seven at most) is exhausted~\cite{meshtastic2024mesh}. The flooding is ``managed'' through a handful of heuristics: duplicate packets are recognised and suppressed via a per-packet identifier cache; rebroadcasts are delayed by a contention window weighted by the received SNR, so that distant nodes---which extend coverage the most---tend to retransmit first; and a node that overhears another copy of the packet during its back-off cancels its own retransmission. Since version 2.6, unicast messages additionally learn a next-hop after the first flooded delivery, although broadcast traffic, which dominates typical usage, continues to flood~\cite{meshtastic2024mesh}.
+
+The strengths of this design are clear. Flooding requires no routing state, no topology knowledge and no control traffic; it is maximally robust to mobility and node failure, since any available path is implicitly used; and it guarantees that broadcasts reach every reachable node. These properties explain Meshtastic's popularity for hiking groups, events and emergency-preparedness communities. The weaknesses, however, are equally structural. Every message triggers up to one transmission per node within the hop horizon, so channel occupancy grows with node density rather than with traffic demand---a particularly serious problem over LoRa, where airtime is long and duty-cycle budgets are tight. Experimental and community evidence consistently reports degraded delivery rates and channel saturation as dense meshes grow towards the order of a hundred nodes, aggravated by periodic telemetry and position broadcasts that the protocol itself generates~\cite{wong2024multihop,meshtastic2024mesh}. In other words, Meshtastic inherits the classical \emph{broadcast storm} pathology discussed in Section~\ref{sec:gossip}, mitigated but not solved by its heuristics.
+
+A3MESH takes Meshtastic's architectural premises---full decentralisation, role-free nodes, BLE smartphone integration---as a baseline, but replaces blind rebroadcasting with a probabilistic, adaptive forwarding discipline. The goal is to retain flooding's robustness and statelessness while decoupling channel load from node density, so that the network degrades gracefully precisely in the dense, high-stress scenarios where flooding performs worst.
+
+\subsection{LocalMesh and MeshCore}
+\label{subsec:localmesh}
+
+LocalMesh is a community initiative, originating in the Netherlands and the United Kingdom, that deploys volunteer-operated LoRa repeaters to provide free, subscription-less emergency messaging when cellular and Internet infrastructure fail~\cite{localmesh2026}. Technically, LocalMesh networks run MeshCore, an open-source mesh protocol released in 2025 as a direct response to the scalability limits of flood-based systems~\cite{meshcore2025}.
+
+MeshCore abandons the egalitarian model in favour of explicit device roles. Ordinary user devices (\emph{companions}) never forward traffic; forwarding is reserved for dedicated \emph{repeaters}, intentionally placed at elevated locations, while \emph{room servers} provide store-and-forward group messaging. Routing is hybrid: the first message towards an unknown destination is flooded through the repeater backbone for path discovery; the acknowledgement returns the ordered sequence of repeaters traversed, and subsequent messages embed this source-routed path in their headers, so that only the designated next-hop repeater forwards each packet. If a cached path fails, the sender falls back to flooding to discover a fresh one~\cite{meshcore2025}. The result is a much quieter channel: after path discovery, most traffic is directed unicast rather than network-wide broadcast, which is why MeshCore networks scale comfortably beyond the practical limits of Meshtastic.
+
+These gains, however, are bought with assumptions that A3MESH cannot make. MeshCore's efficiency depends on a \emph{planned, static backbone} of well-placed, always-on repeaters---volunteer infrastructure that takes months to build and that constitutes, in aggregate, a dependency not unlike the one resilient networks try to escape. Cached source routes also presume topological stability: under mobility or node loss, the protocol repeatedly falls back to flooding, eroding its advantage exactly when conditions are most adverse. A3MESH targets the complementary scenario: spontaneous, fully ad-hoc deployments of homogeneous, possibly mobile nodes, with no pre-positioned infrastructure and no role assignment. The research question is therefore whether the channel-load discipline that MeshCore achieves through \emph{structure} can instead be achieved through \emph{statistics}---that is, through gossip-based forwarding.
 
 \section{Gossip-Based Routing Protocols}
+\label{sec:gossip}
 % ~1.5-2 pages
 %
 % IMPORTANT SECTION
@@ -290,7 +469,26 @@ The document also includes several appendices containing complementary technical
 % - Why smart gossip matters
 % - Research gap your thesis fills
 
-% =============================================================================
+
+\subsection{The Flooding Problem}
+
+Flooding is the simplest possible dissemination primitive: every node retransmits every new packet exactly once. Its appeal in ad-hoc networks is that it requires no routes, no neighbour tables and no coordination, and it finds every reachable node by construction. Its cost was characterised in the seminal analysis of the \emph{broadcast storm problem} by Ni et al., who showed that naive rebroadcasting produces severe redundancy, contention and collisions: in dense topologies, each additional rebroadcast covers only a marginal sliver of new area---at most 61\% for the second transmission and rapidly less thereafter---while every transmission competes for the shared channel~\cite{ni1999broadcast}. The problem is dramatically amplified over LoRa, where frames occupy the channel for hundreds of milliseconds at high spreading factors, transceivers are half-duplex, carrier sensing is unreliable over kilometre-scale links (the hidden-node problem), and regulatory duty cycles cap each node's airtime budget~\cite{adelantado2017limits,bor2016scale}. A LoRa mesh that floods therefore saturates at modest node counts, as the Meshtastic experience illustrates.
+
+\subsection{Probabilistic Forwarding}
+
+Gossip protocols attack this redundancy at its root by randomising the forwarding decision: upon first reception of a packet, a node rebroadcasts it with probability $p$ and stays silent with probability $1-p$. The foundational result of Haas, Halpern and Li is that this simple mechanism exhibits a \emph{bistable} (percolation-like) behaviour: below a critical probability the dissemination dies out quickly, while above it the message reaches almost all nodes almost as reliably as full flooding. In typical random topologies the threshold lies around $p \approx 0.6$--$0.8$, meaning that 25--35\% of transmissions can simply be removed with negligible loss of coverage~\cite{haas2006gossip}. For LoRa meshes this is a directly monetisable saving: fewer transmissions translate into proportionally less airtime, fewer collisions, lower energy consumption and slower duty-cycle exhaustion.
+
+\subsection{Controlled Gossip}
+
+Pure probabilistic forwarding has a known weakness: dissemination can die prematurely in sparse regions, where a node may be the \emph{only} bridge between two parts of the network yet still decline to forward. A family of \emph{controlled} gossip variants addresses this by combining the coin flip with deterministic safeguards~\cite{haas2006gossip,williams2002comparison}. Representative mechanisms include forwarding with probability 1 for the first $k$ hops to give the message critical mass (GOSSIP1$(p,k)$); forcing retransmission when a node has fewer neighbours than a threshold, so that articulation points never stay silent; and counter-based recovery, in which a node that has not overheard sufficient copies of a packet within a timeout concludes that the gossip is dying in its vicinity and retransmits regardless of its earlier decision. These hybrids retain most of the savings of pure gossip while restoring flooding-like reliability in irregular topologies---an essential property for A3MESH, whose deployments are expected to mix dense clusters with sparse long-range bridges.
+
+\subsection{Adaptive Gossip and the Research Gap}
+
+The protocols above still share a limitation: $p$ and its companion thresholds are fixed at design time, while the optimal operating point depends on local density, traffic load and link quality, all of which vary across the network and over time. \emph{Adaptive} gossip closes this loop by letting each node tune its forwarding probability from locally observable signals. Kyasanur et al.'s Smart Gossip, for instance, infers parent--child dependencies from overheard traffic and assigns each node a forwarding probability proportional to how much its neighbours actually depend on it, converging automatically to high probabilities in sparse regions and low ones in dense regions, with no manual configuration~\cite{kyasanur2006smartgossip}. Related adaptive schemes modulate $p$ using neighbour counts, overheard duplicate counters or received signal strength~\cite{williams2002comparison}.
+
+This body of work, however, was developed and evaluated almost exclusively for IEEE~802.11 ad-hoc networks and classical wireless sensor networks---radios with millisecond airtimes, effective carrier sensing and no duty-cycle constraints. Its translation to LoRa is far from mechanical: long airtimes magnify the cost of every redundant transmission, half-duplex operation means a forwarding node is deaf while it helps others, SNR is cheaply observable and unusually informative thanks to CSS, and the duty cycle imposes a hard budget that a forwarding policy should treat as a first-class resource. Meanwhile, the deployed LoRa mesh systems reviewed in Section~\ref{sec:existing-solutions} occupy the two extremes of the spectrum---managed flooding without probabilistic suppression (Meshtastic) and structured routing requiring planned infrastructure (MeshCore)---leaving the middle ground essentially unexplored. This is the research gap addressed by this thesis: A3MESH brings \emph{smart, adaptive gossip} to a fully decentralised LoRa mesh, using locally available information such as RSSI and overheard duplicates to modulate each node's forwarding probability, with the aim of approaching the channel efficiency of structured routing while preserving the zero-infrastructure, zero-configuration resilience of flooding.
+
+
 
 \part{Thesis Body}
 \label{part:thesis_body}
