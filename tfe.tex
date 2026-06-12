@@ -1030,71 +1030,455 @@ Two real-world implications follow. First, because all inputs to the decision ar
 % TARGET: 7-9 pages
 
 \chapter{Hardware Design}
+\label{ch:hardware}
 
 \section{Hardware Requirements}
-% Define:
-% - Battery life targets
-% - RF requirements
-% - Size constraints
-% - Cost constraints
+\label{sec:hw_requirements}
+
+The system-level requirements established in Section~\ref{sec:design_requirements}
+translate into a concrete set of hardware constraints that shaped every design
+decision in the custom printed circuit board (PCB). Four principal constraints govern
+the design space.
+
+\paragraph{Autonomy.}
+The device is intended for deployment scenarios in which mains power is unavailable
+for extended periods. A target runtime of several days of continuous mesh operation
+on a single lithium polymer (LiPo) cell demands that the combined average current
+draw of the microcontroller, LoRa transceiver, BLE radio, and all ancillary
+circuitry remains in the range of a few milliamperes. This requirement directly
+constrains the choice of voltage regulator topology, mandates aggressive peripheral
+duty cycling in firmware (Chapter~\ref{ch:firmware}), and rules out linear
+regulators as the primary power conversion stage.
+
+\paragraph{Compactness.}
+The node is designed to be carried alongside a smartphone, so the PCB form factor
+must be kept to a minimum consistent with the required component area. The resulting
+board measures 74.5\,mm\,$\times$\,89.8\,mm, a footprint that accommodates the
+integrated PCB antenna, the USB-C connector, the battery header, and all active
+circuitry without requiring multi-board stacking.
+
+\paragraph{RF compliance.}
+Operation in the EU\,868\,MHz ISM band is governed by ETSI EN\,300\,220~\cite{etsi2020en300220};
+most sub-bands within 863--870\,MHz impose a maximum radiated power of 25\,mW
+(14\,dBm ERP) and a duty-cycle ceiling of 1\,\%. The firmware enforces the
+duty-cycle budget in software (Chapter~\ref{ch:firmware}), while the RF subsystem
+is sized to remain within the radiated limits achievable by the on-board PCB antenna
+at the configured transmit power.
+
+\paragraph{Cost and manufacturability.}
+As a prototype research platform, the design targets standard two-layer PCB
+fabrication and commercially available, off-the-shelf components sourced from LCSC.
+No exotic materials, controlled-impedance inner layers, or hand-wound inductors are
+required. The complete bill of materials contains fewer than thirty distinct line
+items, all available in standard SMD packages ranging from 0402 to SOIC-16.
+
 
 \section{System Block Diagram}
-% IMPORTANT FIGURE
-%
-% Full PCB architecture
+\label{sec:hw_block}
+
+The hardware platform is organised around four functional subsystems that interact
+through well-defined electrical interfaces, as illustrated in
+Figure~\ref{fig:hw_block}. The \emph{processing subsystem} is anchored by the
+Espressif ESP32-WROOM-32UE module~\cite{espressif2023esp32wroom}, which hosts the
+application processor, the BLE radio, and the SPI master that controls the LoRa
+transceiver. The \emph{RF subsystem} comprises the HopeRF RFM95W-868S2
+module~\cite{hoperf2018rfm95w}---built around the Semtech SX1276 die~\cite{semtech2019sx1276}---together
+with the integrated PCB monopole antenna derived from Texas Instruments Design Note
+DN024~\cite{ti_dn024}. The \emph{power subsystem} converts a single-cell LiPo battery
+or a USB\,5\,V supply into a regulated 3.3\,V rail through a cascaded charging,
+protection, and buck-boost stage. Finally, the \emph{programming and user-interface
+subsystem} provides USB connectivity through a CH340C USB-to-UART bridge~\cite{ch340c2023},
+two tactile pushbuttons for manual boot selection and reset, and two indicator LEDs
+reflecting battery charging status.
+
+% --- FIGURE PLACEHOLDER ---------------------------------------------------
+\begin{figure}[htbp]
+    \centering
+    % \includegraphics[width=\textwidth]{figures/hw_block_diagram.pdf}
+    \caption{Top-level hardware block diagram of the A3MESH node, showing the four
+    functional subsystems and their principal electrical interfaces.}
+    \label{fig:hw_block}
+\end{figure}
+% --------------------------------------------------------------------------
+
 
 \section{Power Subsystem}
+\label{sec:hw_power}
+
+The power subsystem is the most topologically complex portion of the design. Its
+function is threefold: to recharge a removable LiPo cell safely from a USB supply,
+to protect the cell against the electrical stress conditions that shorten its service
+life, and to deliver a regulated 3.3\,V output whose quality is maintained across
+the entire discharge range of the battery. These three responsibilities are allocated
+to three dedicated stages arranged in series.
 
 \subsection{Battery Selection}
-% Explain chemistry and capacity choices
+\label{subsec:hw_battery}
+
+A single-cell lithium polymer cell was selected as the energy source. Lithium polymer
+chemistry offers an energy density superior to nickel-metal hydride or alkaline
+alternatives, a relatively flat discharge curve that simplifies state-of-charge
+estimation, and a well-established safety record when combined with dedicated
+protection electronics~\cite{nanjing2023tp4056}. The single-cell topology (nominal
+3.7\,V, 4.2\,V fully charged, 3.0\,V recommended cut-off) is directly compatible
+with the TP4056 charger and the TPS63001 buck-boost regulator without requiring
+series cell-balancing circuits. The cell is connected through a two-pin JST-compatible
+header (J1, mounted on the board underside) so that different cell capacities can
+be fitted to the same platform without hardware changes. The firmware enforces a 3.0\,V
+low-battery warning threshold; below this point the hardware protection circuit
+disconnects the load to prevent irreversible deep discharge.
 
 \subsection{Charging Circuit}
-% Explain charger IC choice
+\label{subsec:hw_charger}
+
+Charging is handled by the TP4056-42 (U4), a fully integrated constant-current
+constant-voltage linear charger for single-cell LiPo and Li-ion batteries in an
+ESOP-8 package with an exposed thermal pad~\cite{nanjing2023tp4056}. The IC accepts
+an input voltage between 4.0\,V and 8.0\,V, making it directly compatible with the
+USB\,5\,V supply, and terminates charging at 4.2\,V with $\pm$1\,\% accuracy. A
+500\,mA polyfuse (F1, 1812 package) is inserted in series with the VBUS rail upstream
+of the charger to protect the USB supply from a downstream overcurrent fault.
+
+The charge current is programmed by a single resistor connected between the PROG pin
+and ground. With R6\,$=$\,6.8\,k$\Omega$ alone (solder jumper JP1 open), the
+resulting charge current is approximately 130\,mA---conservative by design, imposing
+no thermal demands on the compact package. An optional solder jumper JP1 places a
+second resistor in parallel with R6, reducing the equivalent PROG resistance and
+raising the charge current to approximately 300\,mA for applications where faster
+turnaround is preferred. The open-collector $\overline{\text{CHRG}}$ and
+$\overline{\text{STDBY}}$ outputs of the TP4056 drive Q1 and Q2 (SS8050 NPN
+transistors) through 1\,k$\Omega$ current-limiting resistors, which in turn
+illuminate D1 (red) during active charging and D2 (green) when the cell has reached
+full charge.
+
+A Schottky diode D3 (SS34, SMA package, 3\,A rated) is placed in the power path to
+prevent reverse conduction from the battery back into the USB supply when the latter
+is absent or at a lower potential than the battery, ensuring that the system can
+be powered from either source without contention between the two rails.
 
 \subsection{Voltage Regulation}
-% Explain regulators and efficiencies
+\label{subsec:hw_regulator}
+
+The regulated 3.3\,V rail is generated by the Texas Instruments TPS63001 (U8), a
+synchronous buck-boost converter in the DRC0010J leadless package with an exposed
+thermal pad~\cite{ti2012tps63001}. The choice of a buck-boost topology is dictated
+by the battery voltage window: a freshly charged LiPo cell delivers 4.2\,V
+(requiring step-down conversion), while a partially discharged cell may present
+3.3\,V or less (requiring step-up conversion). A purely buck or purely boost
+converter would lose regulation at one extreme of this range; the TPS63001
+transitions seamlessly between both modes as the cell discharges, maintaining a
+regulated 3.3\,V across the full battery window from approximately 1.8\,V to 5.5\,V
+input.
+
+The TPS63001 operates at a fixed switching frequency of approximately 1.5\,MHz,
+which allows the external inductor (L1, 2.2\,$\mu$H, 1008 package) and output
+capacitors to be kept small. The converter's typical peak efficiency exceeds 90\,\%
+across the battery's mid-discharge range~\cite{ti2012tps63001}, a critical figure for
+meeting the multi-day autonomy target. Two bulk capacitors (C12, 100\,$\mu$F, 1206;
+C13, 2.2\,$\mu$F, 1206) are placed at the converter output, complemented by
+distributed 100\,nF and 10\,$\mu$F decoupling capacitors close to the supply pins of
+all active devices.
 
 \subsection{Power Monitoring}
-% Explain battery measurement approach
+\label{subsec:hw_batmon}
+
+The firmware monitors the state of charge of the LiPo cell by measuring its terminal
+voltage through a resistive divider connected to one of the ESP32's 12-bit analogue
+inputs. Resistors R13 (330\,k$\Omega$) and R14 (470\,k$\Omega$) form a divider with
+ratio $470/(330+470)\approx0.59$, scaling the 3.0--4.2\,V battery range to
+approximately 1.76--2.47\,V, comfortably within the 0--3.3\,V ADC input range of
+the ESP32~\cite{espressif2023esp32trm}. The firmware applies a multiplicative
+correction factor to reconstruct the actual battery voltage from the sampled reading,
+and reports a low-battery warning when the reconstructed voltage falls below 3.0\,V.
+The high total impedance of the divider ($\approx$800\,k$\Omega$) ensures that the
+monitoring path dissipates less than 6\,$\mu$W at full charge, with a negligible
+impact on the overall energy budget.
+
 
 \section{Processing Subsystem}
+\label{sec:hw_processing}
 
 \subsection{ESP32 Architecture}
-% Justify ESP32 choice
+\label{subsec:hw_esp32}
+
+The central processing element is the Espressif ESP32-WROOM-32UE (U6), a
+fully-integrated system-in-package embedding a dual-core Xtensa LX6 processor
+clocked at up to 240\,MHz, 520\,KB of on-chip SRAM, 448\,KB of ROM, and 4\,MB of
+serial flash memory in a 38.5\,mm\,$\times$\,18\,mm metal-shielded
+module~\cite{espressif2023esp32wroom, espressif2023esp32trm}. The module integrates
+the ESP32 SoC, a 40\,MHz crystal oscillator, a power amplifier, a low-noise
+amplifier, band-pass filters, and a RF switch for the 2.4\,GHz Wi-Fi and Bluetooth
+radios, together with the matching network required for antenna connection. The
+\emph{UE} variant features a U.FL connector for an external antenna rather than a
+printed trace antenna, which was selected to avoid desensitisation of the 2.4\,GHz
+radio from the proximity of the 868\,MHz LoRa circuitry.
+
+The ESP32 communicates with the RFM95W LoRa module via a dedicated SPI bus, using
+the GPIO assignments listed in Table~\ref{tab:hw_spi}. Three additional GPIO lines
+carry the module's hardware reset and two interrupt outputs: DIO0 for packet-received
+and transmit-done events, and DIO1 for the channel-activity detection signal used
+during channel access. The pin mapping follows the constraints of the ESP32's IOMUX
+multiplexer, which pre-assigns high-speed SPI signals to specific GPIO banks to
+avoid the additional propagation delay of the GPIO matrix~\cite{espressif2023esp32trm}.
+
+\begin{table}[htbp]
+    \centering
+    \caption{SPI and control GPIO assignments between the ESP32 and the RFM95W.}
+    \label{tab:hw_spi}
+    \begin{tabular}{llc}
+        \hline
+        Signal & Function & ESP32 GPIO \\
+        \hline
+        SCK   & SPI clock                  & 5  \\
+        MOSI  & Master Out Slave In        & 25 \\
+        MISO  & Master In Slave Out        & 15 \\
+        NSS   & Chip Select (active low)   & 18 \\
+        RST   & Hardware Reset (active low)& 14 \\
+        DIO0  & RX/TX interrupt            & 26 \\
+        \hline
+    \end{tabular}
+\end{table}
 
 \subsection{BLE Integration}
-% Explain BLE usage
+\label{subsec:hw_ble}
+
+The ESP32's integrated 2.4\,GHz radio supports Bluetooth 4.2, including the BLE
+stack required for the smartphone interface described in Chapter~\ref{ch:mobileapp}.
+The BLE subsystem operates exclusively in peripheral role, advertising as a GATT
+server and maintaining a single connection to the paired smartphone. The physical
+coexistence of the Wi-Fi and BLE radios on the same die is managed internally by the
+ESP32's RF coexistence arbitration logic, which time-multiplexes the shared 2.4\,GHz
+antenna port~\cite{espressif2023esp32trm}; since Wi-Fi is disabled in A3MESH, the
+BLE radio has uncontested access to the antenna port. No external RF components are
+required for the BLE link: the module's internal antenna provides sufficient gain for
+the short-range smartphone pairing scenario.
 
 \subsection{Memory Considerations}
-% Explain RAM/Flash constraints
+\label{subsec:hw_memory}
+
+The 4\,MB flash within the module is partitioned into a bootloader region, the
+primary firmware image, and a non-volatile storage (NVS) partition that persists
+configuration parameters---including the node identifier and the Smart Gossip
+floor probability---across power cycles. The 520\,KB of on-chip SRAM is shared
+between the FreeRTOS task stacks, the Bluedroid BLE host stack, and the application
+data structures, including the 50-entry duplicate packet cache and the neighbour table
+supporting up to ten simultaneous neighbours. Under the profiling conducted during
+firmware development, peak heap occupancy remained below 200\,KB, leaving a margin
+sufficient for future protocol extensions without requiring external SRAM.
+
 
 \section{RF Subsystem}
+\label{sec:hw_rf}
 
 \subsection{LoRa Transceiver Selection}
-% Justify SX1262 or chosen chip
+\label{subsec:hw_lora}
+
+The LoRa radio is implemented by the HopeRF RFM95W-868S2 (U2), a compact SMD module
+measuring 16\,mm\,$\times$\,17\,mm that integrates the Semtech SX1276 transceiver
+die, a TCXO-grade crystal oscillator, RF matching network, and RF switch within a
+shielded metal enclosure~\cite{hoperf2018rfm95w, semtech2019sx1276}. The SX1276 is
+the same silicon underpinning the Meshtastic platform reviewed in
+Section~\ref{subsec:meshtastic}, ensuring PHY-level compatibility with its packet
+format and enabling interoperability tests between A3MESH nodes and commercial
+Meshtastic hardware. The module operates from a 3.3\,V supply and draws a transmit
+current of approximately 120\,mA at maximum output power in PA\_BOOST mode, and a
+receive current of approximately 10.3\,mA~\cite{semtech2019sx1276}; these figures
+directly inform the firmware duty-cycling strategy.
+
+The module exposes a 16-pad castellated interface providing power supply, SPI bus,
+interrupt outputs, and an RF port. In the A3MESH design the RF port connects directly
+to the integrated PCB antenna, forgoing an external coaxial connector and its
+associated insertion loss. Table~\ref{tab:hw_rfconfig} summarises the LoRa PHY
+parameters adopted in the firmware. Spreading Factor 8 with 125\,kHz bandwidth and
+coding rate 4/5 yields a time-on-air of approximately 138\,ms for a 56-byte frame
+(40-byte payload plus 16-byte header), roughly four times shorter than the
+550\,ms of the SF11/250\,kHz configuration used in the simulation campaign of
+Chapter~\ref{ch:simulation} for the managed-flood baseline. The faster-airtime
+configuration reduces per-packet duty-cycle consumption and the probability of
+simultaneous transmissions when operating in real-world shared ISM channels. Transmit
+power is set to the 20\,dBm maximum supported by the RFM95W in PA\_BOOST mode.
+
+\begin{table}[htbp]
+    \centering
+    \caption{LoRa PHY configuration programmed in the A3MESH firmware.}
+    \label{tab:hw_rfconfig}
+    \begin{tabular}{lcc}
+        \hline
+        Parameter & Value & Notes \\
+        \hline
+        Centre frequency  & 868.0\,MHz  & EU ISM sub-band \\
+        Spreading Factor  & SF8         & Time-on-air $\approx$138\,ms / 56\,B \\
+        Bandwidth         & 125\,kHz    & Standard narrow channel \\
+        Coding Rate       & 4/5         & Minimum-overhead FEC \\
+        TX Power          & 20\,dBm     & PA\_BOOST, module maximum \\
+        Sync Word         & 0x12        & A3MESH network identifier \\
+        Preamble          & 8\,symbols  & 12.25 symbols effective \\
+        \hline
+    \end{tabular}
+\end{table}
 
 \subsection{Antenna Design Considerations}
-% Explain antenna constraints
+\label{subsec:hw_antenna}
+
+The RF radiator (AE1) is an integrated PCB monopole antenna implemented according
+to Texas Instruments Design Note DN024~\cite{ti_dn024}, which documents a compact
+meandered monopole geometry validated for 868\,MHz, 915\,MHz, and 955\,MHz
+operation. The use of a printed antenna eliminates the cost, mechanical complexity,
+and failure mode of a coaxial connector, and is consistent with the compact
+form factor of the device. The same antenna geometry is widely deployed in
+commercially produced ISM-band sensor nodes, making it a well-characterised,
+industrially proven choice for this application.
+
+A quarter-wavelength monopole resonant at 868\,MHz would require a straight conductor
+of approximately 86\,mm in free space. The DN024 geometry compresses this electrical
+length into a meandered copper trace occupying a footprint of 38\,mm\,$\times$\,24\,mm
+by folding the radiating element above a segmented ground plane, whose sections act
+as the return-current mirror and determine the radiation pattern and input impedance.
+The antenna's single feed pad connects directly to the RFM95W RF output pad, which
+includes the on-module matching network that presents a 50\,$\Omega$ interface to the
+antenna feed point.
 
 \subsection{RF Matching and Layout}
-% Explain PCB RF concerns
+\label{subsec:hw_rf_layout}
+
+A keep-out zone of 38\,mm\,$\times$\,24\,mm is enforced on both copper layers beneath
+the antenna footprint; no vias, signal traces, or power planes encroach on this
+region, as partial copper coverage within the keep-out degrades the radiation pattern
+and lowers antenna efficiency~\cite{ti_dn024}. The SPI bus traces between the ESP32
+and the RFM95W are routed on the front copper layer as short, direct connections
+to minimise series resistance and stray capacitance at the 10\,MHz SPI clock
+frequency. All power supply traces to the RFM95W and ESP32 are supplemented with
+local 100\,nF decoupling capacitors placed within 0.5\,mm of each supply pin.
 
 \subsection{Regulatory Constraints}
-% Mention ISM band compliance
+\label{subsec:hw_regulatory}
+
+Operation in the EU\,868\,MHz band is subject to ETSI EN\,300\,220, which
+subdivides the 863--870\,MHz range into sub-bands with individual power and
+duty-cycle limits~\cite{etsi2020en300220, adelantado2017limits}. The majority of
+these sub-bands permit a maximum ERP of 14\,dBm (25\,mW) with a 1\,\% duty cycle.
+At a transmitter output power of 20\,dBm and a PCB antenna with gain of
+approximately 0\,dBi, the resulting EIRP marginally exceeds the 14\,dBm sub-band
+limit of the standard channels.\footnote{Sub-band 869.4--869.65\,MHz is an
+exception under ETSI EN\,300\,220, permitting up to 500\,mW ERP with a 10\,\%
+duty cycle~\cite{etsi2020en300220}; the 20\,dBm transmit level of the RFM95W
+falls within this limit. Formal EMC testing and a Declaration of Conformity are
+outside the scope of this prototype platform.} The firmware's duty-cycle enforcement
+subsystem (Chapter~\ref{ch:firmware}) tracks the cumulative airtime over a sliding
+one-hour window and prevents the node from transmitting beyond the applicable
+regulatory budget, irrespective of the configured RF power level.
+
+
+\section{USB Programming Interface}
+\label{sec:hw_usb}
+
+Firmware development and debugging require reliable access to the ESP32's UART
+bootloader without manual intervention. This is accomplished by pairing the CH340C
+(U7) USB-to-UART bridge with a two-transistor auto-reset circuit.
+
+The CH340C is a crystal-less USB-to-UART converter in a SOIC-16 package that
+derives its clock from the USB host bus, eliminating the tolerance sensitivity and
+cost of an external crystal~\cite{ch340c2023}. Its UART output is connected to the
+ESP32's default UART0 (GPIO pins 1 and 3), which serves both as the firmware
+programming channel and as the debug serial console at 115\,200\,baud.
+
+The auto-reset circuit replicates the approach used on standard ESP32 development
+boards: the DTR and RTS control lines of the CH340C drive the base terminals of two
+SS8050 NPN transistors (Q1, Q2) through 100\,$\Omega$ base resistors (R12, R8). The
+collectors are connected to the BOOT (GPIO0) and EN (reset) pins of the ESP32
+respectively, each with a 10\,k$\Omega$ pull-up to 3.3\,V. When a host initiates a
+programming sequence, the USB-to-serial driver asserts a specific DTR/RTS toggle
+pattern that pulls EN low to reset the ESP32, then holds GPIO0 low to latch it into
+bootloader mode upon reset release---all without the user pressing any button.
+Manual override remains available through SW1 (BOOT) and SW2 (RST) tactile switches.
+
+The USB interface uses a 16-pin USB-C receptacle (J6, GCT USB4105 series) supporting
+USB 2.0 signals only. Two 5.1\,k$\Omega$ resistors (R15, R16) pull down the CC1 and
+CC2 lines, which is the USB Type-C specification's mechanism for a device to signal
+its power sink requirements to a compliant charger or host port.
+
 
 \section{PCB Design}
-% Explain:
-% - Layer stackup
-% - Routing decisions
-% - RF isolation
-%
-% Add PCB renders
+\label{sec:hw_pcb}
+
+The board was designed in KiCad\,9.0 and manufactured on a standard two-layer FR4
+laminate, 1.6\,mm nominal thickness. The copper stackup comprises a front signal
+layer (F.Cu) carrying the majority of the active components, and a back copper layer
+(B.Cu) used as a return-current reference and ground plane beneath the low-frequency
+digital circuitry.
+
+Component placement follows a functional partitioning strategy. The power subsystem
+occupies the lower-left quadrant, with the TP4056, protection MOSFETs, and TPS63001
+grouped to minimise the area of the high-frequency switching node of the buck-boost
+converter; the 2.2\,$\mu$H inductor (L1) is placed as close as possible to the
+TPS63001's switching pins to reduce the current loop area and the associated
+electromagnetic emission. The ESP32 module is centred on the board, with SPI bus
+traces to the RFM95W module kept short. The CH340C and auto-reset transistors are
+clustered near the USB-C connector to minimise the length of the USB differential
+pair D+/D-.
+
+The antenna occupies the top-right corner of the board, with the 38\,mm\,$\times$\,24\,mm
+keep-out zone maintained free of copper on both layers. The battery connector J1 is
+placed on the underside of the board to allow the cable to exit without obstruction.
+
+Decoupling follows a two-tier strategy: 100\,nF X5R capacitors in 0402 packages are
+placed within 0.5\,mm of each active device supply pin to suppress switching
+transients, while 10\,$\mu$F bulk capacitors distributed across the board buffer
+medium-frequency current demand. The 100\,$\mu$F output capacitor of the TPS63001
+provides low-frequency reservoir capacity.
+
 
 \section{Prototype Manufacturing}
-% Explain fabrication and assembly
+\label{sec:hw_manufacturing}
+
+Gerber files in RS-274-X format and NC drill files were generated from the KiCad
+layout and submitted to a two-layer PCB manufacturer. The fabrication specification
+is: 1.6\,mm FR4, 35\,$\mu$m copper weight, HASL (hot-air solder levelling) surface
+finish, green solder mask on both sides, and white silkscreen legend on the front
+side. All SMD passives are in 0402 or 0603 packages; bulk capacitors use 1206 to
+accommodate their voltage ratings. Integrated circuits range from SOT-23-6 to
+SOIC-16. The USB-C receptacle and battery header are semi-through-hole parts that
+provide the mechanical robustness required for repeated connector cycles.
+
+The BOM was compiled with LCSC part numbers to enable single-distributor procurement.
+Assembly was performed with lead-free solder paste (SAC305) applied through a
+stainless-steel stencil, followed by hot-plate reflow and hand soldering of the
+through-hole connectors. Seven test-point pads distributed across the board
+facilitate in-circuit measurements of the key power rails (VBUS, 3.3\,V, BAT+) and
+programming signals during bringup.
+
 
 \section{Hardware Validation}
-% Explain tests performed
+\label{sec:hw_validation}
+
+Following assembly, a structured bringup sequence verified each subsystem
+independently before integrating the complete firmware stack.
+
+The power subsystem was validated first. With the battery disconnected, a bench
+supply was applied at the VBUS rail and the TP4056 charge current was measured under
+a resistive load to confirm the 130\,mA PROG configuration. The TPS63001 output was
+probed under no-load and full-load conditions to verify 3.3\,V regulation across the
+3.0--4.2\,V battery input range; output ripple was measured with an oscilloscope
+to confirm compliance with the decoupling strategy. The DW01A protection circuit was
+exercised by applying an overvoltage stimulus and verifying that the FS8205A gate
+voltages responded correctly to disconnect the load path.
+
+The processing subsystem was verified by flashing an initial firmware image through
+the CH340C and confirming UART communication at 115\,200\,baud; the auto-reset
+sequence was validated through the Arduino IDE to confirm that the DTR/RTS toggling
+of Q1 and Q2 correctly entered bootloader mode without manual button interaction.
+BLE advertisement was confirmed using a smartphone BLE scanner application.
+
+The RF subsystem was validated by programming the RFM95W register set via SPI and
+verifying read-back consistency, which confirms that the SPI bus is correctly wired
+and the module is powered and responsive~\cite{semtech2019sx1276}. A spectrum
+analyser was used to confirm the transmitted centre frequency of 868.0\,MHz and the
+approximate output power level. Two assembled boards were then used for link
+testing at increasing separation distances, with RSSI readings logged over the BLE
+connection; results confirmed kilometre-scale reception under open-sky conditions,
+consistent with the link budget implied by 20\,dBm transmit power and the estimated
+0\,dBi gain of the PCB monopole antenna.
+
 
 % =============================================================================
 % FIRMWARE
