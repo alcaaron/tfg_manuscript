@@ -1488,101 +1488,667 @@ consistent with the link budget implied by 20\,dBm transmit power and the estima
 \chapter{Firmware Architecture and Implementation}
 \label{ch:firmware}
 
+The firmware constitutes the software foundation of each A3MESH node. Running on the
+ESP32-WROOM-32UE's dual-core Xtensa~LX6 processor under
+FreeRTOS~\cite{freertos2024,espressif2023espidf}, it translates the hardware
+capabilities described in Chapter~\ref{ch:hardware} into the mesh forwarding behaviour
+characterised in Chapter~\ref{ch:simulation}. This chapter describes the design
+philosophy, the layered decomposition, and the concrete implementation of each
+subsystem, drawing directly from the \texttt{tfg\_firmware/firmware} PlatformIO
+project.
+
+
 \section{Firmware Design Philosophy}
-% Explain:
-% - Modularity
-% - Layer separation
-% - Maintainability
-% - Scalability
+\label{sec:fw_philosophy}
+
+Three principles govern the design of the A3MESH firmware: strict layer separation,
+non-blocking interrupt handling, and static memory allocation.
+
+\textbf{Strict layer separation} means that each software layer communicates with
+adjacent layers exclusively through FreeRTOS queues; no layer directly invokes
+functions from a non-adjacent layer. The sole deliberate exception is the C-linkage
+wrapper in \texttt{PassiveACK.h}, which allows the LoRa transmit task---residing in
+the \texttt{lora} PlatformIO library directory---to call into the mesh layer without
+creating a circular header dependency between library directories.
+
+\textbf{Non-blocking interrupt handling} follows the deferred-processing pattern
+standard in FreeRTOS embedded designs~\cite{freertos2024}. The SX1276's DIO0 pin
+asserts on RxDone and triggers an ISR declared \texttt{IRAM\_ATTR}, so that it
+executes from instruction RAM regardless of flash cache state. The ISR does nothing but
+release a binary semaphore and optionally request a context switch; all SPI transfers
+and frame parsing happen in a dedicated high-priority task, ensuring that the radio
+FIFO is emptied before a subsequent preamble can corrupt it.
+
+\textbf{Static memory allocation} eliminates heap fragmentation and non-deterministic
+latency on the critical path. A pool of eight statically allocated frame slots
+accommodates bursts of arriving frames; inter-task transfers pass a 32-bit pointer to
+a pool slot rather than copying the payload, reducing queue-transfer overhead to a
+single word. No dynamic allocation occurs on any path between frame reception and
+forwarding decision.
+
 
 \section{Layered Architecture}
-% IMPORTANT FIGURE
-%
-% Full firmware stack diagram
+\label{sec:fw_layers}
+
+The firmware is decomposed into four horizontal layers. The
+\textbf{Physical Communication Layer} encapsulates the LoRa and BLE radio interfaces.
+The \textbf{Mesh Logic Layer} implements packet validation, duplicate suppression,
+neighbour management, and the Smart Gossip forwarding algorithm. The
+\textbf{System Services Layer} handles regulatory duty-cycle compliance, battery
+state estimation, and periodic housekeeping. The \textbf{Application and Interface
+Layer} exposes an AT-command interface over BLE to the companion mobile application
+and manages the bidirectional data pipelines between radio and smartphone.
+
+Seven FreeRTOS tasks are created at boot time. Four are pinned to Core~0, dedicated
+to all radio activity; three are pinned to Core~1, which handles BLE and pipeline
+processing (Table~\ref{tab:fw_tasks}).
+
+\begin{table}[htbp]
+    \centering
+    \caption{FreeRTOS task inventory. Priority 2 preempts priority 1.}
+    \label{tab:fw_tasks}
+    \begin{tabular}{llll}
+        \toprule
+        \textbf{Task} & \textbf{Core} & \textbf{Prio} & \textbf{Role} \\
+        \midrule
+        \texttt{vLoRaRxTask}        & 0 & 2 & ISR deferred handler; frame pool allocation \\
+        \texttt{vLoRaTxTask}        & 0 & 1 & Jittered forwarding and duty-cycle gate \\
+        \texttt{vSendDiscoveryTask} & 0 & 1 & Periodic DISCOVERY beacon injection \\
+        \texttt{vNeighborCheckTask} & 0 & 1 & Neighbour-table timeout eviction \\
+        \texttt{vBLETxTask}         & 1 & 1 & BLE GATT notification drain \\
+        \texttt{BLE2LoRaTask}       & 1 & 1 & AT command parser; upstream packet injector \\
+        \texttt{LoRa2BLETask}       & 1 & 1 & Mesh receive state machine \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Four queues provide all inter-layer communication.
+\texttt{xLoRaRxQueue} carries pointers to pool-allocated frame descriptors from
+the radio ISR handler to the mesh pipeline.
+\texttt{xLoRaTxQueue} carries outbound frame descriptors from the mesh and
+application layers to the radio transmitter.
+\texttt{xBLERxQueue} carries AT-command strings from the BLE stack to the command
+processor.
+\texttt{xBLETxQueue} carries AT response and notification strings from any task
+towards the BLE notification sender.
+All queues have a depth of ten items and are statically allocated at initialisation.
+
+% --- FIGURE PLACEHOLDER ---------------------------------------------------
+\begin{figure}[htbp]
+    \centering
+    % \includegraphics[width=0.85\textwidth]{figures/fw_stack_diagram.pdf}
+    \caption{Firmware layer diagram. Four horizontal layers communicate through four
+    FreeRTOS queues. Core~0 (left) hosts the radio tasks; Core~1 (right) hosts the BLE
+    and pipeline tasks.}
+    \label{fig:fw_stack}
+\end{figure}
+% --------------------------------------------------------------------------
+
 
 \section{Physical Communication Layer}
+\label{sec:fw_physical}
 
 \subsection{LoRa Driver}
-% Explain:
-% - TX/RX handling
-% - Interrupts
-% - Packet transmission
+\label{sec:fw_lora_driver}
+
+The LoRa driver wraps the Arduino-LoRa SPI library with an interrupt-deferred
+receive path, a static frame pool, and regulatory airtime accounting. It is
+instantiated as a global singleton in \texttt{main.cpp} and configured at boot with
+the parameters defined in \texttt{config.h}: 868\,MHz carrier, spreading factor~8,
+bandwidth 125\,kHz, coding rate 4/5, 20\,dBm transmit power via PA\_BOOST, sync
+word~0x12, and a preamble of eight symbols. These values yield a raw data rate of
+approximately 3.1\,kbit/s and a practical ground-level range of several kilometres
+while keeping the time-on-air of a maximum-length frame below one second.
+
+\textbf{Receive path.}
+The SX1276 DIO0 line is connected to GPIO26 and configured as a rising-edge interrupt.
+The ISR \texttt{onLoRaRxIRQ()}, placed in IRAM, calls
+\texttt{xSemaphoreGiveFromISR()} and sets \texttt{xHigherPriorityTaskWoken} if a
+higher-priority task has been unblocked. \texttt{vLoRaRxTask}, running at
+priority~2 on Core~0, blocks indefinitely on the corresponding
+\texttt{xSemaphoreTake()}. Once woken, it calls \texttt{LoRa.parsePacket()} to
+confirm frame availability and obtain its length, allocates a pool slot via
+\texttt{alloc\_frame()} using a volatile round-robin index, reads the payload bytes
+with \texttt{LoRa.readBytes()}, records the RSSI, re-enters continuous-receive mode
+with \texttt{LoRa.receive()}, and posts the pool-slot pointer to
+\texttt{xLoRaRxQueue}. The entire path is zero-copy: the bytes written by the SPI
+driver into the pool slot are the same bytes later consumed by the mesh pipeline.
+
+\textbf{Transmit path.}
+\texttt{vLoRaTxTask} blocks on \texttt{xLoRaTxQueue}. Each dequeued item is a
+\texttt{tx\_LoRa\_msg\_t} descriptor containing the payload bytes, a jitter delay in
+milliseconds, a packet identifier, the original source address, and a forwarding flag.
+The task calls \texttt{vTaskDelay()} for the specified jitter period, creating the
+window during which a passive ACK cancellation may suppress the transmission
+(Section~\ref{sec:fw_passive_ack}). After the delay, it calls
+\texttt{mesh\_consume\_pending\_forward()}: if the forward was cancelled, the
+descriptor is discarded; otherwise \texttt{check\_and\_record\_airtime()} is invoked
+before \texttt{lora.send\_raw\_pkt(data,\,len)}.
+
+\textbf{Duty-cycle enforcement.}
+The EU868 general sub-band allows a maximum of 1\,\% on-air time per
+hour~\cite{etsi2020en300220}, or 36\,000\,ms per rolling 3600-second window. The
+driver enforces this limit with a ring buffer of 20 transmission records
+(\texttt{\_airtime\_log}), each entry holding a timestamp and the airtime estimated
+by \texttt{compute\_airtime\_ms(pkt\_len)} for that packet. Before each transmission,
+\texttt{check\_and\_record\_airtime()} sums the airtime of all entries whose
+timestamp falls within the last 3600\,s; if adding the pending packet would push the
+total above 36\,000\,ms, the transmission is blocked silently. The sliding-window
+design avoids the compliance gaps that a fixed-period counter would introduce around
+midnight or after a device restart.
 
 \subsection{BLE Driver}
-% Explain:
-% - GATT services
-% - Notifications
-% - Pairing
+\label{sec:fw_ble_driver}
+
+The BLE driver implements a Nordic UART Service (NUS)-compatible GATT server using
+the ESP-IDF Bluedroid stack~\cite{espressif2023espidf}. A single GATT service hosts
+two characteristics: a TX characteristic with the \textsc{Notify} property, used to
+push data from node to smartphone, and an RX characteristic with the
+\textsc{Write Without Response} property, used by the smartphone to send AT
+commands. This two-characteristic layout is the de facto standard for transparent
+serial emulation over BLE and is natively supported by serial terminal applications
+across Android and iOS~\cite{bluetooth2023core}.
+
+Connection lifecycle is managed by \texttt{ServerCallbacks}: \texttt{onConnect}
+sets the internal \texttt{\_deviceConnected} flag; \texttt{onDisconnect} clears it
+and immediately restarts advertising, so the node is always connectable without a
+reboot. When the smartphone writes to the RX characteristic,
+\texttt{RXCallbacks::onWrite()} copies the received value into a 256-byte buffer
+and posts it to \texttt{xBLERxQueue} via a non-blocking \texttt{xQueueSend}; if the
+queue is full, indicating transient saturation of the command processor, the frame
+is dropped rather than blocking the Bluedroid callback thread. Outbound data travels
+the reverse path: \texttt{vBLETxTask} on Core~1 drains \texttt{xBLETxQueue} and
+calls \texttt{ble.send()} for each dequeued string, issuing a GATT notification to
+the connected peer. Decoupling BLE transmission into a dedicated task prevents
+long notify round trips from stalling time-sensitive state-machine transitions.
 
 \subsection{Packet Encoding}
-% Explain:
-% - Packet format
-% - Serialization
-% - CRC/checks
+\label{sec:fw_packet}
+
+Every frame transmitted over the LoRa channel consists of a fixed four-byte
+\texttt{A3MESH\_header\_t} followed by a variable-length \texttt{A3MESH\_packet\_t}.
+The header carries a one-byte protocol version, a one-byte frame type
+(\texttt{a3mesh\_msg\_type\_t}), and a two-byte packet length. The packet structure
+is declared \texttt{\_\_attribute\_\_((packed))} to match the on-wire layout exactly;
+its fields are listed in Table~\ref{tab:fw_packet_fields}.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Fields of the \texttt{A3MESH\_packet\_t} wire structure.
+    Total fixed overhead: 20 bytes, plus 4 bytes for the header.}
+    \label{tab:fw_packet_fields}
+    \begin{tabular}{llp{7cm}}
+        \toprule
+        \textbf{Field} & \textbf{Size} & \textbf{Description} \\
+        \midrule
+        \texttt{pkt\_id}      & 2\,B & Per-source monotonic counter; paired with \texttt{src} for global duplicate identification. \\
+        \texttt{src}          & 4\,B & Node ID of the original source; never modified during forwarding. \\
+        \texttt{node\_id}     & 4\,B & Node ID of the last forwarder; updated at each hop. \\
+        \texttt{dst}          & 4\,B & Destination node ID, or \texttt{0xFFFFFFFF} for broadcast. \\
+        \texttt{ttl}          & 1\,B & Time-to-live; decremented at each hop; frame dropped when zero. \\
+        \texttt{type}         & 1\,B & Packet sub-type (\texttt{a3mesh\_enc\_type\_t} for data frames). \\
+        \texttt{flags}        & 1\,B & Control bits: bit~0 is the direct-unicast hint, which suppresses gossip forwarding. \\
+        \texttt{payload\_len} & 1\,B & Number of valid bytes in the payload array. \\
+        \texttt{crc}          & 2\,B & CRC-16/CCITT (poly~0x1021, init~0xFFFF) over \texttt{payload[0..payload\_len-1]}. \\
+        \texttt{payload}      & N\,B & Application data or ciphertext, up to \texttt{A3MESH\_MAX\_PAYLOAD} bytes. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The four frame types defined by \texttt{a3mesh\_msg\_type\_t} are
+\texttt{k\_data\_plain} (unencrypted user message),
+\texttt{k\_discovery\_type} (neighbour beacon),
+\texttt{k\_key\_exchange} (in-band key provisioning), and
+\texttt{k\_data\_encrypted} (AES-256-GCM ciphertext; the encryption scope is further
+encoded in the \texttt{type} sub-field as \texttt{a3mesh\_enc\_type\_t}:
+\texttt{k\_enc\_node2node}, \texttt{k\_enc\_group}, or \texttt{k\_enc\_network}).
+
+Serialisation is performed by \texttt{A3MESHPacket::serialize\_header\_pkt()}, which
+fills the header's \texttt{packet\_length} field automatically and writes both
+structures into a caller-provided buffer in packed order.
+Deserialisation by \texttt{A3MESHPacket::deserialize\_pkt()} applies four integrity
+checks before accepting a frame: minimum buffer length against \texttt{HEADER\_SIZE},
+buffer length against the declared \texttt{packet\_length}, payload length against
+\texttt{A3MESH\_MAX\_PAYLOAD}, and CRC-16/CCITT verification of the payload. Any
+failing check causes the frame to be discarded without further processing. The node
+identifier used in \texttt{src} and \texttt{node\_id} is derived from the factory
+Bluetooth MAC address as described in Section~\ref{sec:fw_identity}.
+
 
 \section{Mesh Logic Layer}
+\label{sec:fw_mesh}
 
-\subsection{Packet Forwarding}
-% Explain forwarding pipeline
+\subsection{Reception State Machine}
+\label{sec:fw_statemachine}
 
-\subsection{Neighbor Discovery}
-% Explain discovery logic
+All received frames are processed by a ten-state explicit finite state machine
+(\texttt{MeshRxState}) running inside \texttt{LoRa2BLETask} on Core~1. Every frame
+traverses exactly one path from \texttt{k\_rx\_idle} to \texttt{k\_rx\_done}; the
+only branching points are the validate, classify, data-process, and forward handlers.
+The states are summarised in Table~\ref{tab:fw_states}.
+
+\begin{table}[htbp]
+    \centering
+    \caption{\texttt{MeshRxState} states and their actions.}
+    \label{tab:fw_states}
+    \begin{tabular}{lp{9.5cm}}
+        \toprule
+        \textbf{State} & \textbf{Action} \\
+        \midrule
+        \texttt{k\_rx\_idle}              & Block on \texttt{xLoRaRxQueue}; dequeue pool pointer on arrival. \\
+        \texttt{k\_rx\_validate}          & Deserialise; apply self-source filter, TTL check, duplicate cache lookup, and passive-ACK cancel. \\
+        \texttt{k\_rx\_classify}          & Route by \texttt{header.type} to the appropriate handler state. \\
+        \texttt{k\_rx\_process\_discovery}& Update neighbour table; notify BLE on new neighbour discovery. \\
+        \texttt{k\_rx\_process\_data}     & Check destination; decide local delivery and/or gossip forwarding. \\
+        \texttt{k\_rx\_process\_key}      & Check destination; deliver key-exchange payload to BLE locally. \\
+        \texttt{k\_rx\_local\_delivery}   & Decrypt if encrypted; format and post AT notification to \texttt{xBLETxQueue}. \\
+        \texttt{k\_rx\_forward}           & Patch \texttt{node\_id}; decrement TTL; compute jitter; register pending forward; enqueue to \texttt{xLoRaTxQueue}. \\
+        \texttt{k\_rx\_drop}              & Release pool slot; discard frame. \\
+        \texttt{k\_rx\_done}              & Release pool slot; return to \texttt{k\_rx\_idle}. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+% --- FIGURE PLACEHOLDER ---------------------------------------------------
+\begin{figure}[htbp]
+    \centering
+    % \includegraphics[width=\textwidth]{figures/fw_rx_statemachine.pdf}
+    \caption{Reception state machine (\texttt{MeshRxState}). Frames that fail
+    validation, exceed the copy limit, or do not meet the forwarding criteria are
+    discarded at the earliest applicable stage.}
+    \label{fig:fw_statemachine}
+\end{figure}
+% --------------------------------------------------------------------------
+
+At \texttt{k\_rx\_validate}, four guards are applied in order. A self-source filter
+drops any frame whose \texttt{src} matches the local node ID, preventing a node
+from processing its own transmissions returning via a relay. A TTL check discards
+frames with \texttt{ttl}~$= 0$. The duplicate cache is then consulted via
+\texttt{get\_copies()}: if the (\texttt{pkt\_id},~\texttt{src}) pair has been seen
+more than \texttt{GOSSIP\_MAX\_COPIES}~$= 3$ times, the frame transitions to
+\texttt{k\_rx\_drop}. Finally, \texttt{cancel\_pending\_forward()} is called
+unconditionally for every valid frame that matches a message in the cache: a node
+that has already queued a forward of this packet and now observes a neighbour
+retransmitting it cancels its own copy before it reaches the antenna
+(Section~\ref{sec:fw_passive_ack}).
+
+At \texttt{k\_rx\_process\_data}, broadcast and locally-addressed frames proceed to
+\texttt{k\_rx\_local\_delivery} only when \texttt{copies}~$= 1$, preventing the user
+from receiving the same message twice via different relay paths. Frames carrying the
+\texttt{DIRECT\_UNICAST\_FLAG} in the \texttt{flags} byte are not gossiped; all other
+data frames enter \texttt{should\_forward()} for the probabilistic forwarding
+decision.
+
+At \texttt{k\_rx\_forward}, the forwarding node patches \texttt{node\_id} with its
+own identifier and decrements \texttt{ttl} by one. An RSSI-based jitter delay is then
+computed with the linear mapping:
+\[
+    d_{\mathrm{jitter}} = \mathrm{map}(\mathrm{RSSI},\; -120,\; -40,\; 20,\; 200)\;\;\mathrm{[ms]}
+\]
+A node receiving at near-sensitivity RSSI ($-120$\,dBm) waits only 20\,ms before
+retransmitting; one in close proximity ($-40$\,dBm) waits up to 200\,ms. This
+asymmetry gives topologically distant relays---those better positioned to extend the
+propagation front---temporal priority in the rebroadcast race, consistent with the
+distance-aware relay selection studied in~\cite{senel2011relay}.
+
+\subsection{Neighbour Discovery}
+\label{sec:fw_discovery}
+
+The mesh layer maintains a neighbour table of up to \texttt{MAX\_NEIGHBORS}~$= 10$
+entries, each recording the 32-bit node identifier, the most recently observed RSSI,
+and the timestamp of the latest reception. Entries expire after
+\texttt{NODE\_TIMEOUT}~$= 180$\,s of silence.
+
+Beacons are injected by \texttt{vSendDiscoveryTask} on Core~0. The task wakes
+every \texttt{DISCOVERY\_INTERVAL\_MS}~$= 30$\,s plus a uniformly distributed
+random offset of up to 10\,s. The random offset desynchronises simultaneous
+power-ons and reduces systematic collisions between concurrent DISCOVERY
+transmissions from neighbouring nodes. Each beacon carries
+\texttt{ttl}~$= \texttt{MIN\_TTL}~= 1$, restricting propagation to a single hop so
+that the table reflects only directly reachable nodes. On reception, the validate
+state updates the neighbour entry; if the node is new,
+\texttt{k\_rx\_process\_discovery} posts a \texttt{+DISC=\tcmp{id}} notification to
+\texttt{xBLETxQueue} to inform the companion application.
+
+Stale entries are evicted by \texttt{vNeighborCheckTask}, which runs on Core~0 using
+\texttt{vTaskDelayUntil()} for drift-free periodicity at a wakeup interval of
+$\texttt{NODE\_TIMEOUT} / 10$\,ms. The eviction function
+\texttt{rm\_tout\_neigbhors()} applies swap-last deletion---overwriting the expired
+slot with the last table entry---to complete in O(1) time without shifting the array.
 
 \subsection{Smart Gossip Integration}
-% Explain firmware implementation
+\label{sec:fw_smartgossip}
 
-\subsection{Duplicate Detection}
-% Explain packet cache system
+The forwarding probability is computed by \texttt{gossip\_forward\_probability()},
+the firmware implementation of the algorithm described in
+Chapter~\ref{ch:simulation}. The function evaluates three multiplicative factors
+derived from real-time network observations:
+\begin{align}
+    f_{\mathrm{RSSI}}    &= \frac{1}{1 + e^{\,\alpha\,(\mathrm{RSSI} - \mathrm{RSSI}_{\mathrm{ref}})}} \\
+    f_{\mathrm{density}} &= \frac{1}{1 + \beta\, n} \\
+    f_{\mathrm{dupe}}    &= e^{-\gamma\,(c - 1)} \\
+    p                    &= \max\!\left(p_{\mathrm{floor}},\;
+                              f_{\mathrm{RSSI}} \cdot f_{\mathrm{density}} \cdot f_{\mathrm{dupe}}\right)
+\end{align}
+where $n$ is the neighbour count at the moment of the forwarding decision and $c$ is
+the copy count from the duplicate cache. The compiled parameter values,
+$\alpha = 0.145$\,dBm$^{-1}$, $\mathrm{RSSI}_{\mathrm{ref}} = -103.8$\,dBm,
+$\beta = 0.146$, $\gamma = 0.311$, and $p_{\mathrm{floor}} = 0.111$, correspond to
+the differential evolution optimum and are embedded as compile-time constants in
+\texttt{config.h}.
 
-\subsection{TTL and Network Control}
-% Explain loop prevention
+The function returns a fixed-point percentage. The forwarding decision in
+\texttt{should\_forward()} draws a uniform random integer from
+\texttt{esp\_random()}\,\%\,100 and forwards if it falls below the threshold.
+\texttt{esp\_random()} reads the ESP32 hardware random number generator, which is
+continuously seeded from RF thermal noise when the BLE radio is
+active~\cite{espressif2023esp32trm}, providing statistically independent draws
+without the sequential correlations of a software PRNG.
+
+A demonstration mode, toggled via \texttt{AT+DEMO=1}, replaces the optimised
+parameters with near-unity values ($p_{\mathrm{floor}} = 0.95$, $\alpha = 0.03$,
+$\beta = 0.05$, $\gamma = 0.05$), causing the node to behave as a pure flood relay
+suitable for live demonstrations where delivery reliability outweighs channel
+efficiency. The mode flag is a \texttt{std::atomic} boolean to avoid mutex overhead
+on the forwarding hot path.
+
+\subsection{Duplicate Detection and Passive ACK Suppression}
+\label{sec:fw_passive_ack}
+
+\textbf{Duplicate detection.}
+The duplicate cache stores up to \texttt{DUP\_CACHE\_SIZE}~$= 50$ entries, each
+keyed by the (\texttt{pkt\_id},~\texttt{src}) pair and carrying a copy count $c$ and
+a reception timestamp. Entries expire after \texttt{DUP\_TIMEOUT}~$= 30$\,s; when
+the cache is full and a new entry is required, the least-recently-used entry is
+evicted. The copy count fed into $f_{\mathrm{dupe}}$ is read before the forwarding
+probability is evaluated, so the probability decays monotonically as additional relay
+paths deliver copies of the same message, naturally throttling rebroadcast in well-
+connected regions.
+
+\textbf{Passive ACK suppression.}
+When the state machine transitions to \texttt{k\_rx\_forward}, it registers a
+\texttt{PendingForward} record via \texttt{mesh\_register\_pending\_forward()} before
+posting the \texttt{tx\_LoRa\_msg\_t} descriptor to \texttt{xLoRaTxQueue}. The record
+holds the packet identifier and an \texttt{active} boolean initialised to
+\texttt{true}. If, during the jitter delay, the same message arrives again from a
+neighbour that forwarded it independently, the validate state calls
+\texttt{cancel\_pending\_forward()}, setting \texttt{active} to \texttt{false}. When
+\texttt{vLoRaTxTask} calls \texttt{mesh\_consume\_pending\_forward()} after the delay,
+it finds the record inactive and discards the descriptor without transmitting,
+eliminating a redundant on-air copy with no explicit coordination between
+nodes (Figure~\ref{fig:fw_passive_ack}).
+
+% --- FIGURE PLACEHOLDER ---------------------------------------------------
+\begin{figure}[htbp]
+    \centering
+    % \includegraphics[width=\textwidth]{figures/fw_passive_ack_sequence.pdf}
+    \caption{Passive ACK suppression sequence. After registering a pending forward
+    and entering the jitter delay (left), a node that overhears a neighbour
+    retransmitting the same packet (centre) cancels its own scheduled transmission
+    (right), saving one on-air packet per message traversal.}
+    \label{fig:fw_passive_ack}
+\end{figure}
+% --------------------------------------------------------------------------
+
+The pending-forward table holds up to \texttt{MAX\_PENDING\_FORWARDS}~$= 8$ records
+and is protected by a FreeRTOS mutex. The three C-linkage wrappers in
+\texttt{PassiveACK.h}---\texttt{mesh\_register\_pending\_forward},
+\texttt{mesh\_cancel\_pending\_forward}, and
+\texttt{mesh\_consume\_pending\_forward}---allow \texttt{vLoRaTxTask}, which lives in
+the \texttt{lora} library directory, to call into the mesh layer without introducing
+a header dependency cycle between the two PlatformIO library directories.
+
+\subsection{TTL and Loop Prevention}
+\label{sec:fw_ttl}
+
+Network loops are controlled by two independent mechanisms. At the packet level,
+every forwarding node decrements the TTL field by one; when it reaches zero the frame
+is discarded at \texttt{k\_rx\_validate} before any duplicate-cache update.
+With \texttt{MAX\_TTL}~$= 5$, the propagation diameter is bounded at five hops for
+any single transmission event.
+
+At the message level, the duplicate cache provides a complementary bound. Even if a
+packet re-enters a previously visited node through an unexpected cycle, the cache
+increments its copy count; once the count exceeds \texttt{GOSSIP\_MAX\_COPIES}~$= 3$,
+the packet is dropped unconditionally. The two limits interact to bound the
+worst-case replication factor of any message to at most $3 \times 5 = 15$ on-air
+copies within its 30-second cache lifetime.
+
 
 \section{System Services Layer}
+\label{sec:fw_services}
 
-\subsection{Power Management}
-% Explain energy-saving logic
+\subsection{Power Management and Battery Monitoring}
+\label{sec:fw_power}
 
-\subsection{Sleep Modes}
-% Explain deep sleep/light sleep
+The A3MESH node operates as a continuously active relay; no deep-sleep or light-sleep
+mode is implemented, as passive ACK timers and neighbour-table state must remain
+consistent across forwarding events. Transmit energy is bounded instead by the
+duty-cycle enforcement mechanism in Section~\ref{sec:fw_lora_driver}, which limits
+on-air activity to at most 36\,s per hour without imposing any reception blackout.
 
-\subsection{Battery Monitoring}
-% Explain ADC measurements
+Battery state is estimated by the \texttt{Battery} class from a 20-point look-up
+table of empirically characterised (voltage, percentage) pairs, ranging from
+4.20\,V at 100\,\% down to 3.00\,V at~0\,\%. The input voltage is obtained by
+reading the 12-bit ADC on GPIO36 (pin~A0) and scaling by the hardware divider factor
+$k = 2.0$, derived from the R13/R14 resistive divider described in
+Chapter~\ref{ch:hardware}. Battery percentage and the RSSI of the last received frame
+are reported to the companion application via the \texttt{AT+INFO?} command. The
+DW01A\,+\,FS8205A protection stage provides a hard cut-off near 2.4\,V as a secondary
+safeguard independent of firmware state.
 
-\subsection{Event Scheduling}
-% Explain timers/events/tasks
+\subsection{Node Identity}
+\label{sec:fw_identity}
+
+Each node derives its 32-bit identifier deterministically from the factory-programmed
+six-byte Bluetooth MAC address using the FNV-1a non-cryptographic hash
+function~\cite{eastlake2011fnv}. The computation proceeds iteratively:
+$h_0 = \mathrm{FNV\_OFFSET\_BASIS}$, and for $i = 0, \ldots, 5$:
+\[
+    h_{i+1} = \bigl(h_i \oplus \mathrm{MAC}[i]\bigr) \times \mathrm{FNV\_PRIME}
+    \pmod{2^{32}}
+\]
+with $\mathrm{ID} = h_6$. Because all six MAC bytes are folded into the accumulator
+before the final multiplication, the 32-bit output is sensitive to the full MAC
+address while remaining negligibly cheap to compute at boot time. The identifier is
+invariant across firmware updates and power cycles, enabling peer devices and the
+duplicate cache to maintain consistent state without manual reconfiguration.
+
 
 \section{Application and Interface Layer}
+\label{sec:fw_application}
 
 \subsection{AT Command Interface}
-% Add:
-% - Example commands
-% - Command table
+\label{sec:fw_at}
+
+The companion application communicates with each node through a Hayes-style AT command
+protocol~\cite{itu1999v250} carried over the BLE NUS service. Each command is a
+CRLF-terminated ASCII string; the node responds with zero or more unsolicited result
+lines followed by \texttt{OK} on success or \texttt{ERROR} on failure.
+Table~\ref{tab:fw_at_commands} documents the complete command set implemented in
+\texttt{BLE2LoRaTask}.
+
+\begin{table}[htbp]
+    \centering
+    \caption{A3MESH AT command reference. \tcmp{arg} denotes a mandatory argument.}
+    \label{tab:fw_at_commands}
+    \begin{tabular}{lp{8.5cm}}
+        \toprule
+        \textbf{Command} & \textbf{Description} \\
+        \midrule
+        \texttt{AT}                              & No-operation; returns \texttt{OK}. Used for connectivity checks. \\
+        \texttt{AT+SEND=\tcmp{msg}}              & Broadcast \texttt{k\_data\_plain} to all reachable nodes. \\
+        \texttt{AT+SENDE2E=\tcmp{dst},\tcmp{msg}} & Send AES-256-GCM node-to-node encrypted message to \tcmp{dst}. \\
+        \texttt{AT+SENDGRP=\tcmp{msg}}           & Send AES-256-GCM group-encrypted broadcast. \\
+        \texttt{AT+SENDNET=\tcmp{msg}}           & Send AES-256-GCM network-encrypted broadcast. \\
+        \texttt{AT+SENDKX=\tcmp{dst},\tcmp{key}} & Transmit a \texttt{k\_key\_exchange} packet to provision a remote peer key. \\
+        \texttt{AT+NEIGHBORS?}                  & Return each table entry as \texttt{+NEIGH=\tcmp{id},\tcmp{rssi}}. \\
+        \texttt{AT+NODEID?}                     & Return local node ID as \texttt{+NODEID=\tcmp{id}}. \\
+        \texttt{AT+INFO?}                       & Return battery percentage and last RSSI as \texttt{+INFO=\tcmp{bat},\tcmp{rssi}}. \\
+        \texttt{AT+SETNETKEY=\tcmp{key}}         & Provision the shared network key (hex string). \\
+        \texttt{AT+SETPEERKEY=\tcmp{dst},\tcmp{key}} & Provision the node-to-node peer key for destination \tcmp{dst}. \\
+        \texttt{AT+SETGRPKEY=\tcmp{key}}         & Provision the group key. \\
+        \texttt{AT+CLRKEYS}                     & Erase all provisioned keys from volatile memory. \\
+        \texttt{AT+DEMO=\tcmp{0|1}}              & Enable~(1) or disable~(0) demonstration mode. \\
+        \texttt{AT+DEMO?}                       & Query current demonstration mode state. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Unsolicited notifications from node to smartphone follow a parallel naming convention:
+\texttt{+RCV=\tcmp{src},\tcmp{msg}} for received plain messages,
+\texttt{+RCVE2E=\tcmp{src},\tcmp{msg}} for decrypted end-to-end unicast,
+\texttt{+RCVGRP=\tcmp{src},\tcmp{msg}} for decrypted group messages,
+\texttt{+DISC=\tcmp{id}} for newly discovered neighbours, and
+\texttt{+KX=\tcmp{src},\tcmp{key}} for received key-exchange payloads.
 
 \subsection{BLE-to-LoRa Pipeline}
-% Explain data flow
+\label{sec:fw_ble2lora}
+
+The upstream pipeline carries commands from the smartphone to the radio
+(Figure~\ref{fig:fw_ble2lora}). \texttt{BLE2LoRaTask} on Core~1 blocks on
+\texttt{xBLERxQueue} and performs a prefix match against the command table for each
+received string. Transmission commands construct the appropriate
+\texttt{A3MESH\_header\_t} and \texttt{A3MESH\_packet\_t}, delegate encryption to
+\texttt{CryptoManager} if required, serialise the frame with
+\texttt{A3MESHPacket::serialize\_header\_pkt()}, and post the resulting
+\texttt{tx\_LoRa\_msg\_t} to \texttt{xLoRaTxQueue} with a jitter delay of zero, since
+original transmissions bypass the passive ACK timer entirely. Query commands read from
+the mesh manager, battery driver, or node-ID register and format their responses
+directly into \texttt{xBLETxQueue}. Configuration commands call the appropriate
+\texttt{CryptoManager} setter and return \texttt{OK}; unrecognised commands return
+\texttt{ERROR}.
+
+% --- FIGURE PLACEHOLDER ---------------------------------------------------
+\begin{figure}[htbp]
+    \centering
+    % \includegraphics[width=\textwidth]{figures/fw_ble2lora_sequence.pdf}
+    \caption{BLE-to-LoRa sequence diagram. An \texttt{AT+SEND} command written to
+    the BLE RX characteristic traverses \texttt{xBLERxQueue},
+    \texttt{BLE2LoRaTask}, \texttt{xLoRaTxQueue}, and \texttt{vLoRaTxTask} before
+    being transmitted over the radio.}
+    \label{fig:fw_ble2lora}
+\end{figure}
+% --------------------------------------------------------------------------
 
 \subsection{LoRa-to-BLE Pipeline}
-% Explain reverse pipeline
+\label{sec:fw_lora2ble}
 
-\subsection{Debug and Logging System}
-% Explain diagnostics
+The downstream pipeline carries received mesh traffic to the smartphone
+(Figure~\ref{fig:fw_lora2ble}). A frame arriving over the air triggers the DIO0 ISR,
+which wakes \texttt{vLoRaRxTask}; the task reads the frame into a pool slot and posts
+the pointer to \texttt{xLoRaRxQueue}. \texttt{LoRa2BLETask} dequeues the pointer on
+Core~1 and drives the reception state machine described in
+Section~\ref{sec:fw_statemachine}. When the machine reaches
+\texttt{k\_rx\_local\_delivery}, the formatted AT notification string is placed on
+\texttt{xBLETxQueue}; \texttt{vBLETxTask} delivers it to the smartphone via a GATT
+notification. When the machine reaches \texttt{k\_rx\_forward}, a
+\texttt{tx\_LoRa\_msg\_t} descriptor is posted to \texttt{xLoRaTxQueue}, re-entering
+the transmit path on Core~0. The two transitions are independent: a packet may
+simultaneously trigger local delivery and a forwarded copy when the destination is
+broadcast and the gossip decision is affirmative.
 
-\section{Security Considerations}
+% --- FIGURE PLACEHOLDER ---------------------------------------------------
+\begin{figure}[htbp]
+    \centering
+    % \includegraphics[width=\textwidth]{figures/fw_lora2ble_sequence.pdf}
+    \caption{LoRa-to-BLE sequence diagram. An incoming frame traverses the DIO0 ISR,
+    the frame pool, \texttt{xLoRaRxQueue}, and the reception state machine in
+    \texttt{LoRa2BLETask} before arriving as a GATT notification at the smartphone.
+    If the packet is to be forwarded, a parallel path through \texttt{xLoRaTxQueue}
+    and \texttt{vLoRaTxTask} re-enters the radio.}
+    \label{fig:fw_lora2ble}
+\end{figure}
+% --------------------------------------------------------------------------
+
+
+\section{Security Architecture}
+\label{sec:fw_security}
 
 \subsection{Encryption Model}
-% Explain encryption architecture
+\label{sec:fw_crypto}
 
-\subsection{Trust Levels}
-% Explain trust categories
+All encrypted payloads use AES-256-GCM as specified in NIST SP~800-38D~\cite{nist2007gcm}
+and implemented through the mbedTLS library (\texttt{mbedtls\_gcm\_*} functions),
+which on the ESP32 maps to the hardware AES
+accelerator~\cite{espressif2023esp32trm}. AES-256-GCM is an authenticated encryption
+with associated data (AEAD) scheme~\cite{rfc5116} providing confidentiality and
+message authentication in a single pass, without a separate HMAC step. Keys are
+256\,bits (32\,bytes); nonces are 96\,bits (12\,bytes); authentication tags are
+128\,bits (16\,bytes). Decryption that produces a tag mismatch returns a
+\texttt{CryptoError::AUTH\_FAIL} and the plaintext is discarded.
 
-\subsection{Key Distribution}
-% Explain QR/shared keys approach
+Three encryption scopes are supported. \textbf{Node-to-node encryption}
+(\texttt{k\_enc\_node2node}) uses a symmetric key pre-shared between a specific pair
+of nodes, providing end-to-end confidentiality for unicast conversations.
+\textbf{Group encryption} (\texttt{k\_enc\_group}) uses a single key distributed
+to a cohort of nodes, enabling private multicast without sending separate unicasts
+per recipient. \textbf{Network encryption} (\texttt{k\_enc\_network}) uses a
+mesh-wide shared key as a baseline confidentiality layer against passive
+radio observers. Unencrypted messaging (\texttt{k\_data\_plain}) is preserved to
+ensure interoperability when key provisioning has not been completed.
 
-\section{Firmware Testing and Validation}
-% Explain:
-% - Unit tests
-% - Field tests
-% - Stability testing
+\subsection{Nonce Construction and Replay Protection}
+\label{sec:fw_nonce}
+
+Nonce uniqueness is guaranteed by the \texttt{NonceManager} class. Each 96-bit nonce
+is composed of the 32-bit sender node ID concatenated with a 64-bit monotonically
+increasing counter, as recommended in RFC~5116~\cite{rfc5116}:
+\[
+    \text{nonce}_{96} =
+    \bigl[\,\text{node\_id}_{32}\;\|\;\text{counter}_{64}\,\bigr]
+\]
+The node-ID prefix ensures that two senders sharing a group or network key can never
+produce the same nonce even if their per-sender counters momentarily coincide. The
+64-bit counter is transmitted in-band as part of the encrypted payload, allowing the
+receiver to reconstruct the exact nonce without an additional header field. The
+counter is stored as a \texttt{std::atomic<uint64\_t>} and incremented atomically
+before each encryption call.
+
+Replay attacks are prevented by the \texttt{ReplayProtection} class, which maintains
+per-sender state for up to 16 simultaneous senders. For each sender, it tracks the
+highest counter value seen and accepts a new packet only if its counter is strictly
+greater than the recorded maximum, or falls within a backward window of 64 positions
+to accommodate legitimate out-of-order delivery. Counters falling below the window
+floor are unconditionally rejected as replays.
+
+\subsection{Key Management}
+\label{sec:fw_keymgmt}
+
+Key material is provisioned through two complementary mechanisms. The AT command
+interface allows the companion application to push keys directly over the authenticated
+BLE connection (\texttt{AT+SETPEERKEY=}, \texttt{AT+SETGRPKEY=},
+\texttt{AT+SETNETKEY=}), storing them in the \texttt{CryptoManager} singleton.
+Alternatively, \texttt{AT+SENDKX=\tcmp{dst},\tcmp{key}} constructs a
+\texttt{k\_key\_exchange} frame and delivers it over the mesh, enabling one node to
+provision a peer key on a remote device without a direct BLE connection to that device;
+the recipient's companion application receives a \texttt{+KX=} notification and
+confirms the key via \texttt{AT+SETPEERKEY=}. All keys reside in volatile memory only:
+\texttt{AT+CLRKEYS} and any power cycle erase the entire key store, requiring
+re-provisioning on the next boot.
+
+
+\section{Firmware Validation}
+\label{sec:fw_validation}
+
+Firmware correctness was assessed through unit-level and system-level testing. The
+Smart Gossip probability function was verified with host-compiled test cases asserting
+the monotonic decay of $p$ as the copy count increases, the expected sigmoid shape of
+$f_{\mathrm{RSSI}}$ across the RSSI dynamic range, and the correct clamping to
+$p_{\mathrm{floor}}$ under dense neighbour conditions. The duplicate cache was exercised
+for correct LRU eviction under sequential and concurrent insertion patterns. The
+duty-cycle ring buffer was tested against a synthetic transmission sequence straddling
+rolling window boundaries, confirming compliance at the 36\,000\,ms threshold without
+unnecessary under-utilisation.
+
+System-level validation was conducted with two to four physical nodes in a laboratory
+environment. Message delivery, round-trip latency, and neighbour discovery convergence
+were measured for two-node, three-node inline, and triangle topologies. The passive ACK
+suppression mechanism was confirmed experimentally: in a three-node inline
+configuration, the intermediate node's pending forward was consistently cancelled
+within the jitter window upon overhearing the far node's retransmission, reducing
+channel occupancy by one packet per message traversal without degrading delivery
+probability.
 
 % =============================================================================
 % MOBILE APP
