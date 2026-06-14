@@ -2291,27 +2291,73 @@ End-to-end integration testing was performed using two physical A3MESH nodes and
 % TARGET: 2-3 pages
 
 \chapter{Development Methodology and Project Management}
+\label{ch:methodology}
 
 \section{Development Workflow}
-% Explain overall workflow
+
+The development of A3MESH was structured around a three-layer management model that connected the highest level of planning to the day-to-day engineering workflow. At the top level, Scrum sprints provided the iteration cadence and the mechanism for regular alignment with the project supervisor. At the intermediate level, Jira served as the task-tracking tool in which each sprint's work items were formalized, assigned a unique ticket identifier, and tracked to completion. At the lowest level, a Git branching strategy tied each task identifier to a specific version-control branch, creating unambiguous traceability between project planning and repository history. The interaction between these three tools---Scrum cadence, Jira tickets, and Git branches---is described in the sections that follow.
 
 \section{Agile Methodology}
-% Explain sprint approach
+
+A lightweight variant of the Scrum framework~\cite{schwaber2020scrum} was adopted for the duration of the project. Sprints of two weeks each provided the iteration unit. At the opening of each sprint, a planning meeting between the student and the project supervisor was held to review the work completed in the preceding iteration, identify any deviations from the original plan, and select the tasks to be addressed in the forthcoming two weeks. At the close of each sprint, a brief review meeting served to demonstrate the increment produced---whether a functioning firmware feature, a set of simulation results, or a drafted thesis chapter---and to gather feedback before proceeding further.
+
+The two-week cadence was chosen as a balance between feedback frequency and iteration overhead. Shorter cycles would have imposed disproportionate planning cost in a project where some tasks---such as PCB fabrication or simulation campaigns---have an inherent minimum duration of several days. Longer cycles would have risked accumulating divergence from the supervisor's expectations before a correction could be applied. In practice, the sprint boundary also served as a forcing function for integration: at the end of each sprint, the increment was required to be testable on physical hardware or demonstrable in a running application, which prevented the gradual accumulation of partially finished work.
+
+When a technical challenge proved larger than anticipated within a sprint---as occurred, for instance, during the implementation of the AES-256-GCM encryption pipeline in the firmware, which required a full sprint extension---the scope of the subsequent sprint was adjusted to compensate, rather than deferring indefinitely. This continuous re-prioritization is precisely the mechanism that Scrum is designed to support and that distinguishes it from a rigid waterfall plan.
 
 \section{Sprint Planning with Jira}
-% Add screenshots if useful
+
+Each sprint's work items were recorded in a Jira project board maintained throughout the development period. Every discrete deliverable---a subsystem design, a firmware module, a simulation experiment, a thesis chapter---was represented as a Jira issue assigned a unique ticket identifier of the form \texttt{TFG-\textit{N}}, where $N$ is a monotonically increasing integer. The ticket captured the acceptance criteria for the item, the sprint to which it was assigned, and the time estimate.
+
+To prevent the backlog from becoming a flat, undifferentiated list as the project grew, tickets were grouped under six parent epics that aligned with the principal concerns of the project. The \emph{Documentation} epic collected all tasks related to the drafting of thesis chapters and the recording of design notes for later reference. The \emph{Debugging and Testing} epic covered real-world validation activities, including field tests and hardware bring-up sessions. The \emph{FW Architecture} epic tracked the implementation of all firmware modules described in Chapter~\ref{ch:firmware}. The \emph{HW Architecture} epic grouped the KiCad schematic design, PCB layout, and manufacturing tasks of Chapter~\ref{ch:hardware}. The \emph{System Architecture} epic covered the network simulation framework and the Smart Gossip algorithm development of Chapter~\ref{ch:simulation}. Finally, the \emph{Mobile SW} epic contained all tasks associated with the Android application described in Chapter~\ref{ch:mobileapp}. This two-level hierarchy---epics grouping individual tickets---made it possible to assess progress at a subsystem granularity during planning meetings without losing sight of the individual task level.
+
+This ticket-centric representation served two purposes beyond simple task tracking. First, it made the scope of each sprint explicit and negotiable at the planning meeting, preventing scope creep from being introduced informally between meetings. Second, and more importantly for day-to-day engineering, the ticket identifier was embedded directly in the version-control branch name, as described in the following section, creating a direct and auditable link between a Jira ticket and all the commits that contributed to resolving it.
 
 \section{Version Control with Git}
-% Explain branch strategy
+
+The project used Git~\cite{chacon2014progit} for version control throughout its entire duration. The repository's branching strategy was designed around a single invariant: the \texttt{main} branch must always represent a compilable, functional state of the project. No commit was ever made directly to \texttt{main}; all development work was carried out on dedicated feature branches.
+
+Feature branches follow the naming convention \texttt{feature\_TFG-\textit{N}\_\textit{summary}}, where \textit{N} is the Jira ticket number and \textit{summary} is a concise, underscore-separated description of the task. For example, the branch on which this chapter was drafted is \texttt{feature\_TFG-52\_Methodology}, and the branch that produced the hardware chapter was \texttt{feature\_TFG-48\_Hardware}. The inclusion of the Jira ticket number in the branch name means that any line of the repository's \texttt{git log} can be traced back to the originating task without consulting external documentation.
+
+The integration workflow follows a deliberate sequence. When starting a new task, a feature branch is created from the current tip of \texttt{main}. All development commits are placed on that branch. Before integrating the completed work, the latest state of \texttt{main} is pulled into the feature branch to incorporate any changes that may have been merged by other branches during the development period, resolving any conflicts at this stage so that \texttt{main} itself is never the site of a conflict resolution. The developer then checks out \texttt{main} and merges the feature branch into it:
+
+\begin{verbatim}
+git checkout main
+git merge feature_TFG-N_summary
+\end{verbatim}
+
+Figure~\ref{fig:git_workflow} illustrates this sequence as a branch diagram, showing the moment at which \texttt{main} is pulled into the feature branch before the final merge, thereby ensuring compatibility with any concurrent work that has already been integrated.
+
+\begin{figure}[ht]
+  \centering
+  % TODO: insert branch diagram showing:
+  %   main ──●──────────────────────────●── (merge commit)
+  %              \                      /
+  %   feature     ●──●──●──(pull main)──●
+  \fbox{\rule{0pt}{4cm}\rule{0.85\textwidth}{0pt}}
+  \caption{Git branching workflow. A feature branch is created from \texttt{main}, developed independently, updated with the latest \texttt{main} before integration, and finally merged back into \texttt{main}.}
+  \label{fig:git_workflow}
+\end{figure}
+
+This direction of merge---feature into \texttt{main}, executed while standing on \texttt{main}---is not arbitrary. It means that the integration point is always on the receiving branch, which by invariant is known to be in a working state. If the merge introduces a regression, it is detectable immediately by building the project on \texttt{main} before the branch is pushed to the remote, and can be corrected or reverted without the history of \texttt{main} ever containing a broken commit visible to a collaborator. The feature branch is retained after the merge so that its history remains accessible for reference.
 
 \section{Repository Organization}
-% Explain project structure
+
+The entire project is maintained within a single repository whose directory structure enforces the orthogonality of its constituent subsystems. The root of the repository contains the LaTeX source of this thesis alongside four subdirectories, each of which corresponds to one self-contained technical component: \texttt{tfg\_firmware/} holds the ESP-IDF firmware project, \texttt{tfg\_hardware/} holds the KiCad PCB schematic and layout files, \texttt{tfg\_software/} holds the Android application Gradle project, and \texttt{MeshtasticatorMeshAlgoComp/} holds the modified Meshtasticator simulation framework.
+
+This monorepo organization was chosen deliberately so that a complete snapshot of the project at any point in history---including the thesis text, the firmware, the hardware design, and the simulation code---is recoverable from a single commit hash. The orthogonality of the subdirectories ensures that changes to one subsystem do not generate noise in the diffs of another: a firmware commit touches only files under \texttt{tfg\_firmware/}, a thesis chapter commit touches only \texttt{tfe.tex} and \texttt{tfe.bib}, and the two are never conflated. This discipline also makes it straightforward to understand the scope of any given feature branch from its commit history alone.
 
 \section{Continuous Testing Strategy}
-% Explain validation workflow
+
+Rather than reserving testing for a dedicated phase at the end of the project, validation was integrated into each sprint at the subsystem level. Simulation code was validated by verifying that the Smart Gossip algorithm produced the expected forwarding probabilities for known input values and by running abbreviated simulation campaigns after any change to the routing logic, before committing the results to the feature branch. Firmware modules were tested on physical hardware at each sprint boundary: the firmware was flashed to a pair of ESP32 nodes and the relevant AT commands were exercised manually, with logcat output compared against expected responses. Mobile application code was validated through the combination of JVM unit tests for the cryptographic utility classes and end-to-end integration tests using a physical BLE connection and a live mesh, as described in Section~\ref{ch:mobileapp}.
+
+The sprint-aligned testing discipline meant that integration failures were discovered within days of being introduced rather than at the end of the project, when resolving them would have been substantially more costly. The most significant integration issue encountered---a mismatch between the AES-256-GCM nonce format expected by the firmware decryption routine and the nonce provisioned by the mobile application---was identified and corrected within the sprint in which the encryption pipeline was implemented, rather than surfacing during final validation.
 
 \section{Documentation Practices}
-% Explain technical documentation
+
+The primary documentation artifact of the project is this thesis, whose chapters were drafted in parallel with the corresponding implementation sprints rather than retrospectively. Writing a chapter concurrently with its associated implementation serves a dual purpose: it forces the author to articulate design decisions clearly at the time they are made, while the rationale is fresh, and it distributes the writing workload evenly across the project timeline rather than concentrating it at the end.
+
+Each subsystem directory additionally contains a \texttt{CLAUDE.md} file that documents the architecture, conventions, and build commands for that component. These files were maintained as developer-facing reference documentation for use during AI-assisted development sessions, as discussed in Section~\ref{ch:mobileapp}, and incidentally serve as concise technical summaries of each subsystem's design decisions.
 
 % =============================================================================
 % RESULTS
