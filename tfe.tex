@@ -225,19 +225,18 @@ The document also includes several appendices containing complementary technical
 %
 % Add:
 % - Simple mesh topology figure
-Mesh communication systems are decentralized network architectures in which devices, commonly referred to as nodes, 
+Mesh communication systems are decentralized network architectures in which devices, commonly referred to as \emph{nodes}, 
 cooperate to exchange information without relying on a fixed centralized infrastructure \cite{mesh_survey,ad_hoc_networks}. Unlike traditional communication 
 models based on access points, cellular towers, or centralized servers, mesh networks distribute communication responsibilities 
 among all participating nodes, allowing the network to operate autonomously even when part of the infrastructure is unavailable or damaged.
 
-To do so, mesh networks utilize multi-hop communication, where messages are forwarded from one node to another until they reach their destination. 
-This approach allows for extended coverage beyond the direct communication range of individual nodes \cite{ad_hoc_networks}, as messages can be relayed through intermediate devices.
+To do so, mesh networks utilize \emph{multi-hop communication}, where messages are forwarded from one node to another until they reach their destination. 
+This approach allows for extended coverage beyond the direct communication range \cite{ad_hoc_networks}.
 
-The operation of multi-hop communication can be understood as a collaborative forwarding process. When a node receives a packet that is not intended for itself, 
-it may retransmit the packet to neighboring nodes according to a predefined routing or forwarding strategy. Depending on the network architecture, these strategies 
+When a node receives a packet that is not intended for itself, it may retransmit the packet to neighboring nodes according to a predefined routing or forwarding strategy. Depending on the network architecture, these strategies 
 may rely on deterministic routing tables, probabilistic forwarding mechanisms, flooding approaches, or adaptive routing algorithms.
-Another important advantage is scalability and deployment flexibility. New nodes can be added dynamically to increase network coverage without requiring significant 
-infrastructure modifications. Additionally, mesh systems can often self-organize and self-heal by adapting communication paths according to network topology changes.
+
+New nodes can be added dynamically to increase network coverage without requiring significant infrastructure modifications. Additionally, mesh systems can often self-organize and self-heal by adapting communication paths according to network topology changes.
 
 On the one hand, this makes mesh networks particularly suitable for scenarios such as disaster recovery, remote areas, and temporary deployments where traditional 
 infrastructure may be unavailable or unreliable. 
@@ -284,7 +283,7 @@ to satisfy: thousands of inexpensive, battery-powered devices, scattered over wi
 bytes of data sporadically. Low-Power Wide-Area Networks (LPWANs) emerged precisely to fill this gap, offering kilometre-scale range 
 and multi-year battery lifetimes at the cost of very low data rates~\cite{raza2017lpwan}. Short-range technologies such as Wi-Fi, 
 Bluetooth and Zigbee provide high throughput but only over tens of metres, while conventional cellular networks offer coverage at the 
-expense of complex protocols, subscription costs and energy budgets incompatible with coin-cell operation~\cite{mekki2019comparative}. 
+expense of complex protocols, subscription costs and energy budgets incompatible with \emph{coin-cell operation}~\cite{mekki2019comparative}. 
 LPWAN deliberately accepts the opposite trade-off: it sacrifices throughput in exchange for range and energy efficiency. This makes it 
 the natural choice for smart cities, precision agriculture, distributed sensing, remote monitoring and resilient communications in 
 infrastructure-degraded scenarios. It is important to stress that LPWAN is not a single technology but a \emph{category} of technologies---including LoRa, Sigfox and NB-IoT---that share these optimisation goals~\cite{raza2017lpwan}.
@@ -312,7 +311,9 @@ sensitivity achieved through spreading and temporal energy integration.
 
 \subsection{Configurable PHY Parameters}
 
-The behaviour of a LoRa link is governed by a small set of PHY parameters that can be tuned per transmission, making the technology unusually adaptable.
+The behaviour of a LoRa link is governed by a small set of PHY parameters that can be tuned per transmission, making the technology unusually adaptable. Figure~\ref{fig:lora_modulation} illustrates the effect of the main LoRa parameters on a time-frequency waterfall plot.
+
+\img{images/lora_modulation.png}{LoRa modulation illustration.}{1}{lora_modulation}
 
 \paragraph{Spreading Factor (SF).} The spreading factor, ranging from SF7 to SF12, defines how many chips encode each symbol; 
 the symbol duration is $T_s = 2^{\mathrm{SF}}/BW$~\cite{semtech2015an1200}. Each unit increase in SF roughly doubles the airtime, so its effect on time-on-air, 
