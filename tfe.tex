@@ -72,7 +72,7 @@
 % - Centralized vs decentralized communication diagram
 During the past few years, the demand on centralized infrastructures has risen considerably. The majority of modern messaging systems rely heavily on cellular networks, internet access, and cloud services. While these infrastructures offer near-global connectivity, they also introduce a Single Point of Failure (SPOF) in the event of natural disasters, blackouts, or network congestion, as well as in remote areas where no coverage is available.
 
-Recent events have exposed the fragility of these infrastructures in emergency scenarios. For instance, a major blackout on April 18th, 2025, clearly demonstrated this vulnerability. During fires, floods, earthquakes, or massive power outages, cellular networks can be rendered useless or congested, hindering coordination and information exchange. As a consequence, interest in off-grid communication systems, which enable operations without any prior infrastructure dependency, has been significantly boosted.
+Recent events have exposed the fragility of these infrastructures in emergency scenarios. For instance, a major blackout in Spain on April 18th, 2025, clearly demonstrated this vulnerability. During fires, floods, earthquakes, or massive power outages, cellular networks can be rendered useless or congested, hindering coordination and information exchange. As a consequence, interest in off-grid communication systems, which enable operations without any prior infrastructure dependency, has been significantly boosted.
 
 Mesh networks play a key role in this context because every node can act simultaneously as a transmitter, receiver, and relay, allowing messages to spread between devices via multiple hops. This approach avoids SPOFs and increases tolerance to partial network failures.
 
@@ -84,7 +84,7 @@ This interest extends beyond tech enthusiasts; the telecommunication industry is
 
 Nevertheless, despite the technical advantages of these systems, significant accessibility barriers remain for non-technical users. Since the onboarding process of current projects requires advanced configuration knowledge, a primary objective of this thesis is to develop a mesh communication platform that is not only efficient and resilient, but also accessible and intuitive for ordinary users. To achieve this, smartphone integration and a user experience similar to a conventional messaging app will be key characteristics of this project.
 
-Driven by this motivation, this work presents the development of A3MESH, a decentralized communication platform based on LoRa and BLE (Bluetooth Low Energy). It is designed to provide resilient, energy-efficient, and easily deployable communication in off-grid or emergency scenarios.
+Driven by this motivation, this work presents the development of \emph{A3MESH}, a decentralized communication platform based on LoRa and BLE (Bluetooth Low Energy). It is designed to provide resilient, energy-efficient, and easily deployable communication in off-grid or emergency scenarios.
 
 
 \section{Objectives}
@@ -114,8 +114,6 @@ The specific objectives of this work are summarized as follows:
 
 \item Design and implement a routing algorithm capable of dynamically adjusting forwarding behavior according to network conditions.
 
-\item Create a mobile application providing an intuitive messaging-oriented interface for interacting with mesh nodes through BLE connectivity.
-
 \item Improve user accessibility by abstracting the underlying networking complexity and providing a user experience similar to conventional messaging applications.
 
 \item Design a compact enclosure and mechanical integration solution suitable for daily portable use alongside smartphones.
@@ -135,7 +133,7 @@ The specific objectives of this work are summarized as follows:
 % - Android-only support
 % - Prototype-level hardware
 % - Limited large-scale field testing
-This thesis focuses on the design, implementation, and validation of a decentralized mesh communication platform based on LoRa and Bluetooth Low Energy technologies. The project includes the development of custom hardware, embedded firmware, a routing simulation environment, and a smartphone-oriented mobile application integrated into a complete end-to-end communication system.
+The project includes the development of custom hardware, embedded firmware, a routing simulation environment, and a smartphone-oriented mobile application integrated into a complete end-to-end communication system.
 
 The scope of the work covers several engineering areas, including low-power wireless communication, mesh networking algorithms, embedded systems, mobile software development, and mechanical integration.
 
@@ -143,13 +141,13 @@ The implemented system is intended for infrastructure-free communication scenari
 
 However, several limitations must also be considered. First, the system has been developed as a prototype-oriented research platform rather than as a commercial product. Consequently, aspects such as industrial certification, large-scale manufacturing optimization, and extensive environmental qualification are outside the scope of this thesis.
 
-Additionally, the mobile application has been developed exclusively for Android devices. Cross-platform compatibility and iOS support were not considered due to time constraints and the primary research focus being centered on mesh networking and embedded communication systems.
+Additionally, the mobile application has been developed exclusively for Android devices. Cross-platform compatibility and iOS support were not considered because the primary research focus being centered on mesh networking and embedded communication systems.
 
 The proposed platform also does not rely on Internet gateways, cloud synchronization, or existing communication infrastructure. While this decision improves independence and resilience, it also limits interoperability with traditional messaging services and prevents communication beyond the mesh network itself.
 
-Although the routing algorithm has been extensively evaluated through simulation and validated through real-world testing, large-scale field deployments involving hundreds or thousands of physical nodes were not feasible within the scope of this project. Therefore, scalability conclusions are partially based on simulated environments and controlled experimental conditions.
+Although the routing algorithm has been evaluated through simulation and validated through real-world testing, large-scale field deployments involving hundreds or thousands of physical nodes were not feasible within the scope of this project. Therefore, scalability conclusions are partially based on simulated environments and controlled experimental conditions.
 
-Finally, while the system incorporates encryption mechanisms and trust-based communication concepts, it is not intended to provide military-grade security or formally verified cryptographic guarantees. Security-related features are designed to improve practical privacy and usability within the context of low-power decentralized communication systems.
+Finally, while the system incorporates encryption mechanisms and trust-based communication concepts, security-related features are designed to improve practical privacy and usability within the context of low-power decentralized communication systems.
 
 \section{Contributions}
 % ~0.5 page
@@ -165,8 +163,8 @@ Finally, while the system incorporates encryption mechanisms and trust-based com
 The main contributions of this thesis are listed below:
 
 \begin{itemize}
-\item The design and implementation of A3Mesh, a complete decentralized communication platform integrating custom hardware, embedded firmware, routing algorithms, and a smartphone-oriented mobile application into a unified ecosystem.
-
+\item The design and implementation of \emph{A3MESH}, a complete decentralized communication platform integrating custom hardware, embedded firmware, routing algorithms, and a smartphone-oriented mobile application into a unified ecosystem.
+    
 \item The development of an adaptive smart gossip routing algorithm capable of dynamically adjusting packet forwarding behavior according to network conditions in order to improve scalability, reduce congestion, and minimize unnecessary retransmissions compared to traditional flooding-based approaches.
 
 \item The creation of a custom network simulation environment specifically designed to evaluate mesh communication performance under different routing strategies, network densities, and propagation conditions.
