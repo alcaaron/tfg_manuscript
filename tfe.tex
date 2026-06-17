@@ -309,17 +309,25 @@ narrowband interference, high tolerance to multipath fading and Doppler effects,
 The long range of LoRa therefore does not come from transmitting at high power, which is in any case limited by regulation, but from extreme receiver 
 sensitivity achieved through spreading and temporal energy integration.
 
-\subsection{Configurable PHY Parameters}
+\paragraph{Symbol Representation in CSS.}
+At the physical layer, a LoRa symbol is not conveyed by selecting a sinusoidal tone, as in conventional FSK schemes, but by choosing one out of $2^{\mathrm{SF}}$ possible cyclic shifts of a reference chirp. In other words, the information content of the symbol is mapped onto the time-frequency position of the chirp within the symbol interval. From a practical perspective, this can also be interpreted as a discrete frequency offset, where each symbol corresponds to a different starting point along the same linear frequency sweep. As a result, all LoRa symbols occupy the full channel bandwidth and have the same duration and average power; what changes from one symbol to another is only the relative shift of the chirp pattern.
 
-The behaviour of a LoRa link is governed by a small set of PHY parameters that can be tuned per transmission, making the technology unusually adaptable. Figure~\ref{fig:lora_modulation} illustrates the effect of the main LoRa parameters on a time-frequency waterfall plot.
+\img{images/chirp_modulation.png}{LoRa symbol-to-chirp mapping~\cite{rfwireless_chirp}.}{0.6}{symbol_chirp}
 
-\img{images/lora_modulation.png}{LoRa modulation illustration.}{1}{lora_modulation}
+At the receiver, demodulation is performed by correlating the incoming waveform with a locally generated reference chirp, a process commonly referred to as \emph{dechirping}. This operation converts the cyclic shift of the received chirp into a tone whose frequency is proportional to the transmitted symbol index. The subsequent FFT stage then identifies the spectral bin associated with that tone, allowing the receiver to recover the symbol value efficiently. This is one of the key reasons why LoRa achieves high sensitivity and robust reception under low signal-to-noise ratios~\cite{wirelesspi_lora}.
 
-\paragraph{Spreading Factor (SF).} The spreading factor, ranging from SF7 to SF12, defines how many chips encode each symbol; 
-the symbol duration is $T_s = 2^{\mathrm{SF}}/BW$~\cite{semtech2015an1200}. Each unit increase in SF roughly doubles the airtime, so its effect on time-on-air, 
-energy consumption and latency is exponential, while sensitivity improves by approximately 2.5~dB per step. Higher SFs thus extend range at the cost of drastically 
+\subsubsection*{Implications of the Configurable Parameters}
+The LoRa PHY therefore exposes a small but highly influential set of parameters that directly shape the link budget, throughput, and robustness of the system. Figure~\ref{fig:lora_modulation} illustrates the effect of the main LoRa parameters on a time-frequency waterfall plot.
+
+\img{images/lora_modulation.png}{LoRa Chirp Spread Spectrum illustration~\cite{wirelesspi_lora}.}{1}{lora_modulation}
+
+% https://wirelesspi.com/understanding-lora-phy-long-range-physical-layer/
+% https://www.rfwireless-world.com/terminology/chip-vs-chirp-lorawan#google_vignette
+\paragraph{Spreading Factor (SF).} The spreading factor, ranging from SF7 to SF12, determines the number of distinct \emph{cyclic shifts} that can be applied to a chirp, yielding up to $2^{\mathrm{SF}}$ unique symbols. 
+By definition, the symbol duration is $T_s = 2^{\mathrm{SF}}/BW$~\cite{semtech2015an1200}. Each unit increase in SF roughly doubles the airtime, so its effect on time-on-air, 
+energy consumption and latency is exponential, while sensitivity improves. Higher SFs thus extend range at the cost of drastically 
 reduced bitrate. Different SFs are quasi-orthogonal, allowing partially concurrent transmissions, although this orthogonality is imperfect in 
-practice~\cite{croce2018orthogonality}. In a mesh context such as A3MESH this trade-off is critical: high SFs improve connectivity between distant nodes but inflate 
+practice~\cite{croce2018orthogonality}. Besides, in a mesh context this trade-off is critical: high SFs improve connectivity between distant nodes but inflate 
 channel occupancy, increasing congestion and the probability of collisions as the network grows~\cite{bor2016scale}.
 
 \paragraph{Bandwidth (BW).} LoRa typically operates with bandwidths of 125, 250 or 500~kHz. Narrower bandwidths capture less thermal noise and therefore improve 
@@ -339,8 +347,7 @@ No LoRa configuration simultaneously maximises range, throughput, latency and sp
 clearly: SF12 with 125~kHz bandwidth and CR~4/8 yields maximum range and robustness, with airtimes of over a second for modest payloads, whereas SF7 
 with 500~kHz and CR~4/5 maximises throughput and minimises latency but sharply reduces link margin. Airtime is the variable that couples these choices to 
 system-level behaviour: longer frames raise collision probability, degrade scalability and consume the limited 
-duty-cycle budget (typically 1\% in the EU 868~MHz sub-bands under ETSI regulations)~\cite{adelantado2017limits,bor2016scale}. Parameter selection is therefore 
-not a local optimisation of a single link but a network-wide engineering decision.
+duty-cycle budget (typically 1\% in the EU 868~MHz sub-bands under ETSI regulations)~\cite{adelantado2017limits,bor2016scale}.
 
 \subsection{Practical Limitations of LoRa}
 
@@ -350,69 +357,138 @@ kilometre-scale links, and collisions grow rapidly with network density~\cite{bo
 Regulatory duty-cycle restrictions in ISM bands further cap achievable throughput and limit how often nodes may relay traffic. 
 Finally, LoRa was conceived for star topologies, not mesh networking: it provides no native routing, scheduling or neighbour-discovery mechanisms. 
 These shortcomings do not invalidate the technology, but they imply that an efficient mesh network over LoRa requires additional protocol 
-mechanisms at the MAC and routing layers---precisely the problem A3MESH addresses.
+mechanisms at the MAC and routing layers.
 
-\subsection{Why LoRa for A3MESH}
+\subsection{Why LoRa}
 
-The requirements of A3MESH map remarkably well onto LoRa's strengths. 
-Alternative technologies fail at least one requirement: Wi-Fi and BLE lack the necessary range; Zigbee meshes well but only over short links; 
+After evaluating alternative technologies, all fail at least one requirement: Wi-Fi and BLE lack the necessary range; Zigbee meshes well but only over short links; 
 NB-IoT depends entirely on operator-owned cellular infrastructure, an unacceptable single point of failure in disaster scenarios; and Sigfox relies on a proprietary, 
 operator-managed network with severely constrained uplink and almost no downlink capability~\cite{mekki2019comparative}. 
 LoRa, in contrast, operates in licence-free ISM bands without any operator, offers kilometre-scale links at milliwatt power levels, and exposes a highly configurable 
 PHY that permits experimentation with custom mesh protocols. For these reasons---autonomy, range, energy efficiency, regulatory accessibility and PHY flexibility---LoRa 
-was selected as the physical layer of A3MESH, with the understanding that the mesh-specific challenges identified above must be solved by the protocol design presented in 
+was selected as the physical layer of this project, with the understanding that the mesh-specific challenges identified above must be solved by the protocol design presented in 
 the following chapters.
 
 \section{Bluetooth Low Energy}
 \label{sec:ble}
-% ~1 page
-%
-% Explain:
-% - BLE architecture
-% - GATT
-% - Low-power advantages
-% - Why BLE fits smartphone integration
-Bluetooth Low Energy (BLE), introduced in version 4.0 of the Bluetooth Core Specification, is a short-range wireless technology designed from the 
-ground up for ultra-low-power operation rather than as a mere optimisation of classic Bluetooth~\cite{bluetooth2023core,gomez2012overview}. 
-Although it shares the brand and the 2.4~GHz ISM band with its predecessor, BLE is a distinct protocol stack: it uses 40 channels of 2~MHz 
-with GFSK modulation, three of which are reserved for advertising, and it replaces the connection-oriented complexity of classic Bluetooth with a 
-lightweight, asynchronous design oriented towards the sporadic exchange of small amounts of data.
 
+Bluetooth Low Energy (BLE), introduced in version 4.0 of the Bluetooth Core
+Specification, is a short-range wireless technology designed from the ground
+up for ultra-low-power operation rather than as a mere optimisation of classic
+Bluetooth~\cite{bluetooth2023core,gomez2012overview}. Although it shares the
+brand and the 2.4~GHz ISM band with its predecessor, BLE is a distinct
+protocol stack: it uses 40 channels of 2~MHz with GFSK modulation, three of
+which are reserved for advertising, and it replaces the connection-oriented
+complexity of classic Bluetooth with a lightweight, asynchronous design
+oriented towards the sporadic exchange of small amounts of data.
+
+% ----------------------------------------------------------------
 \subsection{Architecture}
 
-The BLE stack is organised into three blocks. The \emph{controller} comprises the physical layer and the link layer, which manages device 
-states (advertising, scanning, initiating and connected), adaptive frequency hopping and connection events. The \emph{host} contains the 
-Logical Link Control and Adaptation Protocol (L2CAP), the Attribute Protocol (ATT), the Generic Attribute Profile (GATT), the Security Manager 
-and the Generic Access Profile (GAP), which defines discovery and connection roles such as \emph{central} and \emph{peripheral}. Both blocks 
-communicate through the Host Controller Interface (HCI)~\cite{bluetooth2023core,gomez2012overview}. Communication follows two complementary 
-patterns: connectionless broadcasting over the advertising channels, and point-to-point connections in which the central device polls the 
-peripheral at a negotiated \emph{connection interval}, allowing the radio to remain asleep between events.
+The BLE stack is organised into three blocks. The \emph{controller} comprises
+the physical layer and the link layer, which manages device states
+(advertising, scanning, initiating, and connected), adaptive frequency hopping,
+and connection events. The \emph{host} contains the Logical Link Control and
+Adaptation Protocol (L2CAP), the Attribute Protocol (ATT), the Generic
+Attribute Profile (GATT), the Security Manager, and the Generic Access Profile
+(GAP), which defines discovery and connection roles such as \emph{central} and
+\emph{peripheral}. Both blocks communicate through the Host Controller
+Interface (HCI)~\cite{bluetooth2023core,gomez2012overview}.
 
+Communication follows two complementary patterns: connectionless broadcasting
+over the advertising channels, and point-to-point connections in which the
+central device polls the peripheral at a negotiated \emph{connection interval},
+allowing the radio to remain dormant between events.
+
+% ---- GAP operations ------------------------------------------------
+\subsubsection{Advertising and Scanning}
+
+To establish a connection, one device must advertise while a second device
+scans. The advertiser periodically transmits advertising packets on the three
+dedicated channels; the scanner listens and raises a scan-report event each
+time such a packet is received~\cite{silabs_ble_flowcharts}. Two scanning
+modes are available: in \emph{passive} scanning the scanner only receives
+advertising packets, whereas in \emph{active} scanning it additionally
+transmits a scan-request frame containing its own Bluetooth address, allowing
+the advertiser to respond with supplementary data. BLE implements a
+time-division duplex scheme, so all timing is governed by three tuneable
+parameters---advertising interval, scanning interval, and scanning
+window---whose interaction determines discovery latency and energy
+consumption~\cite{bluetooth2023core}.
+
+\subsubsection{Connection Establishment}
+
+Once the scanner has collected sufficient information from the advertiser, it
+may open a connection, at which point it becomes the \emph{central} device and
+the former advertiser becomes the \emph{peripheral}~\cite{silabs_ble_flowcharts}.
+A connection-initiation failure can occur in two ways: the central explicitly
+cancels the pending request, or the procedure times out because the peripheral
+does not respond within the prescribed interval. The BLE standard defines a
+hard limit of six consecutive connection intervals during which either host may
+remain silent; if this threshold is exceeded, the link layer drops the
+connection~\cite{bluetooth2023core,silabs_ble_flowcharts}.
+
+\subsubsection{Connection Parameter Negotiation}
+
+After a connection has been established, both hosts may request adjustments to
+the link parameters. The connection-parameter-update procedure can be triggered
+either by the central, the peripheral, or autonomously by the link layer during
+connection initiation. In all cases the central retains the final authority over
+parameter selection~\cite{silabs_ble_flowcharts}. A related sub-procedure, the
+\emph{GATT MTU exchange}, is also performed at this stage: the ATT protocol
+defines a default Maximum Transmission Unit (MTU) of 23~bytes, but if both
+devices support a larger value the MTU exchange procedure negotiates a higher
+limit, executed exactly once per connection~\cite{bluetooth2023core}.
+
+% ----------------------------------------------------------------
 \subsection{The Generic Attribute Profile (GATT)}
 
-Data exchange in connected mode is structured by GATT, a client--server model built on top of ATT. A GATT server exposes its state as a 
-hierarchy of \emph{services}, each grouping one or more \emph{characteristics}: typed attributes identified by UUIDs that a client can 
-read, write or subscribe to through \emph{notifications} and \emph{indications}~\cite{bluetooth2023core}. This self-describing structure means 
-that a client can discover at runtime what data a previously unknown device offers, without any out-of-band agreement. In practice, GATT acts as a 
-universal application-layer contract: any BLE-capable device, including every modern smartphone, can interact with a custom peripheral simply by 
-knowing its service and characteristic UUIDs.
+Data exchange in connected mode is structured by GATT, a client--server model
+built on top of ATT. A GATT server exposes its state as a hierarchy of
+\emph{services}, each grouping one or more \emph{characteristics}: typed
+attributes identified by UUIDs that a client can read, write, or subscribe to
+through \emph{notifications} and
+\emph{indications}~\cite{bluetooth2023core}. This self-describing structure
+permits a client to discover at runtime what data a previously unknown device
+offers, without any out-of-band agreement. In practice, GATT acts as a
+universal application-layer contract: any BLE-capable device, including every
+modern smartphone, can interact with a custom peripheral by knowing only its
+service and characteristic UUIDs.
 
+% ----------------------------------------------------------------
 \subsection{Low-Power Operation}
 
-BLE achieves multi-year operation on coin-cell batteries through aggressive duty cycling rather than low transmit power alone. Connection events and 
-advertising bursts last only a few milliseconds, after which the radio returns to deep sleep; protocol overhead is minimal, device discovery and 
-connection establishment take milliseconds rather than seconds, and parameters such as the connection interval, slave latency and advertising interval 
-let the designer trade latency for energy~\cite{gomez2012overview,tosi2017performance}. Reported peak currents in the range of tens of milliamperes, 
-combined with sleep currents of a few microamperes, result in average consumptions orders of magnitude below those of Wi-Fi or classic Bluetooth for 
-intermittent traffic~\cite{siekkinen2012energy}.
+BLE achieves multi-year operation on coin-cell batteries through aggressive
+duty cycling rather than reduced transmit power alone. Connection events and
+advertising bursts last only a few milliseconds, after which the radio returns
+to deep sleep; protocol overhead is minimal, and device discovery and
+connection establishment complete in milliseconds rather than
+seconds~\cite{gomez2012overview,tosi2017performance}. Parameters such as the
+connection interval, slave latency, and advertising interval allow the designer
+to trade latency for energy. Reported peak currents in the range of tens of
+milliamperes, combined with sleep currents of a few microamperes, yield average
+power consumptions that are orders of magnitude below those of Wi-Fi or classic
+Bluetooth for intermittent traffic~\cite{siekkinen2012energy}.
 
-\subsection{BLE as the Smartphone Bridge in A3MESH}
+% ----------------------------------------------------------------
+\subsection{Suitability for Smartphone Integration}
+
+BLE's native support in all major mobile operating systems---iOS, Android, and
+their derivatives---makes it the standard for peripheral-to-smartphone
+communication. The GATT model abstracts hardware specifics behind a uniform
+service interface, so a single mobile application can interact with any
+compliant peripheral without platform-specific drivers. Combined with the
+sub-second connection times and the minimal radio overhead imposed on the
+handset, BLE provides the connectivity layer that enables the local
+configuration and monitoring interface examined in the remainder of this
+work.
+
+\subsection{BLE as the Smartphone Bridge}
 
 The decisive argument for BLE in this project is ubiquity: native BLE support is mandatory hardware in virtually all smartphones manufactured in the last 
 decade, and both Android and iOS expose mature GATT APIs to applications, with no need for pairing infrastructure, routers or licensed 
 spectrum~\cite{gomez2012overview}. In A3MESH, BLE therefore plays a role complementary to LoRa: while LoRa provides the long-range 
-backbone between nodes, BLE provides the last metre between each node and its user. The node acts as a GATT peripheral exposing message and 
-configuration characteristics, and the smartphone application, acting as central, becomes the human interface of the mesh without requiring any 
+backbone between nodes, BLE provides the last metre between each node and its user. The node acts as a GATT peripheral exposing message characteristics, and the smartphone application, acting as central, becomes the human interface of the mesh without requiring any 
 custom radio hardware on the user's side. The combination of negligible energy cost, standardised application-layer semantics through GATT, 
 and universal smartphone availability makes BLE the natural choice for this local link.
 
