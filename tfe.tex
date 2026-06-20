@@ -599,7 +599,7 @@ To structure this communication, an AT-command-based interface has been implemen
  
 Finally, the outermost layer of the architecture is the LoRa mesh network, which provides long-range wireless communication between nodes. This network constitutes the backbone of the system, allowing nodes to communicate with one another.
 
-% image of the complete project architecture
+% TODO: image of the complete project architecture
 
 
 \section{Node Interaction Model}
@@ -630,6 +630,7 @@ This design choice follow directly from the resilience objectives of the system 
 % - App -> BLE -> LoRa -> Mesh -> BLE -> App
 
 This section traces the complete lifecycle of a user message through the system, from the sender's smartphone to the recipient's, tying together the four architectural components introduced in Section~\ref{sec:general_architecture}. Figure~\ref{fig:sequence_message} presents the corresponding sequence diagram.
+% TODO: 
 % \begin{figure}[htbp]
 %     \centering
 %     % \includegraphics[width=\textwidth]{figures/sequence_message.pdf}
@@ -660,7 +661,7 @@ A3MESH nodes are battery-powered devices intended for scenarios---emergencies, r
 \subsection{Scalability}
 \label{subsec:req_scalability}
 % Explain node density concerns
-The system must remain functional as node density grows, precisely the regime in which flood-based LoRa meshes degrade. The underlying tension is structural: the LoRa channel is a single shared medium with long frame airtimes, no effective carrier sensing over kilometre-scale links and a hard duty-cycle ceiling, so aggregate channel occupancy---not computation or memory---is the binding resource. The requirement is therefore formulated in terms of \emph{graceful degradation}: channel load must grow with offered traffic rather than with the number of deployed nodes, and the addition of nodes to a region should improve, not erode, its connectivity. This requirement is the principal motivation for abandoning deterministic flooding in favour of the adaptive gossip policy, and it is evaluated quantitatively through the congestion metrics of Chapter~\ref{ch:simulation}.
+The system must remain functional as node density grows, precisely the regime in which flood-based LoRa meshes degrade. The requirement is therefore formulated in terms of \emph{graceful degradation}: channel load must grow with offered traffic rather than with the number of deployed nodes, and the addition of nodes to a region should improve, not erode, its connectivity. This requirement is the principal motivation for abandoning deterministic flooding in favour of the adaptive gossip policy, and it is evaluated quantitatively through the congestion metrics of Chapter~\ref{ch:simulation}.
 
 \subsection{Reliability}
 \label{subsec:req_reliability}
@@ -2441,6 +2442,7 @@ Each subsystem directory additionally contains a \texttt{CLAUDE.md} file that do
 % TARGET: 5-6 pages
 
 \chapter{Experimental Results and Evaluation}
+\label{ch:results}
 
 \section{Test Methodology}
 % Explain:
