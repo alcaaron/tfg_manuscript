@@ -689,7 +689,7 @@ Finally, the system must be operable by users with no technical background whats
 % - Parameter exploration problem
 There are several reasons why a network simulator was necessary for this thesis.
 
-The first is the \emph{parameter exploration problem}. The adaptive forwarding function developed in this chapter is governed by five continuous parameters, defining a five-dimensional search space in which performance must be evaluated. Each evaluation of a single parameter combination requires observing the network for a statistically meaningful period; performing even a coarse exploration of this space on real hardware would require thousands of multi-hour field deployments, which is materially impossible within the scope of this work. In simulation, the same exploration is reduced to minutes of computation.
+The first is the \emph{parameter exploration problem}. The adaptive forwarding function developed in this chapter is governed by five continuous parameters, where each evaluation of a single parameter combination requires observing the network for a statistically meaningful period. In other words, performing even a coarse exploration of this space on real hardware would require thousands of multi-hour field deployments, which is materially impossible within the scope of this work. In contrast, in simulation the same exploration is reduced to minutes of computation.
 
 The second obstacle is \emph{scale and controllability}. The phenomena of interest---broadcast storms, channel congestion, gossip die-out---only emerge at network sizes of tens of nodes spread over kilometres, far beyond the prototype fleet that can realistically be manufactured and deployed. Moreover, physical experiments cannot hold conditions constant: interference, weather and node placement vary between runs, making it impossible to attribute performance differences to the routing algorithm rather than to the environment. 
 
@@ -709,9 +709,9 @@ Finally, a discrete-event simulator provides perfectly repeatable conditions in 
 % - Architecture diagram
 
 \subsection{Simulator Architecture}
-The experimental platform is built upon \emph{Meshtasticator}, the open-source discrete-event simulator of the Meshtastic project~\cite{meshtasticator2024}. Meshtasticator models a LoRa mesh as a set of node processes coordinated by the SimPy discrete-event engine~\cite{simpy2024}: nodes exchange packets through a broadcast pipe that emulates the shared radio medium, and every transmission is propagated to all other nodes, where it may be received, lost due to insufficient signal strength, or destroyed by collision. The simulator implements the relevant PHY and MAC behaviour of real Meshtastic devices, including LoRa time-on-air computation, capture-effect collision modelling, listen-before-talk channel access with random back-off, and---crucially for this work---the official \emph{managed flood} routing algorithm of the Meshtastic firmware, which provides a faithful baseline for comparison.
+The experimental platform is built upon \emph{Meshtasticator}, the open-source discrete-event simulator of the Meshtastic project~\cite{meshtasticator2024}. Meshtasticator models a LoRa mesh as a set of node processes coordinated by the SimPy discrete-event engine~\cite{simpy2024}: nodes exchange packets through a broadcast pipe that emulates the shared radio medium, and every transmission is propagated to all other nodes, where it may be received, lost due to insufficient signal strength, or destroyed by collision. The simulator implements the relevant PHY and MAC behaviour of real Meshtastic devices as well as LoRa time-on-air computation, capture-effect collision modelling, listen-before-talk channel access with random back-off, and the official \emph{managed flood} routing algorithm of the Meshtastic firmware, which provides a faithful baseline for comparison.
 
-The simulator was extended for this thesis in two main directions. First, the routing layer was refactored to support pluggable forwarding policies, and the candidate strategies described in Section~\ref{sec:sim_strategies} were implemented as selectable router types, culminating in the Smart Gossip router. Second, the configuration system was instrumented so that the parameters of the Smart Gossip decision function are exposed as runtime variables, a prerequisite for the automated optimisation process of Section~\ref{sec:sim_optimization}. A batch-execution harness and an optimisation driver were developed on top of the simulator to run large experiment campaigns and collect the metrics defined in Section~\ref{sec:sim_metrics}.
+On top of that, the simulator was extended for this thesis in two main directions. First, the routing layer was refactored to support pluggable forwarding policies, and the candidate strategies described in Section~\ref{sec:sim_strategies} were implemented as selectable router types, culminating in the Smart Gossip router. Second, the configuration system was instrumented so that the parameters of the Smart Gossip decision function are exposed as runtime variables, a prerequisite for the automated optimisation process of Section~\ref{sec:sim_optimization}. Finally, a batch-execution harness and an optimisation driver were developed on top of the simulator to run large experiment campaigns and collect the metrics defined in Section~\ref{sec:sim_metrics}.
 
 % --- FIGURE PLACEHOLDER -------------------------------------
 % \begin{figure}[htbp]
@@ -723,16 +723,17 @@ The simulator was extended for this thesis in two main directions. First, the ro
 % ------------------------------------------------------------
 
 \subsection{Node, Packet and Channel Models}
-Each simulated node replicates the behaviour of an A3MESH device: it generates application messages, maintains a duplicate cache, executes the configured forwarding policy and respects the half-duplex constraint of the radio. Nodes are placed uniformly at random over a 15$\times$15~km area, subject to a minimum-separation constraint, and approximately 30\% of the nodes are mobile, exercising the protocols under topological change. Message generation follows a Poisson-like process with exponentially distributed inter-arrival times of mean 100~s per node, and each application message carries a 40-byte payload plus a 16-byte header, consistent with the packet format of the real firmware.
+Each simulated node generates application messages, maintains a duplicate cache, executes the configured forwarding policy and respects the half-duplex constraint of the radio. Nodes are placed uniformly at random over a 15$\times$15~km area, subject to a minimum-separation constraint, and approximately 30\% of the nodes are mobile, exercising the protocols under topological change.
 
-The radio configuration corresponds to the \texttt{LONG\_FAST} preset on the EU~868 band: SF11, 250~kHz bandwidth and coding rate 4/5, yielding a time-on-air of approximately 550~ms per packet; transmit power is 27~dBm and receiver sensitivity $-131.5$~dBm. Path loss follows the 3GPP Suburban Macro model (Model~5), which produces realistic link ranges of roughly 1.8~km in this configuration. Two refinements increase realism: log-normal shadowing and per-link asymmetric gain offsets (normally distributed, $\sigma = 3$~dB), so that link quality differs between directions, as observed in real LoRa deployments~\cite{cattani2017reliability}. The hop limit is fixed at 3, matching the Meshtastic default.
+A part from this, the radio configuration corresponds to the \texttt{LONG\_FAST} preset on the EU~868 band: SF11, 250~kHz bandwidth and coding rate 4/5, yielding a time-on-air of approximately 550~ms per packet; transmit power is 27~dBm and receiver sensitivity $-131.5$~dBm. Path loss follows the 3GPP Suburban Macro model (Model~5), which produces realistic link ranges of roughly 1.8~km in this configuration. Two refinements increase realism: log-normal shadowing and per-link asymmetric gain offsets (normally distributed, $\sigma = 3$~dB), so that link quality differs between directions, as observed in real LoRa deployments~\cite{cattani2017reliability}. The hop limit is fixed at 3, matching the Meshtastic default.
 
 
 \subsection{Randomness and Reproducibility}
  
-Every stochastic element of the simulation---node placement, traffic generation, link asymmetries, mobility and the gossip coin flips themselves---derives from explicitly seeded pseudo-random generators. Each repetition of a scenario uses a distinct, documented seed (0--29), and node positions are pre-generated and cached per seed, so that all routing algorithms are evaluated on \emph{exactly} the same sequence of topologies. This pairing eliminates topology variance from inter-algorithm comparisons and makes every result in this chapter exactly reproducible from the configuration files listed in Appendix~E.
+Every stochastic element of the simulation---node placement, traffic generation, link asymmetries, mobility and the gossip coin flips themselves---derives from explicitly seeded pseudo-random generators. Each repetition of a scenario uses a distinct, documented seed (0--29), and node positions are pre-generated and cached per seed, so that all routing algorithms are evaluated on \emph{exactly} the same sequence of topologies. What is more, this pairing eliminates topology variance from inter-algorithm comparisons and makes every result in this chapter exactly reproducible from the configuration files listed in Appendix~E.
 
 \section{Evaluated Routing Strategies}
+\label{sec:sim_strategies}
 
 The design of the final algorithm proceeded incrementally: a sequence of forwarding strategies of increasing sophistication was implemented and evaluated, each addressing a weakness identified in its predecessor. This section describes the progression conceptually; quantitative results are deferred to Section~\ref{sec:sim_results}.
 
@@ -747,13 +748,16 @@ Pure flooding is the natural baseline: every node retransmits every packet it ha
 % Explain:
 % - Random forwarding probability
 % - Trade-offs
-The first refinement replaces the deterministic rebroadcast with a Bernoulli trial: each node forwards a new packet with fixed probability $p$ and stays silent otherwise, following the classical gossip scheme of Haas et al.~\cite{haas2006gossip}. Simulation confirmed the bimodal behaviour predicted by the theory: above a critical probability, coverage approaches that of flooding at a fraction of the transmissions. The scheme's weakness is equally clear: no single value of $p$ suits all regions of a heterogeneous network. A probability low enough to relieve congestion in dense clusters causes premature die-out in sparse areas, where a silent node may be the only bridge between partitions; a probability high enough to protect sparse areas forfeits most of the savings in dense ones. The optimal $p$ is, in short, a \emph{local} quantity---which motivates making the decision adaptive.
+The first refinement replaces the deterministic rebroadcast with a Bernoulli trial: each node forwards a new packet with fixed probability $p$ and stays silent otherwise, following the classical gossip scheme of Haas et al.~\cite{haas2006gossip}. After simulation, several values of $p$ were tested, and the scheme's weakness is equally clear: no single value of $p$ suits all regions of a heterogeneous network. Therefore, a probability low enough to relieve congestion in dense clusters causes premature die-out in sparse areas, where a silent node may be the only bridge between partitions; a probability high enough to protect sparse areas forfeits most of the savings in dense ones. Consequently, the optimal $p$ is, in short, a \emph{local} quantity---which motivates making the decision adaptive.
 
+This routing logic is defined as \emph{GOSSIP0N} in the simulator, where N value is represented between 2 and 8, related to the values of $p$ tested.
 \subsection{RSSI-Aware Gossip}
 % Explain:
 % - Link quality usage
-% - Distance estimation logic
 The second refinement modulates the forwarding probability with the received signal strength of the incoming packet. The intuition exploits a geometric fact of broadcast propagation: a packet received weakly arrives from far away, meaning the receiver lies near the edge of the transmitter's coverage area and is precisely the kind of node that extends the packet's reach furthest if it relays; conversely, a packet received strongly comes from a nearby transmitter whose coverage area largely overlaps the receiver's, making a relay largely redundant. RSSI thus acts as a zero-cost proxy for geographic progress, an idea well established in WSN and LPWAN routing~\cite{senel2011relay,cattani2017reliability}. This strategy concentrates retransmissions at the periphery of each broadcast wave, improving the usefulness of each transmission, but it remains blind to how many \emph{other} candidates surround the receiver.
+
+This routing logic is defined as \emph{RSSI\_BASED} in the simulator.
+
 
 \subsection{Density-Aware Gossip}
 % Explain:
@@ -762,6 +766,8 @@ The second refinement modulates the forwarding probability with the received sig
 The third refinement addresses exactly that blindness: the forwarding probability is made inversely dependent on the number of neighbors a node currently observes, following the neighbor-knowledge principle of Tseng et al.~\cite{tseng2002broadcast}. A node surrounded by many peers can afford to stay silent, since the expected number of other relays is high; a node with few neighbors must forward, since it may be an articulation point of the topology. This mechanism attacks the broadcast storm at its root---it decouples the aggregate retransmission count from node density---and proved in simulation to be the single most effective congestion-mitigation ingredient. In isolation, however, it ignores both link quality and the redundancy already observed on the channel.
 
 Each of the three signals---link quality, local density, observed redundancy---thus captures a complementary aspect of the forwarding decision. The natural conclusion is to combine them, which leads to the algorithm at the core of this thesis.
+
+This routing logic is defined as \emph{ADAPTATIVE\_GOSSIP} in the simulator.
 
 
 \section{Smart Gossip Algorithm}
@@ -833,7 +839,8 @@ The node then draws a uniform random number and retransmits if it falls below $p
 \subsection{Behaviour in Representative Scenarios}
  
 Table~\ref{tab:sg_examples} evaluates Equation~\eqref{eq:smartgossip} with the optimised parameters of Section~\ref{sec:sim_optimization} in five representative situations, illustrating how the factors interact. A node at the coverage edge with few neighbors forwards with high probability (0.70); an average node halves that; observed duplicates suppress it further; and well-connected nodes near the transmitter fall to the floor, retransmitting only 11\% of the time.
- 
+
+% Check again that values are correct
 \begin{table}[htbp]
     \centering
     \caption{Smart Gossip forwarding probability in representative scenarios (optimised parameters).}
@@ -878,16 +885,16 @@ Table~\ref{tab:sg_examples} evaluates Equation~\eqref{eq:smartgossip} with the o
 
 \subsection{Why Manual Tuning Is Insufficient}
  
-Equation~\eqref{eq:smartgossip} introduces five free parameters: $\theta = (\alpha, \mathrm{RSSI}_{\text{ref}}, \beta, \gamma, p_{\text{floor}})$. Their effects are strongly coupled---a steeper sigmoid changes the operating point at which the density factor matters, the duplicate penalty interacts with the floor---so tuning them one at a time is methodologically unsound. Exhaustive search fares no better: a modest grid of ten values per dimension yields $10^5$ combinations, each requiring multiple full network simulations to average out stochastic noise; at roughly a minute per evaluation, such a sweep would take months. Finally, the objective surface is non-convex and \emph{noisy}, since every evaluation is itself a random experiment, which rules out gradient-based methods. The problem calls for a derivative-free global optimiser that is sample-efficient in moderate dimensions.
+Equation~\eqref{eq:smartgossip} introduces five free parameters: $\theta = (\alpha, \mathrm{RSSI}_{\text{ref}}, \beta, \gamma, p_{\text{floor}})$. Owing to their effects are strongly coupled---a steeper sigmoid changes the operating point at which the density factor matters, the duplicate penalty interacts with the floor---so tuning them one at a time is methodologically unsound. Also, exhaustive search fares no better: a modest grid of ten values per dimension yields $10^5$ combinations, each requiring multiple full network simulations to average out stochastic noise. Finally, the objective surface is non-convex and \emph{noisy}, since every evaluation is itself a random experiment, which rules out gradient-based methods. The problem calls for a derivative-free global optimiser that is sample-efficient in moderate dimensions.
  
 \subsection{Differential Evolution}
  
-Differential evolution (DE)~\cite{storn1997de} satisfies these requirements and was adopted through its \texttt{scipy.optimize} implementation. DE maintains a population of candidate parameter vectors and evolves it through three operators. \emph{Mutation} creates, for each individual $\mathbf{x}_i$, a mutant vector from three distinct randomly chosen members of the population,
+Differential evolution (DE)~\cite{storn1997de,price2005de} satisfies these requirements and was adopted through its \texttt{scipy.optimize} implementation~\cite{virtanen2020scipy}. DE maintains a population of candidate parameter vectors and evolves it through three operators. \emph{Mutation} creates, for each individual $\mathbf{x}_i$, a mutant vector from three distinct randomly chosen members of the population,
 \begin{equation}
     \mathbf{v}_i = \mathbf{x}_a + F \cdot (\mathbf{x}_b - \mathbf{x}_c),
     \label{eq:de_mutation}
 \end{equation}
-where the differential weight $F$ was dithered in $[0.5, 1.0]$ to balance exploration and convergence. \emph{Crossover} then mixes $\mathbf{v}_i$ with $\mathbf{x}_i$ coordinate-wise with recombination probability 0.7, producing a trial vector. \emph{Selection} is greedy: the trial replaces $\mathbf{x}_i$ in the next generation only if it achieves a better fitness. Because mutation step sizes derive from the population's own spread, DE self-adapts its search scale, behaving exploratively while the population is dispersed and refining once it concentrates around an optimum---a property well suited to noisy, non-convex landscapes.
+where the differential weight $F$ was dithered in $[0.5, 1.0]$ to balance exploration and convergence~\cite{price2005de}. \emph{Crossover} then mixes $\mathbf{v}_i$ with $\mathbf{x}_i$ coordinate-wise with recombination probability 0.7, producing a trial vector. \emph{Selection} is greedy: the trial replaces $\mathbf{x}_i$ in the next generation only if it achieves a better fitness. Because mutation step sizes derive from the population's own spread, DE self-adapts its search scale, behaving exploratively while the population is dispersed and refining once it concentrates around an optimum---a property well suited to noisy, non-convex landscapes~\cite{das2011de}.
  
 \subsection{Fitness Function and Configuration}
  
@@ -897,16 +904,8 @@ Each candidate $\theta$ is evaluated by running full network simulations at size
     \label{eq:fitness}
 \end{equation}
 where $\overline{\text{reach}}$ is the mean reachability, $\overline{\text{useful}}$ the mean usefulness, $\overline{\text{col}}$ the mean collision rate (all in \%) and $\overline{\text{tx}}$ the mean per-node transmission airtime normalised to a comparable scale. The weights encode the design intent: coverage and channel efficiency are rewarded equally and dominantly, while collisions and raw airtime act as soft penalties. The search ranges of the five parameters (Table~\ref{tab:sg_params}) were chosen generously around physically meaningful values. The optimisation converged after approximately 160 fitness evaluations, completing in under ten minutes of computation---itself a demonstration of why the exploration had to be conducted in simulation.
- 
-% --- FIGURE PLACEHOLDER -------------------------------------
-\begin{figure}[htbp]
-    \centering
-    % \includegraphics[width=\textwidth]{figures/de_convergence.pdf}
-    \caption{Evolution of the best fitness value per generation (left) and convergence of the five parameters towards their final values (right).}
-    \label{fig:de_convergence}
-\end{figure}
-% ------------------------------------------------------------
- 
+
+
 \subsection{Limitations of the Optimization}
  
 Three limitations of this process must be acknowledged. First, to keep the campaign tractable, each fitness evaluation averaged over a small number of repetitions, so the optimum is estimated under residual noise; a larger budget would yield a more robust optimum. Second, fitness was evaluated only at 15 and 30 nodes; including the extremes (5 and 50) might have shifted the optimum towards higher coverage in small networks. Third, Equation~\eqref{eq:fitness} does not impose a hard reachability constraint, which explains the coverage deficit observed in the smallest networks in Section~\ref{sec:sim_results}. These limitations delimit the validity of the chosen parameters and directly motivate the future-work directions of Chapter~\ref{ch:conclusions}.
@@ -950,8 +949,6 @@ The final evaluation campaign compared Smart Gossip, with the optimised paramete
  
 \begin{table}[htbp]
     \centering
-    \caption{Reachability (\%), mean $\pm$ standard deviation over 30 repetitions.}
-    \label{tab:res_reach}
     \begin{tabular}{rcccc}
         \hline
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
@@ -962,12 +959,13 @@ The final evaluation campaign compared Smart Gossip, with the optimised paramete
         50 & $29.3 \pm 4.1$  & $33.8 \pm 3.0$  & $-4.5$ pp  & $-13.4\%$ \\
         \hline
     \end{tabular}
+    \caption{Reachability (\%), mean $\pm$ standard deviation over 30 repetitions.}
+    \label{tab:res_reach}
 \end{table}
  
 \begin{table}[htbp]
     \centering
-    \caption{Collision rate (\%), mean $\pm$ standard deviation over 30 repetitions.}
-    \label{tab:res_col}
+
     \begin{tabular}{rcccc}
         \hline
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
@@ -978,12 +976,12 @@ The final evaluation campaign compared Smart Gossip, with the optimised paramete
         50 & $20.6 \pm 2.4$ & $19.1 \pm 2.3$ & $+1.5$ pp & $+7.9\%$ \\
         \hline
     \end{tabular}
+    \caption{Collision rate (\%), mean $\pm$ standard deviation over 30 repetitions.}
+    \label{tab:res_col}
 \end{table}
  
 \begin{table}[htbp]
     \centering
-    \caption{Usefulness (\%), mean $\pm$ standard deviation over 30 repetitions.}
-    \label{tab:res_useful}
     \begin{tabular}{rcccc}
         \hline
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
@@ -994,12 +992,12 @@ The final evaluation campaign compared Smart Gossip, with the optimised paramete
         50 & $49.9 \pm 2.3$ & $45.2 \pm 2.4$ & $+4.8$ pp & $+10.6\%$ \\
         \hline
     \end{tabular}
+    \caption{Usefulness (\%), mean $\pm$ standard deviation over 30 repetitions.}
+    \label{tab:res_useful}
 \end{table}
  
 \begin{table}[htbp]
     \centering
-    \caption{Per-node transmission air utilization (ms), mean $\pm$ standard deviation over 30 repetitions.}
-    \label{tab:res_txair}
     \begin{tabular}{rcccc}
         \hline
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
@@ -1010,12 +1008,12 @@ The final evaluation campaign compared Smart Gossip, with the optimised paramete
         50 & $79\,802 \pm 2\,479$ & $109\,958 \pm 7\,701$ & $-30\,156$ & $-27.4\%$ \\
         \hline
     \end{tabular}
+    \caption{Per-node transmission air utilization (ms), mean $\pm$ standard deviation over 30 repetitions.}
+    \label{tab:res_txair}
 \end{table}
  
 \begin{table}[htbp]
     \centering
-    \caption{Average end-to-end delay (ms), mean $\pm$ standard deviation over 30 repetitions.}
-    \label{tab:res_delay}
     \begin{tabular}{rcccc}
         \hline
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
@@ -1026,6 +1024,8 @@ The final evaluation campaign compared Smart Gossip, with the optimised paramete
         50 & $27\,112 \pm 16\,709$ & $160\,440 \pm 50\,484$  & $-133\,328$  & $-83.1\%$ \\
         \hline
     \end{tabular}
+    \caption{Average end-to-end delay (ms), mean $\pm$ standard deviation over 30 repetitions.}
+    \label{tab:res_delay}
 \end{table}
  
 \subsection{Channel Efficiency}
@@ -1053,8 +1053,6 @@ The weighting differs slightly from the optimisation fitness of Equation~\eqref{
  
 \begin{table}[htbp]
     \centering
-    \caption{Composite score (Equation~\eqref{eq:composite}) per network size.}
-    \label{tab:res_score}
     \begin{tabular}{rcccc}
         \hline
         Nodes & Smart Gossip & Managed Flood & Winner & Margin \\
@@ -1065,6 +1063,8 @@ The weighting differs slightly from the optimisation fitness of Equation~\eqref{
         50 & \textbf{12.65} & 8.28  & SG & $+4.38$ \\
         \hline
     \end{tabular}
+    \caption{Composite score (Equation~\eqref{eq:composite}) per network size.}
+    \label{tab:res_score}
 \end{table}
  
 In summary, the simulations demonstrate that Smart Gossip delivers comparable information dissemination at a 27--32\% lower channel and energy cost, while avoiding the congestion collapse that renders flooding-based forwarding unusable---delays beyond a minute---at the network sizes the system is designed to scale to.
@@ -1080,8 +1080,6 @@ Table~\ref{tab:sg_params} lists the parameter values produced by the optimisatio
  
 \begin{table}[htbp]
     \centering
-    \caption{Optimised Smart Gossip parameters, search ranges and physical interpretation.}
-    \label{tab:sg_params}
     \begin{tabular}{llccl}
         \hline
         Parameter & Symbol & Value & Search range & Interpretation \\
@@ -1090,9 +1088,11 @@ Table~\ref{tab:sg_params} lists the parameter values produced by the optimisatio
         RSSI inflection point  & $\mathrm{RSSI}_{\text{ref}}$ & $-103.8$~dBm & $[-120,\,-80]$ & ${\sim}600$--$800$~m in the 3GPP model \\
         Density weight         & $\beta$ & $0.146$ & $[0.01,\,0.15]$ & 7 neighbors $\rightarrow f_{\text{density}} \approx 0.49$ \\
         Duplicate penalty      & $\gamma$ & $0.311$ & $[0.10,\,0.60]$ & each extra copy reduces $p$ by ${\sim}27\%$ \\
-        Probability floor      & $p_{\text{floor}}$ & $0.111$ & $[0.10,\,0.45]$ & guaranteed minimum relay probability \\
+        Probability floor      & $p_{\text{floor}}$ & $0.111$ & $[0.10,\,0.40]$ & guaranteed minimum relay probability \\
         \hline
     \end{tabular}
+    \caption{Optimised Smart Gossip parameters, search ranges and physical interpretation.}
+    \label{tab:sg_params}
 \end{table}
  
 Each value admits a coherent physical reading, which lends confidence that the optimiser converged to a meaningful operating point rather than a noise artefact. The inflection point of $-103.8$~dBm places the centre of the RSSI transition at roughly 600--800~m under the simulated propagation model---comfortably inside coverage, so that only genuinely close receivers are suppressed. The steepness $\alpha = 0.145$ spreads the transition over approximately 28~dB, wide enough to absorb shadowing fluctuations. The density weight $\beta = 0.146$ halves the forwarding probability at around 7 neighbors, bounding the expected relay count per neighborhood near $1/\beta \approx 7$ for very dense regions. The duplicate penalty $\gamma = 0.311$ attenuates each additional overheard copy by roughly 27\%, and the floor of $p_{\text{floor}} = 0.111$ guarantees that even maximally suppressed nodes relay about one packet in nine. Notably, the optimiser drove both $\beta$ towards the top of its search range and $p_{\text{floor}}$ towards the bottom, confirming that in the evaluated regime the dominant lever is aggressive density-based suppression.
@@ -2478,6 +2478,7 @@ Each subsystem directory additionally contains a \texttt{CLAUDE.md} file that do
 % TARGET: 3-4 pages
 
 \chapter{Conclusions and Future Work}
+\label{ch:conclusions}
 
 \section{Achieved Objectives}
 % Revisit objectives
