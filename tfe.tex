@@ -1801,48 +1801,35 @@ distance-aware relay selection studied in~\cite{senel2011relay}:
 
 The mesh layer maintains a neighbour table of up to \texttt{MAX\_NEIGHBORS}~$= 10$
 entries, each recording the 32-bit node identifier, the most recently observed RSSI,
-and the timestamp of the latest reception. Entries expire after
+and the timestamp of the latest reception; entries expire after
 \texttt{NODE\_TIMEOUT}~$= 180$\,s of silence.
 
-Beacons are injected by \texttt{vSendDiscoveryTask} on Core~0. The task wakes
-every \texttt{DISCOVERY\_INTERVAL\_MS}~$= 30$\,s plus a uniformly distributed
-random offset of up to 10\,s. The random offset desynchronises simultaneous
-power-ons and reduces systematic collisions between concurrent DISCOVERY
-transmissions from neighbouring nodes. Each beacon carries
-\texttt{ttl}~$= \texttt{MIN\_TTL}~= 1$, restricting propagation to a single hop so
-that the table reflects only directly reachable nodes. On reception, the validate
-state updates the neighbour entry; if the node is new,
-\texttt{k\_rx\_process\_discovery} posts a \texttt{+DISC=\tcmp{id}} notification to
-\texttt{xBLETxQueue} to inform the companion application.
+\texttt{vSendDiscoveryTask} injects beacons, waking every
+\texttt{DISCOVERY\_INTERVAL\_MS}~$= 30$\,s plus a random offset of up to 10\,s,
+which desynchronises simultaneous power-ons and reduces collisions between
+concurrent DISCOVERY transmissions from neighbouring nodes. Each beacon carries
+\texttt{ttl}~$= \texttt{MIN\_TTL}~= 1$, limiting propagation to a single hop so that
+the table reflects only directly reachable nodes. On reception, the validate state
+updates the corresponding entry; if the node is new, \texttt{k\_rx\_process\_discovery}
+also posts a \texttt{+DISC=\tcmp{id}} notification to \texttt{xBLETxQueue} to inform
+the companion application.
 
-Stale entries are evicted by \texttt{vNeighborCheckTask}, which runs on Core~0 using
+Stale entries are evicted by \texttt{vNeighborCheckTask}, which uses
 \texttt{vTaskDelayUntil()} for drift-free periodicity at a wakeup interval of
-$\texttt{NODE\_TIMEOUT} / 10$\,ms. The eviction function
-\texttt{rm\_tout\_neigbhors()} applies swap-last deletion---overwriting the expired
-slot with the last table entry---to complete in O(1) time without shifting the array.
+$\texttt{NODE\_TIMEOUT} / 10$\,ms. Its eviction function \texttt{rm\_tout\_neigbhors()}
+applies swap-last deletion---overwriting the expired slot with the last table
+entry---completing in O(1) time without shifting the array.
 
 \subsection{Smart Gossip Integration}
 \label{sec:fw_smartgossip}
 
 The forwarding probability is computed by \texttt{gossip\_forward\_probability()},
 the firmware implementation of the algorithm described in
-Chapter~\ref{ch:simulation}. The function evaluates three multiplicative factors
-derived from real-time network observations:
-\begin{align}
-    f_{\mathrm{RSSI}}    &= \frac{1}{1 + e^{\,\alpha\,(\mathrm{RSSI} - \mathrm{RSSI}_{\mathrm{ref}})}} \\
-    f_{\mathrm{density}} &= \frac{1}{1 + \beta\, n} \\
-    f_{\mathrm{dupe}}    &= e^{-\gamma\,(c - 1)} \\
-    p                    &= \max\!\left(p_{\mathrm{floor}},\;
-                              f_{\mathrm{RSSI}} \cdot f_{\mathrm{density}} \cdot f_{\mathrm{dupe}}\right)
-\end{align}
-where $n$ is the neighbour count at the moment of the forwarding decision and $c$ is
-the copy count from the duplicate cache. The compiled parameter values,
-$\alpha = 0.145$\,dBm$^{-1}$, $\mathrm{RSSI}_{\mathrm{ref}} = -103.8$\,dBm,
-$\beta = 0.146$, $\gamma = 0.311$, and $p_{\mathrm{floor}} = 0.111$, correspond to
+Chapter~\ref{ch:simulation} using the compiled parameter values that correspond to
 the differential evolution optimum and are embedded as compile-time constants in
-\texttt{config.h}.
+\texttt{config.h}, that returns a fixed-point percentage.
 
-The function returns a fixed-point percentage. The forwarding decision in
+Apart from this, the forwarding decision in
 \texttt{should\_forward()} draws a uniform random integer from
 \texttt{esp\_random()}\,\%\,100 and forwards if it falls below the threshold.
 \texttt{esp\_random()} reads the ESP32 hardware random number generator, which is
@@ -1850,74 +1837,57 @@ continuously seeded from RF thermal noise when the BLE radio is
 active~\cite{espressif2023esp32trm}, providing statistically independent draws
 without the sequential correlations of a software PRNG.
 
-A demonstration mode, toggled via \texttt{AT+DEMO=1}, replaces the optimised
-parameters with near-unity values ($p_{\mathrm{floor}} = 0.95$, $\alpha = 0.03$,
-$\beta = 0.05$, $\gamma = 0.05$), causing the node to behave as a pure flood relay
-suitable for live demonstrations where delivery reliability outweighs channel
-efficiency. The mode flag is a \texttt{std::atomic} boolean to avoid mutex overhead
-on the forwarding hot path.
+% A demonstration mode, toggled via \texttt{AT+DEMO=1}, replaces the optimised
+% parameters with near-unity values ($p_{\mathrm{floor}} = 0.95$, $\alpha = 0.03$,
+% $\beta = 0.05$, $\gamma = 0.05$), causing the node to behave as a pure flood relay
+% suitable for live demonstrations where delivery reliability outweighs channel
+% efficiency. The mode flag is a \texttt{std::atomic} boolean to avoid mutex overhead
+% on the forwarding hot path.
 
 \subsection{Duplicate Detection and Passive ACK Suppression}
 \label{sec:fw_passive_ack}
 
-\textbf{Duplicate detection.}
+\paragraph{Duplicate detection.}
 The duplicate cache stores up to \texttt{DUP\_CACHE\_SIZE}~$= 50$ entries, each
 keyed by the (\texttt{pkt\_id},~\texttt{src}) pair and carrying a copy count $c$ and
-a reception timestamp. Entries expire after \texttt{DUP\_TIMEOUT}~$= 30$\,s; when
-the cache is full and a new entry is required, the least-recently-used entry is
-evicted. The copy count fed into $f_{\mathrm{dupe}}$ is read before the forwarding
-probability is evaluated, so the probability decays monotonically as additional relay
-paths deliver copies of the same message, naturally throttling rebroadcast in well-
-connected regions.
+a reception timestamp; entries expire after \texttt{DUP\_TIMEOUT}~$= 30$\,s, and
+once the cache is full, a new entry evicts the least-recently-used one. Since the
+copy count fed into $f_{\mathrm{dupe}}$ is read before the forwarding probability is
+evaluated, that probability decays monotonically as additional relay paths deliver
+copies of the same message, naturally throttling rebroadcast in well-connected
+regions.
 
-\textbf{Passive ACK suppression.}
-When the state machine transitions to \texttt{k\_rx\_forward}, it registers a
-\texttt{PendingForward} record via \texttt{mesh\_register\_pending\_forward()} before
-posting the \texttt{tx\_LoRa\_msg\_t} descriptor to \texttt{xLoRaTxQueue}. The record
-holds the packet identifier and an \texttt{active} boolean initialised to
-\texttt{true}. If, during the jitter delay, the same message arrives again from a
-neighbour that forwarded it independently, the validate state calls
-\texttt{cancel\_pending\_forward()}, setting \texttt{active} to \texttt{false}. When
-\texttt{vLoRaTxTask} calls \texttt{mesh\_consume\_pending\_forward()} after the delay,
-it finds the record inactive and discards the descriptor without transmitting,
-eliminating a redundant on-air copy with no explicit coordination between
-nodes (Figure~\ref{fig:fw_passive_ack}).
+\paragraph{Passive ACK suppression.}
+When the state machine transitions to \texttt{k\_rx\_forward}, it calls
+\texttt{mesh\_register\_pending\_forward()} to insert a \texttt{PendingForward}
+record---holding the packet identifier and an \texttt{active} boolean initialised to
+\texttt{true}---into a mutex-protected table of up to
+\texttt{MAX\_PENDING\_FORWARDS}~$= 8$ entries, before posting the
+\texttt{tx\_LoRa\_msg\_t} descriptor to \texttt{xLoRaTxQueue}. If, during the jitter
+delay, the same message arrives again from a neighbour that forwarded it
+independently, the validate state calls \texttt{cancel\_pending\_forward()},
+clearing \texttt{active}; when \texttt{vLoRaTxTask} later calls
+\texttt{mesh\_consume\_pending\_forward()}, it then finds the record inactive and
+discards the descriptor without transmitting---eliminating a redundant on-air copy
+with no explicit coordination between nodes as illustrated in Figure~\ref{fig:fw_passive_ack}.
 
-% --- FIGURE PLACEHOLDER ---------------------------------------------------
-\begin{figure}[htbp]
-    \centering
-    % \includegraphics[width=\textwidth]{figures/fw_passive_ack_sequence.pdf}
-    \caption{Passive ACK suppression sequence. After registering a pending forward
-    and entering the jitter delay (left), a node that overhears a neighbour
-    retransmitting the same packet (centre) cancels its own scheduled transmission
-    (right), saving one on-air packet per message traversal.}
-    \label{fig:fw_passive_ack}
-\end{figure}
-% --------------------------------------------------------------------------
-
-The pending-forward table holds up to \texttt{MAX\_PENDING\_FORWARDS}~$= 8$ records
-and is protected by a FreeRTOS mutex. The three C-linkage wrappers in
-\texttt{PassiveACK.h}---\texttt{mesh\_register\_pending\_forward},
-\texttt{mesh\_cancel\_pending\_forward}, and
-\texttt{mesh\_consume\_pending\_forward}---allow \texttt{vLoRaTxTask}, which lives in
-the \texttt{lora} library directory, to call into the mesh layer without introducing
-a header dependency cycle between the two PlatformIO library directories.
+\img{images/passive_ack_sequence_diagram.png}{Passive ACK suppression sequence-diagram.}{0.85}{fw_passive_ack}
 
 \subsection{TTL and Loop Prevention}
 \label{sec:fw_ttl}
 
 Network loops are controlled by two independent mechanisms. At the packet level,
-every forwarding node decrements the TTL field by one; when it reaches zero the frame
-is discarded at \texttt{k\_rx\_validate} before any duplicate-cache update.
-With \texttt{MAX\_TTL}~$= 5$, the propagation diameter is bounded at five hops for
-any single transmission event.
+every forwarding node decrements the TTL field by one, and once it reaches zero the
+frame is discarded at \texttt{k\_rx\_validate} before any duplicate-cache update;
+with \texttt{MAX\_TTL}~$= 5$, this bounds the propagation diameter to five hops per
+transmission event.
 
-At the message level, the duplicate cache provides a complementary bound. Even if a
+At the message level, the duplicate cache provides a complementary bound: even if a
 packet re-enters a previously visited node through an unexpected cycle, the cache
-increments its copy count; once the count exceeds \texttt{GOSSIP\_MAX\_COPIES}~$= 3$,
-the packet is dropped unconditionally. The two limits interact to bound the
-worst-case replication factor of any message to at most $3 \times 5 = 15$ on-air
-copies within its 30-second cache lifetime.
+increments its copy count, and once that count exceeds
+\texttt{GOSSIP\_MAX\_COPIES}~$= 3$, the packet is dropped unconditionally. Together,
+the two limits bound the worst-case replication factor of any message to at most
+$3 \times 5 = 15$ on-air copies within its 30-second cache lifetime.
 
 
 \section{System Services Layer}
@@ -1947,17 +1917,17 @@ safeguard independent of firmware state.
 
 Each node derives its 32-bit identifier deterministically from the factory-programmed
 six-byte Bluetooth MAC address using the FNV-1a non-cryptographic hash
-function~\cite{eastlake2011fnv}. The computation proceeds iteratively:
-$h_0 = \mathrm{FNV\_OFFSET\_BASIS}$, and for $i = 0, \ldots, 5$:
+function~\cite{eastlake2011fnv}, computed iteratively as
+$h_0 = \mathrm{FNV\_OFFSET\_BASIS}$ and, for $i = 0, \ldots, 5$:
 \[
     h_{i+1} = \bigl(h_i \oplus \mathrm{MAC}[i]\bigr) \times \mathrm{FNV\_PRIME}
     \pmod{2^{32}}
 \]
-with $\mathrm{ID} = h_6$. Because all six MAC bytes are folded into the accumulator
+with $\mathrm{ID} = h_6$. Since all six MAC bytes are folded into the accumulator
 before the final multiplication, the 32-bit output is sensitive to the full MAC
-address while remaining negligibly cheap to compute at boot time. The identifier is
-invariant across firmware updates and power cycles, enabling peer devices and the
-duplicate cache to maintain consistent state without manual reconfiguration.
+address while remaining negligibly cheap to compute at boot time, and because it
+stays invariant across firmware updates and power cycles, peer devices and the
+duplicate cache can maintain consistent state without manual reconfiguration.
 
 
 \section{Application and Interface Layer}
