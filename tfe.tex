@@ -1485,12 +1485,7 @@ Furthermore, the BOM was compiled with LCSC part numbers so that JLCPCB could so
 \chapter{Firmware Architecture and Implementation}
 \label{ch:firmware}
 
-The firmware constitutes the software foundation of each A3MESH node. Running on the
-ESP32-WROOM-32UE's dual-core Xtensa~LX6 processor under
-FreeRTOS~\cite{freertos2024,espressif2023espidf}, it translates the hardware
-capabilities described in Chapter~\ref{ch:hardware} into the mesh forwarding behaviour
-characterised in Chapter~\ref{ch:simulation}. This chapter describes the design
-philosophy, the layered decomposition, and the concrete implementation of each
+This chapter describes the design philosophy, the layered decomposition, and the concrete implementation of each
 subsystem, drawing directly from the \texttt{tfg\_firmware/firmware} PlatformIO
 project.
 
@@ -1501,38 +1496,38 @@ project.
 Three principles govern the design of the A3MESH firmware: strict layer separation,
 non-blocking interrupt handling, and static memory allocation.
 
-\textbf{Strict layer separation} means that each software layer communicates with
+\paragraph{Strict layer separation.} Each software layer communicates with
 adjacent layers exclusively through FreeRTOS queues; no layer directly invokes
 functions from a non-adjacent layer. The sole deliberate exception is the C-linkage
 wrapper in \texttt{PassiveACK.h}, which allows the LoRa transmit task---residing in
 the \texttt{lora} PlatformIO library directory---to call into the mesh layer without
 creating a circular header dependency between library directories.
 
-\textbf{Non-blocking interrupt handling} follows the deferred-processing pattern
-standard in FreeRTOS embedded designs~\cite{freertos2024}. The SX1276's DIO0 pin
+\paragraph{Non-blocking interrupt handling.} Follows the deferred-processing pattern
+standard in FreeRTOS embedded designs~\cite{freertos2024}. In particular, the SX1276's DIO0 pin
 asserts on RxDone and triggers an ISR declared \texttt{IRAM\_ATTR}, so that it
-executes from instruction RAM regardless of flash cache state. The ISR does nothing but
-release a binary semaphore and optionally request a context switch; all SPI transfers
+executes from instruction RAM regardless of flash cache state. Especially, the ISR does nothing but
+release a binary semaphore and optionally request a context switch. Apart from that all SPI transfers
 and frame parsing happen in a dedicated high-priority task, ensuring that the radio
 FIFO is emptied before a subsequent preamble can corrupt it.
 
-\textbf{Static memory allocation} eliminates heap fragmentation and non-deterministic
-latency on the critical path. A pool of eight statically allocated frame slots
-accommodates bursts of arriving frames; inter-task transfers pass a 32-bit pointer to
+\paragraph{Static memory allocation.} Eliminates heap fragmentation and non-deterministic
+latency on the critical path. For instance, a pool of eight statically allocated frame slots
+accommodates bursts of arriving frames, then inter-task transfers pass a 32-bit pointer to
 a pool slot rather than copying the payload, reducing queue-transfer overhead to a
-single word. No dynamic allocation occurs on any path between frame reception and
+single word. As a result, no dynamic allocation occurs on any path between frame reception and
 forwarding decision.
 
 
 \section{Layered Architecture}
 \label{sec:fw_layers}
 
-The firmware is decomposed into four horizontal layers. The
-\textbf{Physical Communication Layer} encapsulates the LoRa and BLE radio interfaces.
-The \textbf{Mesh Logic Layer} implements packet validation, duplicate suppression,
-neighbour management, and the Smart Gossip forwarding algorithm. The
-\textbf{System Services Layer} handles regulatory duty-cycle compliance, battery
-state estimation, and periodic housekeeping. The \textbf{Application and Interface
+The firmware is decomposed into four horizontal layers. Firstly, the
+\emph{Physical Communication Layer} encapsulates the LoRa and BLE radio interfaces.
+Secondly, the \emph{Mesh Logic Layer} implements packet validation, duplicate suppression,
+neighbour management, and the Smart Gossip forwarding algorithm. Thirdly, the
+\emph{System Services Layer} handles regulatory duty-cycle compliance, battery
+state estimation, and periodic housekeeping. Finally, the \emph{Application and Interface
 Layer} exposes an AT-command interface over BLE to the companion mobile application
 and manages the bidirectional data pipelines between radio and smartphone.
 
@@ -1542,8 +1537,6 @@ processing (Table~\ref{tab:fw_tasks}).
 
 \begin{table}[htbp]
     \centering
-    \caption{FreeRTOS task inventory. Priority 2 preempts priority 1.}
-    \label{tab:fw_tasks}
     \begin{tabular}{llll}
         \toprule
         \textbf{Task} & \textbf{Core} & \textbf{Prio} & \textbf{Role} \\
@@ -1557,29 +1550,25 @@ processing (Table~\ref{tab:fw_tasks}).
         \texttt{LoRa2BLETask}       & 1 & 1 & Mesh receive state machine \\
         \bottomrule
     \end{tabular}
+    \caption{FreeRTOS task inventory.}
+    \label{tab:fw_tasks}
 \end{table}
 
-Four queues provide all inter-layer communication.
-\texttt{xLoRaRxQueue} carries pointers to pool-allocated frame descriptors from
-the radio ISR handler to the mesh pipeline.
-\texttt{xLoRaTxQueue} carries outbound frame descriptors from the mesh and
-application layers to the radio transmitter.
-\texttt{xBLERxQueue} carries AT-command strings from the BLE stack to the command
-processor.
-\texttt{xBLETxQueue} carries AT response and notification strings from any task
-towards the BLE notification sender.
+Four queues provide all inter-layer communication:
+\begin{itemize}
+    \item \texttt{xLoRaRxQueue} carries pointers to pool-allocated frame descriptors from
+    the radio ISR handler to the mesh pipeline.
+    \item \texttt{xLoRaTxQueue} carries outbound frame descriptors from the mesh and
+    application layers to the radio transmitter.
+    \item \texttt{xBLERxQueue} carries AT-command strings from the BLE stack to the command
+    processor.
+    \item \texttt{xBLETxQueue} carries AT response and notification strings from any task
+    towards the BLE notification sender.
+\end{itemize}
 All queues have a depth of ten items and are statically allocated at initialisation.
 
-% --- FIGURE PLACEHOLDER ---------------------------------------------------
-\begin{figure}[htbp]
-    \centering
-    % \includegraphics[width=0.85\textwidth]{figures/fw_stack_diagram.pdf}
-    \caption{Firmware layer diagram. Four horizontal layers communicate through four
-    FreeRTOS queues. Core~0 (left) hosts the radio tasks; Core~1 (right) hosts the BLE
-    and pipeline tasks.}
-    \label{fig:fw_stack}
-\end{figure}
-% --------------------------------------------------------------------------
+
+\img{images/firmware_layered_architecture.png}{Firmware layer diagram.}{0.85}{fw_stack}
 
 
 \section{Physical Communication Layer}
@@ -1597,67 +1586,74 @@ word~0x12, and a preamble of eight symbols. These values yield a raw data rate o
 approximately 3.1\,kbit/s and a practical ground-level range of several kilometres
 while keeping the time-on-air of a maximum-length frame below one second.
 
-\textbf{Receive path.}
-The SX1276 DIO0 line is connected to GPIO26 and configured as a rising-edge interrupt.
-The ISR \texttt{onLoRaRxIRQ()}, placed in IRAM, calls
-\texttt{xSemaphoreGiveFromISR()} and sets \texttt{xHigherPriorityTaskWoken} if a
-higher-priority task has been unblocked. \texttt{vLoRaRxTask}, running at
-priority~2 on Core~0, blocks indefinitely on the corresponding
-\texttt{xSemaphoreTake()}. Once woken, it calls \texttt{LoRa.parsePacket()} to
-confirm frame availability and obtain its length, allocates a pool slot via
-\texttt{alloc\_frame()} using a volatile round-robin index, reads the payload bytes
-with \texttt{LoRa.readBytes()}, records the RSSI, re-enters continuous-receive mode
-with \texttt{LoRa.receive()}, and posts the pool-slot pointer to
-\texttt{xLoRaRxQueue}. The entire path is zero-copy: the bytes written by the SPI
-driver into the pool slot are the same bytes later consumed by the mesh pipeline.
+\paragraph{Receive path.}
+The SX1276 DIO0 line is connected to GPIO26 and configured as a rising-edge
+interrupt. When it fires, the ISR \texttt{onLoRaRxIRQ()}, placed in IRAM, calls
+\texttt{xSemaphoreGiveFromISR()} and, if this unblocks a higher-priority task,
+sets \texttt{xHigherPriorityTaskWoken} accordingly. This semaphore is what
+\texttt{vLoRaRxTask} is waiting on: running at priority~2 on Core~0, the task
+blocks indefinitely on the corresponding \texttt{xSemaphoreTake()} until the ISR
+wakes it. Once woken, it first calls \texttt{LoRa.parsePacket()} to confirm frame
+availability and obtain its length, then allocates a pool slot via
+\texttt{alloc\_frame()} using a volatile round-robin index~\cite[Ch.~2]{tanenbaum2015modern}, and reads the payload
+bytes with \texttt{LoRa.readBytes()}. Along the way it also records the RSSI,
+before re-entering continuous-receive mode with \texttt{LoRa.receive()} and
+finally posting the pool-slot pointer to \texttt{xLoRaRxQueue}. Throughout this
+path, no copying takes place: the bytes written by the SPI driver into the pool
+slot are the same bytes later consumed by the mesh pipeline.
 
-\textbf{Transmit path.}
-\texttt{vLoRaTxTask} blocks on \texttt{xLoRaTxQueue}. Each dequeued item is a
-\texttt{tx\_LoRa\_msg\_t} descriptor containing the payload bytes, a jitter delay in
-milliseconds, a packet identifier, the original source address, and a forwarding flag.
-The task calls \texttt{vTaskDelay()} for the specified jitter period, creating the
-window during which a passive ACK cancellation may suppress the transmission
-(Section~\ref{sec:fw_passive_ack}). After the delay, it calls
-\texttt{mesh\_consume\_pending\_forward()}: if the forward was cancelled, the
-descriptor is discarded; otherwise \texttt{check\_and\_record\_airtime()} is invoked
-before \texttt{lora.send\_raw\_pkt(data,\,len)}.
+\paragraph{Transmit path.}
+\texttt{vLoRaTxTask} blocks on \texttt{xLoRaTxQueue}, waiting for items to dequeue.
+Each dequeued item is a \texttt{tx\_LoRa\_msg\_t} descriptor containing the payload
+bytes, a jitter delay in milliseconds, a packet identifier, the original source
+address, and a forwarding flag. The task then calls \texttt{vTaskDelay()} for the
+specified jitter period, which in turn creates the window during which a passive
+ACK cancellation may suppress the transmission (Section~\ref{sec:fw_passive_ack}).
+Once this delay elapses, it calls \texttt{mesh\_consume\_pending\_forward()}: if the
+forward has been cancelled in the meantime, the descriptor is simply discarded;
+otherwise, \texttt{check\_and\_record\_airtime()} is invoked first, followed by
+\texttt{lora.send\_raw\_pkt(data,\,len)}.
 
-\textbf{Duty-cycle enforcement.}
-The EU868 general sub-band allows a maximum of 1\,\% on-air time per
-hour~\cite{etsi2020en300220}, or 36\,000\,ms per rolling 3600-second window. The
-driver enforces this limit with a ring buffer of 20 transmission records
-(\texttt{\_airtime\_log}), each entry holding a timestamp and the airtime estimated
-by \texttt{compute\_airtime\_ms(pkt\_len)} for that packet. Before each transmission,
-\texttt{check\_and\_record\_airtime()} sums the airtime of all entries whose
-timestamp falls within the last 3600\,s; if adding the pending packet would push the
-total above 36\,000\,ms, the transmission is blocked silently. The sliding-window
-design avoids the compliance gaps that a fixed-period counter would introduce around
-midnight or after a device restart.
+\paragraph{Duty-cycle enforcement.}
+Under the EU868 general sub-band, the maximum allowed on-air time is 1\,\% per
+hour~\cite{etsi2020en300220}, or equivalently 36\,000\,ms per rolling 3600-second
+window. To enforce this limit, the driver maintains a ring buffer of 20
+transmission records (\texttt{\_airtime\_log}), where each entry holds a timestamp
+together with the airtime estimated by \texttt{compute\_airtime\_ms(pkt\_len)} for
+that packet. Before each transmission, \texttt{check\_and\_record\_airtime()} sums
+the airtime of all entries whose timestamp falls within the last 3600\,s; if adding
+the pending packet would then push the total above 36\,000\,ms, the transmission is
+blocked silently. By design, this sliding window avoids the compliance gaps that a
+fixed-period counter would otherwise introduce around midnight or after a device
+restart.
 
 \subsection{BLE Driver}
 \label{sec:fw_ble_driver}
 
 The BLE driver implements a Nordic UART Service (NUS)-compatible GATT server using
-the ESP-IDF Bluedroid stack~\cite{espressif2023espidf}. A single GATT service hosts
-two characteristics: a TX characteristic with the \textsc{Notify} property, used to
-push data from node to smartphone, and an RX characteristic with the
-\textsc{Write Without Response} property, used by the smartphone to send AT
-commands. This two-characteristic layout is the de facto standard for transparent
-serial emulation over BLE and is natively supported by serial terminal applications
-across Android and iOS~\cite{bluetooth2023core}.
+the ESP-IDF Bluedroid stack~\cite{espressif2023espidf}. In particular, a single
+GATT service hosts two characteristics: a TX characteristic with the
+\textsc{Notify} property, used to push data from node to smartphone, and an RX
+characteristic with the \textsc{Write Without Response} property, used by the
+smartphone to send AT commands. This two-characteristic layout is in fact the
+standard for transparent serial emulation over BLE, and as such is natively
+supported by serial terminal applications across Android and
+iOS~\cite{bluetooth2023core}.
 
-Connection lifecycle is managed by \texttt{ServerCallbacks}: \texttt{onConnect}
-sets the internal \texttt{\_deviceConnected} flag; \texttt{onDisconnect} clears it
-and immediately restarts advertising, so the node is always connectable without a
-reboot. When the smartphone writes to the RX characteristic,
-\texttt{RXCallbacks::onWrite()} copies the received value into a 256-byte buffer
-and posts it to \texttt{xBLERxQueue} via a non-blocking \texttt{xQueueSend}; if the
-queue is full, indicating transient saturation of the command processor, the frame
-is dropped rather than blocking the Bluedroid callback thread. Outbound data travels
-the reverse path: \texttt{vBLETxTask} on Core~1 drains \texttt{xBLETxQueue} and
-calls \texttt{ble.send()} for each dequeued string, issuing a GATT notification to
-the connected peer. Decoupling BLE transmission into a dedicated task prevents
-long notify round trips from stalling time-sensitive state-machine transitions.
+Connection lifecycle, in turn, is managed by \texttt{ServerCallbacks}:
+\texttt{onConnect} sets the internal \texttt{\_deviceConnected} flag, while
+\texttt{onDisconnect} clears it and immediately restarts advertising, so that the
+node remains always connectable without requiring a reboot. When the smartphone
+writes to the RX characteristic, \texttt{RXCallbacks::onWrite()} copies the
+received value into a 256-byte buffer and then posts it to \texttt{xBLERxQueue} via
+a non-blocking \texttt{xQueueSend}; if the queue happens to be full, indicating
+transient saturation of the command processor, the frame is dropped rather than
+blocking the Bluedroid callback thread. Outbound data, meanwhile, travels the
+reverse path: \texttt{vBLETxTask} on Core~1 drains \texttt{xBLETxQueue} and, for
+each dequeued string, calls \texttt{ble.send()}, thereby issuing a GATT
+notification to the connected peer. By decoupling BLE transmission into a
+dedicated task, long notify round trips are prevented from stalling time-sensitive
+state-machine transitions.
 
 \subsection{Packet Encoding}
 \label{sec:fw_packet}
@@ -1665,15 +1661,27 @@ long notify round trips from stalling time-sensitive state-machine transitions.
 Every frame transmitted over the LoRa channel consists of a fixed four-byte
 \texttt{A3MESH\_header\_t} followed by a variable-length \texttt{A3MESH\_packet\_t}.
 The header carries a one-byte protocol version, a one-byte frame type
-(\texttt{a3mesh\_msg\_type\_t}), and a two-byte packet length. The packet structure
-is declared \texttt{\_\_attribute\_\_((packed))} to match the on-wire layout exactly;
-its fields are listed in Table~\ref{tab:fw_packet_fields}.
+(\texttt{a3mesh\_msg\_type\_t}), and a two-byte packet length as shown in Table~\ref{tab:fw_header_fields}, while the packet
+structure itself is declared \texttt{\_\_attribute\_\_((packed))} to match the
+on-wire layout exactly; its fields are listed in Table~\ref{tab:fw_packet_fields}.
 
 \begin{table}[htbp]
     \centering
-    \caption{Fields of the \texttt{A3MESH\_packet\_t} wire structure.
-    Total fixed overhead: 20 bytes, plus 4 bytes for the header.}
-    \label{tab:fw_packet_fields}
+    \begin{tabular}{llp{7cm}}
+        \toprule
+        \textbf{Field} & \textbf{Size} & \textbf{Description} \\
+        \midrule
+        \texttt{version}       & 1\,B & Protocol version identifier. \\
+        \texttt{type}          & 1\,B & Frame type (\texttt{a3mesh\_msg\_type\_t}); determines how the following payload is interpreted. \\
+        \texttt{packet\_length} & 2\,B & Length in bytes of the following \texttt{A3MESH\_packet\_t}. \\
+        \bottomrule
+    \end{tabular}
+    \caption{Fields of the \texttt{A3MESH\_header\_t} wire structure.}
+    \label{tab:fw_header_fields}
+\end{table}
+
+\begin{table}[htbp]
+    \centering
     \begin{tabular}{llp{7cm}}
         \toprule
         \textbf{Field} & \textbf{Size} & \textbf{Description} \\
@@ -1690,25 +1698,33 @@ its fields are listed in Table~\ref{tab:fw_packet_fields}.
         \texttt{payload}      & N\,B & Application data or ciphertext, up to \texttt{A3MESH\_MAX\_PAYLOAD} bytes. \\
         \bottomrule
     \end{tabular}
+    \caption{Fields of the \texttt{A3MESH\_packet\_t} wire structure.}
+    \label{tab:fw_packet_fields}
 \end{table}
 
-The four frame types defined by \texttt{a3mesh\_msg\_type\_t} are
-\texttt{k\_data\_plain} (unencrypted user message),
-\texttt{k\_discovery\_type} (neighbour beacon),
-\texttt{k\_key\_exchange} (in-band key provisioning), and
-\texttt{k\_data\_encrypted} (AES-256-GCM ciphertext; the encryption scope is further
+The four frame types defined by \texttt{a3mesh\_msg\_type\_t} are:
+\begin{itemize}
+    \item \texttt{k\_data\_plain}: unencrypted user message.
+    \item \texttt{k\_discovery\_type}: neighbour beacon.
+    \item \texttt{k\_key\_exchange}: in-band key provisioning.
+    \item \texttt{k\_data\_encrypted}: AES-256-GCM ciphertext; the encryption scope is further
 encoded in the \texttt{type} sub-field as \texttt{a3mesh\_enc\_type\_t}:
-\texttt{k\_enc\_node2node}, \texttt{k\_enc\_group}, or \texttt{k\_enc\_network}).
+    \begin{itemize}
+        \item \texttt{k\_enc\_node2node}: unicast between two nodes
+        \item \texttt{k\_enc\_group}: multicast to a group of nodes sharing the same key
+        \item \texttt{k\_enc\_network}: broadcast to all nodes in the network
+    \end{itemize}
+\end{itemize}
 
-Serialisation is performed by \texttt{A3MESHPacket::serialize\_header\_pkt()}, which
-fills the header's \texttt{packet\_length} field automatically and writes both
-structures into a caller-provided buffer in packed order.
-Deserialisation by \texttt{A3MESHPacket::deserialize\_pkt()} applies four integrity
-checks before accepting a frame: minimum buffer length against \texttt{HEADER\_SIZE},
-buffer length against the declared \texttt{packet\_length}, payload length against
-\texttt{A3MESH\_MAX\_PAYLOAD}, and CRC-16/CCITT verification of the payload. Any
-failing check causes the frame to be discarded without further processing. The node
-identifier used in \texttt{src} and \texttt{node\_id} is derived from the factory
+Serialisation, performed by \texttt{A3MESHPacket::serialize\_header\_pkt()}, fills
+the header's \texttt{packet\_length} field automatically and writes both structures
+into a caller-provided buffer in packed order. Deserialisation, by
+\texttt{A3MESHPacket::deserialize\_pkt()}, applies four integrity checks before
+accepting a frame: minimum buffer length against \texttt{HEADER\_SIZE}, buffer
+length against the declared \texttt{packet\_length}, payload length against
+\texttt{A3MESH\_MAX\_PAYLOAD}, and CRC-16/CCITT verification of the payload; any
+failing check discards the frame without further processing. The node identifier
+used in \texttt{src} and \texttt{node\_id}, in turn, is derived from the factory
 Bluetooth MAC address as described in Section~\ref{sec:fw_identity}.
 
 
@@ -1719,15 +1735,13 @@ Bluetooth MAC address as described in Section~\ref{sec:fw_identity}.
 \label{sec:fw_statemachine}
 
 All received frames are processed by a ten-state explicit finite state machine
-(\texttt{MeshRxState}) running inside \texttt{LoRa2BLETask} on Core~1. Every frame
+(\texttt{MeshRxState}) running inside \texttt{LoRa2BLETask}. Every frame
 traverses exactly one path from \texttt{k\_rx\_idle} to \texttt{k\_rx\_done}; the
 only branching points are the validate, classify, data-process, and forward handlers.
 The states are summarised in Table~\ref{tab:fw_states}.
 
 \begin{table}[htbp]
     \centering
-    \caption{\texttt{MeshRxState} states and their actions.}
-    \label{tab:fw_states}
     \begin{tabular}{lp{9.5cm}}
         \toprule
         \textbf{State} & \textbf{Action} \\
@@ -1744,23 +1758,17 @@ The states are summarised in Table~\ref{tab:fw_states}.
         \texttt{k\_rx\_done}              & Release pool slot; return to \texttt{k\_rx\_idle}. \\
         \bottomrule
     \end{tabular}
+    \caption{\texttt{MeshRxState} states and their actions.}
+    \label{tab:fw_states}
 \end{table}
 
-% --- FIGURE PLACEHOLDER ---------------------------------------------------
-\begin{figure}[htbp]
-    \centering
-    % \includegraphics[width=\textwidth]{figures/fw_rx_statemachine.pdf}
-    \caption{Reception state machine (\texttt{MeshRxState}). Frames that fail
-    validation, exceed the copy limit, or do not meet the forwarding criteria are
-    discarded at the earliest applicable stage.}
-    \label{fig:fw_statemachine}
-\end{figure}
-% --------------------------------------------------------------------------
+\img{images/mesh_rx_state_machine.png}{Reception state machine diagram.}{1}{fw_rx_sm}
 
-At \texttt{k\_rx\_validate}, four guards are applied in order. A self-source filter
-drops any frame whose \texttt{src} matches the local node ID, preventing a node
-from processing its own transmissions returning via a relay. A TTL check discards
-frames with \texttt{ttl}~$= 0$. The duplicate cache is then consulted via
+\paragraph{Packet validation.}
+First, at \texttt{k\_rx\_validate}, four guards are applied in order: a self-source filter
+which drops any frame whose \texttt{src} matches the local node ID, preventing a node
+from processing its own transmissions returning via a relay. Then, a TTL check discards
+frames with \texttt{ttl}~$= 0$. Next, the duplicate cache is then consulted via
 \texttt{get\_copies()}: if the (\texttt{pkt\_id},~\texttt{src}) pair has been seen
 more than \texttt{GOSSIP\_MAX\_COPIES}~$= 3$ times, the frame transitions to
 \texttt{k\_rx\_drop}. Finally, \texttt{cancel\_pending\_forward()} is called
@@ -1769,6 +1777,10 @@ that has already queued a forward of this packet and now observes a neighbour
 retransmitting it cancels its own copy before it reaches the antenna
 (Section~\ref{sec:fw_passive_ack}).
 
+\paragraph{Packet classification.}
+Following validation---at \texttt{k\_rx\_classify}---the state machine branches to one of three handlers based on the \texttt{header.type} field.
+
+\paragraph{Data packet handling.}
 At \texttt{k\_rx\_process\_data}, broadcast and locally-addressed frames proceed to
 \texttt{k\_rx\_local\_delivery} only when \texttt{copies}~$= 1$, preventing the user
 from receiving the same message twice via different relay paths. Frames carrying the
@@ -1778,15 +1790,11 @@ decision.
 
 At \texttt{k\_rx\_forward}, the forwarding node patches \texttt{node\_id} with its
 own identifier and decrements \texttt{ttl} by one. An RSSI-based jitter delay is then
-computed with the linear mapping:
+computed with the linear mapping consistent with the
+distance-aware relay selection studied in~\cite{senel2011relay}:
 \[
     d_{\mathrm{jitter}} = \mathrm{map}(\mathrm{RSSI},\; -120,\; -40,\; 20,\; 200)\;\;\mathrm{[ms]}
 \]
-A node receiving at near-sensitivity RSSI ($-120$\,dBm) waits only 20\,ms before
-retransmitting; one in close proximity ($-40$\,dBm) waits up to 200\,ms. This
-asymmetry gives topologically distant relays---those better positioned to extend the
-propagation front---temporal priority in the rebroadcast race, consistent with the
-distance-aware relay selection studied in~\cite{senel2011relay}.
 
 \subsection{Neighbour Discovery}
 \label{sec:fw_discovery}
