@@ -1938,10 +1938,11 @@ duplicate cache can maintain consistent state without manual reconfiguration.
 
 The companion application communicates with each node through a Hayes-style AT command
 protocol~\cite{itu1999v250} carried over the BLE NUS service. Each command is a
-CRLF-terminated ASCII string; the node responds with zero or more unsolicited result
-lines followed by \texttt{OK} on success or \texttt{ERROR} on failure.
-Table~\ref{tab:fw_at_commands} documents the complete command set implemented in
-\texttt{BLE2LoRaTask}.
+CRLF-terminated ASCII string, and the node replies with zero or more unsolicited result
+lines followed by a final status code: \texttt{+OK} indicates that the command was
+executed successfully, while \texttt{+ERR=n} indicates failure, with the integer
+\texttt{n} identifying the specific error condition. Table~\ref{tab:fw_at_commands}
+documents the complete command set implemented in \texttt{BLE2LoRaTask}.
 
 \begin{table}[htbp]
     \centering
@@ -1951,60 +1952,48 @@ Table~\ref{tab:fw_at_commands} documents the complete command set implemented in
         \toprule
         \textbf{Command} & \textbf{Description} \\
         \midrule
-        \texttt{AT}                              & No-operation; returns \texttt{OK}. Used for connectivity checks. \\
+        \texttt{AT}                              & No-operation; Used for connectivity checks. \\
         \texttt{AT+SEND=\tcmp{msg}}              & Broadcast \texttt{k\_data\_plain} to all reachable nodes. \\
         \texttt{AT+SENDE2E=\tcmp{dst},\tcmp{msg}} & Send AES-256-GCM node-to-node encrypted message to \tcmp{dst}. \\
         \texttt{AT+SENDGRP=\tcmp{msg}}           & Send AES-256-GCM group-encrypted broadcast. \\
         \texttt{AT+SENDNET=\tcmp{msg}}           & Send AES-256-GCM network-encrypted broadcast. \\
         \texttt{AT+SENDKX=\tcmp{dst},\tcmp{key}} & Transmit a \texttt{k\_key\_exchange} packet to provision a remote peer key. \\
-        \texttt{AT+NEIGHBORS?}                  & Return each table entry as \texttt{+NEIGH=\tcmp{id},\tcmp{rssi}}. \\
-        \texttt{AT+NODEID?}                     & Return local node ID as \texttt{+NODEID=\tcmp{id}}. \\
-        \texttt{AT+INFO?}                       & Return battery percentage and last RSSI as \texttt{+INFO=\tcmp{bat},\tcmp{rssi}}. \\
+        \texttt{AT+NEIGHBORS?}                  & Return each neigbhor table entry, together with their RSSI and last seen time. \\
+        \texttt{AT+NODEID?}                     & Return local node ID. \\
+        \texttt{AT+INFO?}                       & Return firmware version, battery percentage, node uptime, LoRa parameters and neighbor count. \\
         \texttt{AT+SETNETKEY=\tcmp{key}}         & Provision the shared network key (hex string). \\
         \texttt{AT+SETPEERKEY=\tcmp{dst},\tcmp{key}} & Provision the node-to-node peer key for destination \tcmp{dst}. \\
         \texttt{AT+SETGRPKEY=\tcmp{key}}         & Provision the group key. \\
         \texttt{AT+CLRKEYS}                     & Erase all provisioned keys from volatile memory. \\
-        \texttt{AT+DEMO=\tcmp{0|1}}              & Enable~(1) or disable~(0) demonstration mode. \\
-        \texttt{AT+DEMO?}                       & Query current demonstration mode state. \\
+        % \texttt{AT+DEMO=\tcmp{0|1}}              & Enable~(1) or disable~(0) demonstration mode. \\
+        % \texttt{AT+DEMO?}                       & Query current demonstration mode state. \\
         \bottomrule
     \end{tabular}
 \end{table}
 
 Unsolicited notifications from node to smartphone follow a parallel naming convention:
-\texttt{+RCV=\tcmp{src},\tcmp{msg}} for received plain messages,
-\texttt{+RCVE2E=\tcmp{src},\tcmp{msg}} for decrypted end-to-end unicast,
-\texttt{+RCVGRP=\tcmp{src},\tcmp{msg}} for decrypted group messages,
-\texttt{+DISC=\tcmp{id}} for newly discovered neighbours, and
-\texttt{+KX=\tcmp{src},\tcmp{key}} for received key-exchange payloads.
+\begin{itemize}
+    \item \texttt{+RCV=\tcmp{src},\tcmp{msg}} for received plain messages.
+    \item \texttt{+RCVE2E=\tcmp{src},\tcmp{msg}} for decrypted end-to-end unicast.
+    \item \texttt{+RCVGRP=\tcmp{src},\tcmp{msg}} for decrypted group messages.
+    \item \texttt{+DISC=\tcmp{id}} for newly discovered neighbours.
+    \item \texttt{+KX=\tcmp{src},\tcmp{key}} for received key-exchange payloads.
+\end{itemize}
+
 
 \subsection{BLE-to-LoRa Pipeline}
 \label{sec:fw_ble2lora}
 
-The upstream pipeline carries commands from the smartphone to the radio
-(Figure~\ref{fig:fw_ble2lora}). \texttt{BLE2LoRaTask} on Core~1 blocks on
-\texttt{xBLERxQueue} and performs a prefix match against the command table for each
-received string. Transmission commands construct the appropriate
-\texttt{A3MESH\_header\_t} and \texttt{A3MESH\_packet\_t}, delegate encryption to
-\texttt{CryptoManager} if required, serialise the frame with
-\texttt{A3MESHPacket::serialize\_header\_pkt()}, and post the resulting
-\texttt{tx\_LoRa\_msg\_t} to \texttt{xLoRaTxQueue} with a jitter delay of zero, since
-original transmissions bypass the passive ACK timer entirely. Query commands read from
-the mesh manager, battery driver, or node-ID register and format their responses
-directly into \texttt{xBLETxQueue}. Configuration commands call the appropriate
-\texttt{CryptoManager} setter and return \texttt{OK}; unrecognised commands return
-\texttt{ERROR}.
+On the upstream path, \texttt{BLE2LoRaTask} on Core~1 blocks on \texttt{xBLERxQueue} and,
+for each command received from the smartphone, performs a prefix match against the
+command table from Section~\ref{sec:fw_at} to determine the appropriate action.
+Transmission commands construct and serialise an \texttt{A3MESH\_packet\_t} (delegating
+encryption to \texttt{CryptoManager} when required) before posting it to
+\texttt{xLoRaTxQueue}; query commands read from the mesh manager, battery driver, or
+node-ID register and write their responses directly to \texttt{xBLETxQueue}.
 
-% --- FIGURE PLACEHOLDER ---------------------------------------------------
-\begin{figure}[htbp]
-    \centering
-    % \includegraphics[width=\textwidth]{figures/fw_ble2lora_sequence.pdf}
-    \caption{BLE-to-LoRa sequence diagram. An \texttt{AT+SEND} command written to
-    the BLE RX characteristic traverses \texttt{xBLERxQueue},
-    \texttt{BLE2LoRaTask}, \texttt{xLoRaTxQueue}, and \texttt{vLoRaTxTask} before
-    being transmitted over the radio.}
-    \label{fig:fw_ble2lora}
-\end{figure}
-% --------------------------------------------------------------------------
+
+\img{images/at_sende2e_sequence_diagram_outline.png}{BLE-to-LoRa sequence diagram.}{0.9}{fw_ble2lora}
 
 \subsection{LoRa-to-BLE Pipeline}
 \label{sec:fw_lora2ble}
@@ -2012,30 +2001,20 @@ directly into \texttt{xBLETxQueue}. Configuration commands call the appropriate
 The downstream pipeline carries received mesh traffic to the smartphone
 (Figure~\ref{fig:fw_lora2ble}). A frame arriving over the air triggers the DIO0 ISR,
 which wakes \texttt{vLoRaRxTask}; the task reads the frame into a pool slot and posts
-the pointer to \texttt{xLoRaRxQueue}. \texttt{LoRa2BLETask} dequeues the pointer on
+the pointer to \texttt{xLoRaRxQueue}. \texttt{LoRa2BLETask} then dequeues the pointer on
 Core~1 and drives the reception state machine described in
-Section~\ref{sec:fw_statemachine}. When the machine reaches
-\texttt{k\_rx\_local\_delivery}, the formatted AT notification string is placed on
-\texttt{xBLETxQueue}; \texttt{vBLETxTask} delivers it to the smartphone via a GATT
-notification. When the machine reaches \texttt{k\_rx\_forward}, a
-\texttt{tx\_LoRa\_msg\_t} descriptor is posted to \texttt{xLoRaTxQueue}, re-entering
-the transmit path on Core~0. The two transitions are independent: a packet may
-simultaneously trigger local delivery and a forwarded copy when the destination is
-broadcast and the gossip decision is affirmative.
+Section~\ref{sec:fw_statemachine}. If the destination matches the local node (or the
+packet is broadcast), the machine reaches \texttt{k\_rx\_local\_delivery}: the formatted
+AT notification string is placed on \texttt{xBLETxQueue}, and \texttt{vBLETxTask}
+delivers it to the smartphone via a GATT notification. If the packet must instead be
+relayed, the machine reaches \texttt{k\_rx\_forward}: a \texttt{tx\_LoRa\_msg\_t}
+descriptor is posted to \texttt{xLoRaTxQueue}, re-entering the transmit path on
+Core~0. These two transitions are independent rather than mutually exclusive: a
+broadcast packet with an affirmative gossip decision triggers both local delivery and a
+forwarded copy in the same pass through the state machine.
 
-% --- FIGURE PLACEHOLDER ---------------------------------------------------
-\begin{figure}[htbp]
-    \centering
-    % \includegraphics[width=\textwidth]{figures/fw_lora2ble_sequence.pdf}
-    \caption{LoRa-to-BLE sequence diagram. An incoming frame traverses the DIO0 ISR,
-    the frame pool, \texttt{xLoRaRxQueue}, and the reception state machine in
-    \texttt{LoRa2BLETask} before arriving as a GATT notification at the smartphone.
-    If the packet is to be forwarded, a parallel path through \texttt{xLoRaTxQueue}
-    and \texttt{vLoRaTxTask} re-enters the radio.}
-    \label{fig:fw_lora2ble}
-\end{figure}
-% --------------------------------------------------------------------------
 
+\img{images/lora2ble_sequence_diagram_outline_v3.png}{LoRa-to-BLE sequence diagram.}{0.9}{fw_lora2ble}
 
 \section{Security Architecture}
 \label{sec:fw_security}
@@ -2101,29 +2080,6 @@ the recipient's companion application receives a \texttt{+KX=} notification and
 confirms the key via \texttt{AT+SETPEERKEY=}. All keys reside in volatile memory only:
 \texttt{AT+CLRKEYS} and any power cycle erase the entire key store, requiring
 re-provisioning on the next boot.
-
-
-\section{Firmware Validation}
-\label{sec:fw_validation}
-
-Firmware correctness was assessed through unit-level and system-level testing. The
-Smart Gossip probability function was verified with host-compiled test cases asserting
-the monotonic decay of $p$ as the copy count increases, the expected sigmoid shape of
-$f_{\mathrm{RSSI}}$ across the RSSI dynamic range, and the correct clamping to
-$p_{\mathrm{floor}}$ under dense neighbour conditions. The duplicate cache was exercised
-for correct LRU eviction under sequential and concurrent insertion patterns. The
-duty-cycle ring buffer was tested against a synthetic transmission sequence straddling
-rolling window boundaries, confirming compliance at the 36\,000\,ms threshold without
-unnecessary under-utilisation.
-
-System-level validation was conducted with two to four physical nodes in a laboratory
-environment. Message delivery, round-trip latency, and neighbour discovery convergence
-were measured for two-node, three-node inline, and triangle topologies. The passive ACK
-suppression mechanism was confirmed experimentally: in a three-node inline
-configuration, the intermediate node's pending forward was consistently cancelled
-within the jitter window upon overhearing the far node's retransmission, reducing
-channel occupancy by one packet per message traversal without degrading delivery
-probability.
 
 % =============================================================================
 % MOBILE APP
