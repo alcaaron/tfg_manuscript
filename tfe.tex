@@ -2186,37 +2186,41 @@ The total development effort invested in the mobile application was approximatel
 \chapter{Mechanical Integration}
 
 \section{Design Objectives}
+\label{sec:design_objectives}
 
-The mechanical integration of the node was guided primarily by user-friendliness: the
-enclosure had to attach to and detach from the phone without tools, without adhesives,
-and without risking damage to either device. A case-mounted form factor was chosen over
-alternatives such as a strap or a sleeve, since it allows the node to be clipped onto a
-phone case that the user is already wearing day-to-day, rather than introducing a
-separate accessory that must be remembered, charged, or carried independently.
+The primary design objective was to create an accessory that the user would not need to consciously manage. Rather than requiring the user to remember to attach and detach the device, the goal was an "install once, forget it's there" experience: the board should become a permanent, unobtrusive extension of the phone rather than a separate object to keep track of.
 
-Daily usability and portability followed naturally from this choice. Because the node
-sits flush against the back of the phone, it adds negligible bulk and does not interfere
-with normal phone handling or pocket storage. The low
-profile also keeps the centre of mass close to the phone, so the assembly does not feel
-front-heavy or unbalanced when held. This makes the node something the user can leave
-attached indefinitely, rather than a piece of equipment to be put on only for specific
-occasions, which is essential if the mesh network is to provide continuous coverage
-throughout the day.
+To achieve this, the PCBA was housed in a dedicated protective shell, conceptually similar to a small case of its own. This shell is then permanently bonded to the back of the phone's existing case using an adhesive layer, following the same attachment principle used by many "smart wallet" card holders available on the market. This approach removes the need for any manual connection or disconnection step, satisfying the core usability goal of the project.
 
 \section{Ergonomic Considerations}
-% Explain comfort considerations
 
-\section{3D Modeling Process}
-% Explain CAD workflow
+Building on the goal of making the accessory feel like a natural part of the phone, two main ergonomic decisions were made. First, all external edges of the enclosure were rounded, eliminating sharp corners and edges so that the device sits comfortably in the hand during normal phone use, in the same way that commercial phone cases avoid hard edges.
 
-\section{Enclosure Design}
-% Add renders/photos
+Second, the enclosure was modeled to be 3D printed in a flexible, rubber-like plastic, matching the material commonly used in standard phone cases. This material choice provides a soft tactile feel consistent with the rest of the phone accessory, while also adding a degree of shock absorption to protect the PCBA inside.
 
 \section{Smartphone Integration}
-% Explain attachment strategy
 
-\section{User-Centered Design Decisions}
-% Explain usability choices
+Several attachment strategies were evaluated before settling on the adhesive-mounted shell described in Section~\ref{sec:design_objectives}. One alternative considered was integrating a small dedicated pocket directly into the phone case, sized to hold the board internally. This approach would reduce the overall added thickness and improve comfort, but it was discarded because it is not scalable: a custom case would need to be designed and manufactured for every phone model, which is impractical for a general-purpose accessory.
+
+A second alternative considered was a MagSafe-style magnetic attachment. This option was ultimately rejected due to the risk of the magnets' electromagnetic field interfering with the radiofrequency signals handled by the board, which could compromise the device's wireless performance.
+
+Given these constraints, the adhesive-backed shell was selected as the final solution, as it offers a reasonable compromise between universality, ease of installation, and signal integrity.
+
+
+\section{3D Modeling Process}
+
+The enclosure was designed using Autodesk Fusion 360 as the primary CAD tool. To ensure the design would integrate correctly with a real device, a 3D model of a phone similar to the target unit was sourced online and used as a reference geometry throughout the modeling process, allowing the enclosure's dimensions and curvature to closely match the actual phone form factor.
+
+In parallel, the 3D model of the PCBA was exported directly from KiCad. This ensured that the internal cavity of the enclosure was dimensioned to match the real board geometry as closely as possible, avoiding the tolerance issues that can arise when modeling component placement from datasheets alone.
+
+
+\section{Enclosure Design}
+
+Figure~\ref{fig:enclosure_render} shows the final enclosure design housing the PCBA. The rounded edges, the rubber-like surface finish, and the discreet ventilation slots can be appreciated in the render, along with the engraved logo on the rear face. The bottom edge integrates the connector cutout required for charging and data access, keeping the silhouette as close as possible to that of a standard phone case.
+
+Additonally, two small elements made of a transparent material can be observed. These act as light diffusers for the red and green charging status LEDs mounted on the PCBA: since the LEDs themselves are fully enclosed within the opaque shell, these transparent inserts channel and scatter their light to the outer surface, allowing the user to clearly see the charging status indicators from outside the enclosure.
+
+\img{images/a3mesh_case_enclosure.png}{Final enclosure design housing the PCBA.}{0.7}{enclosure_render}
 
 % =============================================================================
 % METHODOLOGY
