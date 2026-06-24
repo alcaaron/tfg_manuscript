@@ -19,6 +19,13 @@ lib::lora::LoRaDriver lora;
 lib::mesh::A3MESHManager a3mesh;
 lib::crypto::CryptoManager crypto;
 
+// Current LoRa radio parameters — updated by AT+LORA= and reported by AT+INFO?
+// CR uses arduino-LoRa denominator convention: 5=4/5, 6=4/6, 7=4/7, 8=4/8.
+// A3MESH_CR (config.h) = 1 is clamped to 5 by the library, so we start at 5.
+static uint8_t  g_lora_sf = A3MESH_SF;
+static uint16_t g_lora_bw = 125;
+static uint8_t  g_lora_cr = 5;
+
 // Parse a lowercase/uppercase hex string of exactly (out_len*2) chars into bytes.
 static bool parse_hex_bytes(const char *hex, uint8_t *out, size_t out_len)
 {
@@ -886,6 +893,8 @@ void BLE2LoRaTask(void *pvParameters)
           "+UPTIME=%02u:%02u:%02u\r\n"
           "+FREQ=%u\r\n"
           "+SF=SF%d\r\n"
+          "+BW=%d kHz\r\n"
+          "+CR=4/%d\r\n"
           "+NEIGHBORS=%d\r\n"
           "+OK\r\n",
           node_id,
@@ -893,7 +902,9 @@ void BLE2LoRaTask(void *pvParameters)
           bat_pct,
           h, m, s,
           freq_mhz,
-          (int)A3MESH_SF,
+          (int)g_lora_sf,
+          (int)g_lora_bw,
+          (int)g_lora_cr,
           (int)a3mesh.get_neighbor_count());
 
       xQueueSend(xBLETxQueue, response, 0);
@@ -902,36 +913,42 @@ void BLE2LoRaTask(void *pvParameters)
 
 
     // -------------------------
-    // DEMO mode
-    // AT+DEMO=1  → enable (high-probability forwarding for lab demos)
-    // AT+DEMO=0  → disable (normal Smart Gossip)
-    // AT+DEMO?   → query current state
+    // LORA config
+    // AT+LORA=<SF>,<BW>,<CR>   — reconfigure radio (SF: 7-12, BW: 125/250/500 kHz, CR: 5-8)
+    // AT+LORA?                 — query current config
     // -------------------------
-    if (strcmp(rx_buffer, "AT+DEMO?\r\n") == 0)
+    if (strcmp(rx_buffer, "AT+LORA?\r\n") == 0)
     {
-      char response[32];
+      char response[48];
       snprintf(response, sizeof(response),
-               "+DEMO=%d\r\n+OK\r\n",
-               (int)a3mesh.get_demo_mode());
+               "+SF=SF%d\r\n+BW=%d kHz\r\n+CR=4/%d\r\n+OK\r\n",
+               (int)g_lora_sf, (int)g_lora_bw, (int)g_lora_cr);
       xQueueSend(xBLETxQueue, response, 0);
       continue;
     }
 
-    if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+DEMO="))
+    if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+LORA="))
     {
-      const char *arg = rx_buffer + 8;
-      if (arg[0] == '1') {
-        a3mesh.set_demo_mode(true);
-        xQueueSend(xBLETxQueue, "+DEMO=1\r\n+OK\r\n", 0);
-      } else if (arg[0] == '0') {
-        a3mesh.set_demo_mode(false);
-        xQueueSend(xBLETxQueue, "+DEMO=0\r\n+OK\r\n", 0);
-      } else {
+      int sf = 0, bw = 0, cr = 0;
+      if (sscanf(rx_buffer + 8, "%d,%d,%d", &sf, &bw, &cr) != 3 ||
+          sf < 7 || sf > 12 ||
+          (bw != 125 && bw != 250 && bw != 500) ||
+          cr < 5 || cr > 8)
+      {
         xQueueSend(xBLETxQueue, "+ERR=3\r\n", 0);
+        continue;
       }
+      LoRa.idle();
+      LoRa.setSpreadingFactor((uint8_t)sf);
+      LoRa.setSignalBandwidth((float)bw * 1000.0f);
+      LoRa.setCodingRate4((uint8_t)cr);
+      LoRa.receive();
+      g_lora_sf = (uint8_t)sf;
+      g_lora_bw = (uint16_t)bw;
+      g_lora_cr = (uint8_t)cr;
+      xQueueSend(xBLETxQueue, "+OK\r\n", 0);
       continue;
     }
-
 
     // -------------------------
     // Fallback

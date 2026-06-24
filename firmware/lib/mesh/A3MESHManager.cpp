@@ -224,41 +224,14 @@ namespace lib::mesh
         return true;  // entry not found: transmit by default
     }
 
-    void A3MESHManager::set_demo_mode(bool enabled)
+    uint8_t A3MESHManager::gossip_forward_probability(uint8_t n_neighbors, int16_t rssi, uint8_t copies)
     {
-        _demo_mode.store(enabled, std::memory_order_relaxed);
-        MESH_LOG("[MESH] Demo mode %s\r\n", enabled ? "ENABLED" : "disabled");
-    }
-
-    bool A3MESHManager::get_demo_mode()
-    {
-        return _demo_mode.load(std::memory_order_relaxed);
-    }
-
-    uint8_t A3MESHManager::gossip_forward_probability(uint8_t n_neighbors, int16_t rssi, uint8_t copies, bool demo)
-    {
-        float alpha, rssi_ref, beta, gamma, p_floor;
-
-        if (demo) {
-            alpha   = DEMO_MESH_ALPHA;
-            rssi_ref = DEMO_MESH_RSSI_REF;
-            beta    = DEMO_MESH_BETA;
-            gamma   = DEMO_MESH_GAMMA;
-            p_floor = DEMO_MESH_P_FLOOR;
-        } else {
-            alpha   = GOSSIP_ALPHA;
-            rssi_ref = GOSSIP_RSSI_REF;
-            beta    = GOSSIP_BETA;
-            gamma   = GOSSIP_GAMMA;
-            p_floor = GOSSIP_P_FLOOR;
-        }
-
-        float f_rssi    = 1.0f / (1.0f + expf(alpha * ((float)rssi - rssi_ref)));
-        float f_density = 1.0f / (1.0f + beta  * (float)n_neighbors);
-        float f_dupe    = expf(-gamma * (float)(copies - 1));
+        float f_rssi    = 1.0f / (1.0f + expf(GOSSIP_ALPHA * ((float)rssi - GOSSIP_RSSI_REF)));
+        float f_density = 1.0f / (1.0f + GOSSIP_BETA  * (float)n_neighbors);
+        float f_dupe    = expf(-GOSSIP_GAMMA * (float)(copies - 1));
 
         float p = f_rssi * f_density * f_dupe;
-        if (p < p_floor) p = p_floor;
+        if (p < GOSSIP_P_FLOOR) p = GOSSIP_P_FLOOR;
 
         return (uint8_t)(p * 100.0f + 0.5f);
     }
@@ -278,13 +251,12 @@ namespace lib::mesh
         }
 
         uint8_t n     = get_neighbor_count();
-        bool    demo  = _demo_mode.load(std::memory_order_relaxed);
-        uint8_t threshold = gossip_forward_probability(n, rssi, copies, demo);
+        uint8_t threshold = gossip_forward_probability(n, rssi, copies);
         // esp_random() is a thread-safe hardware TRNG
         bool forward = (esp_random() % 100) < threshold;
 
-        MESH_LOG("[MESH] %sSmartGossip: n=%u rssi=%d copies=%u | P=%u%% → %s\r\n",
-                 demo ? "DEMO " : "", n, rssi, copies, threshold, forward ? "fwd" : "drop");
+        MESH_LOG("[MESH] SmartGossip: n=%u rssi=%d copies=%u | P=%u%% → %s\r\n", 
+            n, rssi, copies, threshold, forward ? "fwd" : "drop");
 
         return forward;
     }

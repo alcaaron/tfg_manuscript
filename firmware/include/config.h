@@ -98,19 +98,6 @@
 #define DIRECT_UNICAST_FLAG             0x01            // Packet flag indicating a direct unicast (as opposed to a broadcast or multi-hop message)
 #define BROADCAST_FLAG                  0x00            // Packet flag indicating a broadcast message
 
-// ============================================
-// === DEMO MODE PARAMETERS (lab / TFG demo) ===
-// ============================================
-// Active when AT+DEMO=1. Same formula as Smart Gossip but tuned for
-// close-range lab conditions (RSSI ≈ -20 to -40 dBm).
-// DEMO_MESH_P_FLOOR=0.95 ensures the network always relays visibly.
-
-#define DEMO_MESH_ALPHA       0.03f    // Very gentle sigmoid: RSSI barely suppresses forwarding
-#define DEMO_MESH_RSSI_REF   -30.0f   // Inflection point shifted to lab-range RSSI
-#define DEMO_MESH_BETA        0.05f    // Density effect nearly negligible
-#define DEMO_MESH_GAMMA       0.05f    // Duplicate penalty nearly negligible
-#define DEMO_MESH_P_FLOOR     0.95f   // At least 95% forwarding probability guaranteed
-
 
 // ================================
 // === SMART GOSSIP PARAMETERS ===

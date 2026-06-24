@@ -213,28 +213,6 @@ namespace lib::mesh
          */
         bool consume_pending_forward(uint16_t pkt_id, uint32_t src);
 
-        /*!
-         * \brief Enables or disables demo mode.
-         *
-         * In demo mode the Smart Gossip parameters are tuned for close-range
-         * lab conditions (high forwarding probability regardless of RSSI or
-         * density).  Lock-free; uses an atomic store with relaxed ordering.
-         *
-         * \param [IN] enabled  True to activate demo mode, false to restore
-         *                      normal Smart Gossip behaviour.
-         */
-        void set_demo_mode(bool enabled);
-
-        /*!
-         * \brief Returns whether demo mode is currently active.
-         *
-         * Lock-free; uses an atomic load with relaxed ordering.
-         *
-         * \retval true   Demo mode is active.
-         * \retval false  Normal Smart Gossip mode is active.
-         */
-        bool get_demo_mode();
-
 
     private:
 
@@ -242,9 +220,6 @@ namespace lib::mesh
 
         /*!< Monotonically incrementing packet counter; accessed lock-free via atomic. */
         std::atomic<uint16_t> _msg_counter{0};
-
-        /*!< Demo-mode flag; accessed lock-free via atomic. */
-        std::atomic<bool>     _demo_mode{false};
 
         SemaphoreHandle_t _mutex;
 
@@ -259,11 +234,10 @@ namespace lib::mesh
          * \param [IN] n_neighbors  Current number of known neighbours.
          * \param [IN] rssi         RSSI of the received frame in dBm.
          * \param [IN] copies       Number of times this packet has been received.
-         * \param [IN] demo         True when demo mode is active.
          *
          * \retval uint8_t  Forwarding probability in [0, 100] (percent).
          */
-        static uint8_t gossip_forward_probability(uint8_t n_neighbors, int16_t rssi, uint8_t copies, bool demo);
+        static uint8_t gossip_forward_probability(uint8_t n_neighbors, int16_t rssi, uint8_t copies);
 
         Neighbor neighbors[MAX_NEIGHBORS];
         uint8_t neighbor_count = 0;
