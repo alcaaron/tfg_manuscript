@@ -26,11 +26,17 @@
 
 
 \begin{resum}
+La dependència actual dels sistemes de missatgeria respecte a les xarxes cel·lulars i la infraestructura d'Internet els fa vulnerables davant de catàstrofes, apagades o zones sense cobertura, justament quan la comunicació és més crítica. Aquest treball presenta \emph{A3MESH}, una plataforma de comunicació descentralitzada basada en LoRa i Bluetooth Low Energy (BLE) que permet a telèfons mòbils intercanviar missatges mitjançant una xarxa mallada multi-salt, sense necessitat de cap infraestructura prèvia.
+
+El projecte integra una PCB compacta de baix consum (ESP32, transceptor LoRa SX1276 i antena pròpia), un firmware modular i estratificat, i una aplicació Android que abstrau la complexitat de la xarxa amb una experiència similar a la missatgeria convencional. La principal aportació és l'\emph{Smart Gossip}, un algorisme adaptatiu d'encaminament que ajusta la probabilitat de retransmissió segons la qualitat de l'enllaç (RSSI), els missatges duplicats, i la densitat de veïns, superant les limitacions de congestió i consum de la difusió tradicional. Els seus paràmetres s'han optimitzat evolutivament sobre un simulador basat en Meshtasticator, amb resultats que mostren menys retard i congestió que la difusió clàssica i una taxa de lliurament comparable. El treball es completa amb una carcassa mecànica i la validació experimental en laboratori i en condicions reals.
 \end{resum}
 
 
 
 \begin{abstract}
+Modern messaging systems depend almost entirely on cellular networks and Internet infrastructure, a dependency that becomes critical during disasters, blackouts, or in areas without coverage---precisely when reliable communication matters most. This thesis presents \emph{A3MESH}, a decentralized communication platform based on LoRa and Bluetooth Low Energy (BLE) that allows smartphones to exchange messages through a multi-hop mesh network without relying on any pre-existing infrastructure.
+
+The project integrates a compact, low-power PCB (ESP32, SX1276 LoRa transceiver, custom antenna), a layered, modular firmware, and an Android application that hides the network's complexity behind an experience similar to conventional messaging. Its central contribution is \emph{Smart Gossip}, an adaptive forwarding algorithm that adjusts each node's relay probability based on link quality (RSSI), duplicate messages, and neighbor density, overcoming the congestion and energy limitations of traditional flooding. Its parameters were tuned through evolutionary optimization on a simulator built upon Meshtasticator, with results showing reduced delay and congestion versus conventional flooding and a comparable delivery ratio. The work is completed with a portable enclosure and experimental validation in laboratory and real-world conditions.
 \end{abstract}
 
 
