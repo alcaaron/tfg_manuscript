@@ -1,6 +1,8 @@
 \documentclass[english,bachelor]{tfgitic}[2026/01/22]
 
 \usepackage{custom_cmd}
+\usepackage{longtable}
+\usepackage{dirtree}
 
 \addbibresource{tfe.bib}
 
@@ -2358,22 +2360,796 @@ This monorepo organization was chosen deliberately so that a complete snapshot o
 \part{Appendices}
 
 \chapter{AT Command Reference}
-% Full command table
+\label{ch:appendix_at}
+
+This appendix provides the complete reference for the A3MESH AT-command interface
+implemented in the node firmware (version~\texttt{1.0.0}). Commands are issued by the
+companion mobile application over Bluetooth Low Energy using the Nordic UART Service
+(NUS) write characteristic (\texttt{UUID 6E400002}).
+
+\bigskip
+\noindent\textbf{Important:} every command string must be terminated with a
+carriage-return followed by a line-feed
+(\texttt{\textbackslash{}r\textbackslash{}n}, i.e.\ the byte sequence
+\texttt{0x0D\,0x0A}). The firmware parser discards any input that does not carry
+this terminator.
+
+\medskip
+\noindent The node always ends its response with one of the following terminal status
+lines:
+\begin{itemize}
+    \item \texttt{+OK\textbackslash{}r\textbackslash{}n} --- the command completed successfully.
+    \item \texttt{+ERR=}\textit{n}\texttt{\textbackslash{}r\textbackslash{}n} --- the command failed; \textit{n} is the error code defined in Table~\ref{tab:at_appendix_errors}.
+\end{itemize}
+
+\paragraph{Notation.}
+In the syntax columns below, tokens enclosed in angle brackets (\tcmp{name})
+represent mandatory arguments to be substituted by the caller. Node identifiers and
+group identifiers are 32-bit unsigned integers encoded as exactly eight lower-case
+hexadecimal characters (e.g.\ \texttt{0ab1c2d3}). Cryptographic keys are 32-byte
+(256-bit) values encoded as exactly 64 hexadecimal characters.
+
+\begin{table}[htbp]
+    \centering
+    \caption{AT-command error codes.}
+    \label{tab:at_appendix_errors}
+    \begin{tabular}{ll}
+        \toprule
+        \textbf{Code} & \textbf{Meaning} \\
+        \midrule
+        \texttt{+ERR=1} & Input does not begin with the prefix \texttt{AT}. \\
+        \texttt{+ERR=2} & Command not recognised by the parser. \\
+        \texttt{+ERR=3} & Argument parse error or value outside the permitted range. \\
+        \texttt{+ERR=4} & LoRa transmit queue full; the radio is busy. \\
+        \texttt{+ERR=5} & Cryptographic error or required key not provisioned. \\
+        \texttt{+ERR=6} & Key storage table full; no slot available for the new key. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Basic Command}
+
+\subsection{\texttt{AT} \textemdash{} Connectivity check}
+\label{subsec:at_basic}
+
+No-operation command used to verify that the BLE link and the firmware command parser
+are operational. Produces no side effects.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT\textbackslash{}r\textbackslash{}n} &
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} \\
+        \hline
+    \end{tabular}
+\end{table}
+
+
+% ─────────────────────────────────────────────────────────────────────────────
+\newpage
+\section{Messaging Commands}
+\label{sec:at_messaging}
+
+\subsection{\texttt{AT+SEND} \textemdash{} Transmit plain (unencrypted) message}
+\label{subsec:at_send}
+
+Constructs an unencrypted \texttt{k\_data\_plain} packet addressed to \tcmp{dst} and
+queues it for LoRa transmission. Set \tcmp{dst} to \texttt{ffffffff} to broadcast to
+all reachable nodes. The payload field may contain any sequence of printable ASCII
+characters up to 233\,bytes in length.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+SEND=\tcmp{dst},\tcmp{payload}\textbackslash{}r\textbackslash{}n} &
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} (success) \newline
+        \texttt{+ERR=3\textbackslash{}r\textbackslash{}n} (invalid arguments) \newline
+        \texttt{+ERR=4\textbackslash{}r\textbackslash{}n} (TX queue full) \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{\texttt{AT+SENDE2E} \textemdash{} Transmit end-to-end encrypted message}
+\label{subsec:at_sende2e}
+
+Encrypts \tcmp{payload} using the pre-provisioned AES-256-GCM node-to-node key for
+peer \tcmp{dst} and transmits the resulting ciphertext as a
+\texttt{k\_enc\_node2node} packet. The peer key for \tcmp{dst} must have been
+loaded previously with \texttt{AT+SETPEERKEY}.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+SENDE2E=\tcmp{dst},\tcmp{payload}\textbackslash{}r\textbackslash{}n} &
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} (success) \newline
+        \texttt{+ERR=3\textbackslash{}r\textbackslash{}n} (invalid arguments) \newline
+        \texttt{+ERR=5\textbackslash{}r\textbackslash{}n} (key not provisioned) \newline
+        \texttt{+ERR=4\textbackslash{}r\textbackslash{}n} (TX queue full) \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{\texttt{AT+SENDGRP} \textemdash{} Transmit group-encrypted broadcast}
+\label{subsec:at_sendgrp}
+
+Encrypts \tcmp{payload} with the pre-provisioned AES-256-GCM group key for
+\tcmp{group\_id} and transmits the ciphertext as a broadcast
+(\texttt{k\_enc\_group} packet addressed to all nodes). All nodes holding the same
+group key will be able to decrypt the message. The group key must have been loaded
+in advance with \texttt{AT+SETGRPKEY}.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+SENDGRP=\tcmp{group\_id},\tcmp{payload}\textbackslash{}r\textbackslash{}n} &
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} (success) \newline
+        \texttt{+ERR=3\textbackslash{}r\textbackslash{}n} (invalid arguments) \newline
+        \texttt{+ERR=5\textbackslash{}r\textbackslash{}n} (key not provisioned) \newline
+        \texttt{+ERR=4\textbackslash{}r\textbackslash{}n} (TX queue full) \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{\texttt{AT+SENDNET} \textemdash{} Transmit network-layer encrypted message}
+\label{subsec:at_sendnet}
+
+Encrypts \tcmp{payload} with the shared network-wide AES-256-GCM key and transmits
+the ciphertext as a \texttt{k\_enc\_network} packet addressed to \tcmp{dst}. The
+network key must have been loaded with \texttt{AT+SETNETKEY}. At the destination,
+the firmware decrypts the payload transparently and delivers it through the standard
+\texttt{+RCV} notification, so the receiving application requires no special
+handling for this encryption scope.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+SENDNET=\tcmp{dst},\tcmp{payload}\textbackslash{}r\textbackslash{}n} &
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} (success) \newline
+        \texttt{+ERR=3\textbackslash{}r\textbackslash{}n} (invalid arguments) \newline
+        \texttt{+ERR=5\textbackslash{}r\textbackslash{}n} (key not provisioned) \newline
+        \texttt{+ERR=4\textbackslash{}r\textbackslash{}n} (TX queue full) \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{\texttt{AT+SENDKX} \textemdash{} Transmit key-exchange packet}
+\label{subsec:at_sendkx}
+
+Transmits a \texttt{k\_key\_exchange} packet to \tcmp{dst} carrying an arbitrary
+\tcmp{payload} (typically a cryptographic public value or shared secret in
+hexadecimal encoding). The time-to-live counter is set to the minimum value
+(\texttt{0x01}), so the packet is never relayed beyond direct radio range.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+SENDKX=\tcmp{dst},\tcmp{payload}\textbackslash{}r\textbackslash{}n} &
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} (success) \newline
+        \texttt{+ERR=3\textbackslash{}r\textbackslash{}n} (invalid arguments) \newline
+        \texttt{+ERR=4\textbackslash{}r\textbackslash{}n} (TX queue full) \\
+        \hline
+    \end{tabular}
+\end{table}
+
+
+% ─────────────────────────────────────────────────────────────────────────────
+\newpage
+\section{Query Commands}
+\label{sec:at_query}
+
+\subsection{\texttt{AT+NODEID?} \textemdash{} Query local node identifier}
+\label{subsec:at_nodeid}
+
+Returns the unique 32-bit identifier of this node. The identifier is derived at
+firmware startup from the lower four bytes of the ESP32 BLE MAC address.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+NODEID?\textbackslash{}r\textbackslash{}n} &
+        \texttt{+NODEID=\tcmp{node\_id\_hex8}\textbackslash{}r\textbackslash{}n} \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{\texttt{AT+NEIGHBORS?} \textemdash{} Query neighbor table}
+\label{subsec:at_neighbors}
+
+Returns the current contents of the neighbor table (up to ten entries). Each entry
+reports the neighbour's node identifier, the received signal strength (RSSI in~dBm)
+from the most recent discovery beacon, and the system uptime timestamp (in~ms) at
+which that beacon was received.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+NEIGHBORS?\textbackslash{}r\textbackslash{}n} &
+        \emph{No neighbours:} \newline
+        \texttt{+NEIGHBORS=0\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} \newline
+        \emph{With} $n$ \emph{neighbours:} \newline
+        \texttt{+NEIGHBORS=}\textit{n}\texttt{\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+N:\tcmp{id},RSSI:\tcmp{dBm},T:\tcmp{ms};\textbackslash{}r\textbackslash{}n} \newline
+        \hspace{1em}\emph{(one line per neighbour)} \newline
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{\texttt{AT+INFO?} \textemdash{} Query system diagnostics}
+\label{subsec:at_info}
+
+Returns a multi-field diagnostic report covering the node identity, firmware version,
+battery charge level, device uptime, and current LoRa radio configuration.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+INFO?\textbackslash{}r\textbackslash{}n} &
+        \texttt{+NODEID=\tcmp{hex8}\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+FWVER=\tcmp{version}\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+BATT=\tcmp{pct}\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+UPTIME=\tcmp{hh:mm:ss}\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+FREQ=\tcmp{MHz}\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+SF=SF\tcmp{n}\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+BW=\tcmp{n}\,kHz\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+CR=4/\tcmp{n}\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+NEIGHBORS=\tcmp{count}\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{\texttt{AT+LORA?} \textemdash{} Query LoRa radio configuration}
+\label{subsec:at_lora_query}
+
+Returns the current spreading factor, signal bandwidth, and coding rate of the LoRa
+radio without modifying any settings.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+LORA?\textbackslash{}r\textbackslash{}n} &
+        \texttt{+SF=SF\tcmp{n}\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+BW=\tcmp{n}\,kHz\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+CR=4/\tcmp{n}\textbackslash{}r\textbackslash{}n} \newline
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} \\
+        \hline
+    \end{tabular}
+\end{table}
+
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Radio Configuration Commands}
+\label{sec:at_radio}
+
+\subsection{\texttt{AT+LORA} \textemdash{} Set LoRa radio parameters}
+\label{subsec:at_lora_set}
+
+Reconfigures the LoRa transceiver immediately. The permitted parameter ranges are:
+spreading factor \tcmp{SF}~$\in \{7,\ldots,12\}$; bandwidth
+\tcmp{BW}~$\in \{125, 250, 500\}$\,kHz; coding-rate denominator
+\tcmp{CR}~$\in \{5,\ldots,8\}$ (corresponding to rates 4/5 through 4/8). All three
+parameters must be supplied simultaneously; partial updates are not supported.
+Any out-of-range value triggers \texttt{+ERR=3} and leaves the radio configuration
+unchanged.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+LORA=\tcmp{SF},\tcmp{BW},\tcmp{CR}\textbackslash{}r\textbackslash{}n} &
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} (success) \newline
+        \texttt{+ERR=3\textbackslash{}r\textbackslash{}n} (invalid parameters) \\
+        \hline
+    \end{tabular}
+\end{table}
+
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Key Management Commands}
+\label{sec:at_keys}
+
+\subsection{\texttt{AT+SETNETKEY} \textemdash{} Provision shared network key}
+\label{subsec:at_setnetkey}
+
+Loads the 32-byte (256-bit) network-wide AES-256-GCM key into volatile memory.
+\tcmp{key\_64hex} must be exactly 64 hexadecimal characters. This key is subsequently
+used by \texttt{AT+SENDNET} for transparent network-layer encryption and decryption.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+SETNETKEY=\tcmp{key\_64hex}\textbackslash{}r\textbackslash{}n} &
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} (success) \newline
+        \texttt{+ERR=3\textbackslash{}r\textbackslash{}n} (invalid key format) \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{\texttt{AT+SETPEERKEY} \textemdash{} Provision node-to-node peer key}
+\label{subsec:at_setpeerkey}
+
+Loads the 32-byte AES-256-GCM symmetric key for peer \tcmp{peer\_id} into the
+firmware key table. \tcmp{key\_64hex} must be exactly 64 hexadecimal characters.
+Once provisioned, this key enables end-to-end encrypted communication with that
+specific peer via \texttt{AT+SENDE2E}.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+SETPEERKEY=\tcmp{peer\_id},\tcmp{key\_64hex}\textbackslash{}r\textbackslash{}n} &
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} (success) \newline
+        \texttt{+ERR=3\textbackslash{}r\textbackslash{}n} (parse error) \newline
+        \texttt{+ERR=6\textbackslash{}r\textbackslash{}n} (key table full) \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{\texttt{AT+SETGRPKEY} \textemdash{} Provision group key}
+\label{subsec:at_setgrpkey}
+
+Loads the 32-byte AES-256-GCM group key for group identifier \tcmp{group\_id} into
+the firmware key table. \tcmp{key\_64hex} must be exactly 64 hexadecimal characters.
+Once provisioned, this key enables group-encrypted broadcasts via
+\texttt{AT+SENDGRP}.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+SETGRPKEY=\tcmp{group\_id},\tcmp{key\_64hex}\textbackslash{}r\textbackslash{}n} &
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} (success) \newline
+        \texttt{+ERR=3\textbackslash{}r\textbackslash{}n} (parse error) \newline
+        \texttt{+ERR=6\textbackslash{}r\textbackslash{}n} (key table full) \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsection{\texttt{AT+CLRKEYS} \textemdash{} Clear all provisioned keys}
+\label{subsec:at_clrkeys}
+
+Erases all stored keys (network, peer, and group) from volatile memory and resets
+the replay-protection counters. This operation is irreversible within the current
+power cycle; all keys must be re-provisioned if secure messaging is to continue.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|p{0.46\linewidth}|p{0.46\linewidth}|}
+        \hline
+        \textbf{Syntax} & \textbf{Response} \\
+        \hline
+        \texttt{AT+CLRKEYS\textbackslash{}r\textbackslash{}n} &
+        \texttt{+OK\textbackslash{}r\textbackslash{}n} \\
+        \hline
+    \end{tabular}
+\end{table}
+
+
+% ─────────────────────────────────────────────────────────────────────────────
+\newpage
+\section{Unsolicited Notifications}
+\label{sec:at_notifications}
+
+The firmware pushes unsolicited notification strings to the mobile application via
+BLE GATT notifications on the NUS RX characteristic (\texttt{UUID 6E400003})
+independently of any command exchange. In all formats, \tcmp{src} is the originating
+node identifier, \tcmp{fwd} is the node that last forwarded the packet (its
+\texttt{node\_id} field), and \tcmp{dst} is the destination address as carried in
+the packet header. All notifications are terminated with
+\texttt{\textbackslash{}r\textbackslash{}n}.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Unsolicited notifications issued by the firmware.}
+    \label{tab:at_notifications}
+    \begin{tabular}{p{0.50\linewidth}p{0.44\linewidth}}
+        \toprule
+        \textbf{Notification format} & \textbf{Triggering event} \\
+        \midrule
+        \texttt{+RCV=\tcmp{src},\tcmp{fwd},\tcmp{dst},\tcmp{payload}} &
+        Plain or network-decrypted message delivered locally. \\[4pt]
+        \texttt{+RCVE2E=\tcmp{src},\tcmp{fwd},\tcmp{payload}} &
+        Node-to-node AES-256-GCM message addressed to this node. \\[4pt]
+        \texttt{+RCVGRP=\tcmp{group\_id},\tcmp{src},\tcmp{fwd},\tcmp{payload}} &
+        Group-encrypted broadcast decrypted with the matching group key. \\[4pt]
+        \texttt{+KX=\tcmp{src},\tcmp{fwd},\tcmp{payload}} &
+        Key-exchange packet received; payload carries the cryptographic value. \\[4pt]
+        \texttt{+DISC=\tcmp{node\_id}} &
+        New neighbour discovered via a received discovery beacon. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \chapter{Packet Structures}
 % Full packet documentation
 
 \chapter{PCB Schematics}
-% Large figures here
+\label{ch:appendix_pcb}
+
+This appendix contains the full electrical schematic
+(Figure~\ref{fig:app_schematic}), followed by the front copper layer
+(Figure~\ref{fig:app_fcu}) and the back copper layer
+(Figure~\ref{fig:app_bcu}) of the printed circuit board, as exported from
+KiCad.
+
+\begin{figure}[p]
+    \centering
+    \includegraphics[width=\textwidth, height=0.88\textheight, keepaspectratio]%
+        {images/schematic.pdf}
+    \caption{Electrical schematic.}
+    \label{fig:app_schematic}
+\end{figure}
+
+\begin{figure}[p]
+    \centering
+    \includegraphics[width=\textwidth, height=0.88\textheight, keepaspectratio]%
+        {images/pcb_front_layer.pdf}
+    \caption{Front copper layer (F.Cu) with silkscreen.}
+    \label{fig:app_fcu}
+\end{figure}
+
+\begin{figure}[p]
+    \centering
+    \includegraphics[width=\textwidth, height=0.88\textheight, keepaspectratio]%
+        {images/pcb_back_layer.pdf}
+    \caption{Back copper layer (B.Cu) with silkscreen.}
+    \label{fig:app_bcu}
+\end{figure}
 
 \chapter{Bill of Materials}
-% Full BOM tables
+\label{ch:appendix_bom}
 
-\chapter{Simulation Parameters}
-% Full simulator configs
+Table~\ref{tab:bom} lists all components assembled on the A3MESH PCB, exported
+from the KiCad schematic. Components sourced through JLCPCB carry an LCSC part
+number in the rightmost column; parts obtained separately are indicated with a
+dash. Test points, PCB logos, and bridged solder jumpers are excluded from the
+table as they require no physical procurement.
+
+\begingroup\footnotesize
+\begin{longtable}{@{}p{3.6cm}p{4.2cm}lllp{1.8cm}@{}}
+    \caption{A3MESH bill of materials.}
+    \label{tab:bom} \\
+    \toprule
+    \textbf{Designator(s)} & \textbf{Description} & \textbf{Value} &
+    \textbf{Package} & \textbf{Qty} & \textbf{LCSC \#} \\
+    \midrule
+    \endfirsthead
+    \multicolumn{6}{l}{\textit{(continued from previous page)}} \\[2pt]
+    \toprule
+    \textbf{Designator(s)} & \textbf{Description} & \textbf{Value} &
+    \textbf{Package} & \textbf{Qty} & \textbf{LCSC \#} \\
+    \midrule
+    \endhead
+    \midrule
+    \multicolumn{6}{r}{\textit{(continued on next page)}} \\
+    \endfoot
+    \bottomrule
+    \endlastfoot
+
+    % ── Microcontroller & Wireless Modules ────────────────────────────────────
+    \multicolumn{6}{l}{\textit{Microcontroller and Wireless Modules}} \\
+    \midrule
+    U6  & ESP32 MCU module (Wi-Fi + BLE) & ESP32-WROOM-32UE & LGA-38 module & 1 & C701344 \\
+    U2  & LoRa transceiver module (SX1276, 868\,MHz) & RFM95W-868S2 & SMD module & 1 & ---\textsuperscript{1} \\
+    U7  & USB-to-UART bridge & CH340C & SOIC-16 & 1 & C7464026 \\[4pt]
+
+    % ── Power Management ──────────────────────────────────────────────────────
+    \multicolumn{6}{l}{\textit{Power Management}} \\
+    \midrule
+    U4  & Li-ion single-cell battery charger & TP4056 & ESOP-8 & 1 & C16581 \\
+    U8  & Buck-boost DC-DC converter (3.3\,V) & TPS63001 & WSON-10 & 1 & C28060 \\
+    U9  & Li-ion battery protection IC & DW01A & SOT-23-6 & 1 & C351410 \\
+    U1  & Dual N-channel MOSFET (battery cutoff) & FS8205A & SOT-23-6 & 1 & C908265 \\
+    Q3  & P-channel MOSFET (power path switch) & DMP1045UQ-7 & SOT-23 & 1 & C706746 \\
+    D3  & Schottky diode (reverse-polarity protection) & SS34 & SMA & 1 & C8678 \\
+    F1  & Polyfuse (overcurrent protection) & 500\,mA & 1812 & 1 & C12559 \\
+    L1  & Power inductor (DC-DC converter) & 2.2\,\textmu H & 1008 & 1 & C5832372 \\[4pt]
+
+    % ── Status Indicators & User Interface ────────────────────────────────────
+    \multicolumn{6}{l}{\textit{Status Indicators and User Interface}} \\
+    \midrule
+    D1  & LED status indicator (red) & Red LED & 0603 & 1 & C2286 \\
+    D2  & LED status indicator (green) & Green LED & 0603 & 1 & C2289 \\
+    Q1, Q2 & NPN transistor (LED driver) & SS8050 & SOT-23 & 2 & C916392 \\
+    SW1, SW2 & Tactile pushbutton switch & TS-1088-AR02016 & SMD & 2 & C118141 \\[4pt]
+
+    % ── Connectors ────────────────────────────────────────────────────────────
+    \multicolumn{6}{l}{\textit{Connectors}} \\
+    \midrule
+    J6  & USB-C receptacle (USB 2.0, 16-pin) & GCT USB4105 & SMD top-mount & 1 & C2765186 \\
+    J1  & JST-PH 2-pin battery connector & JST-PH-2 & SMD & 1 &  ---\textsuperscript{2} \\[4pt]
+
+
+    % ── Capacitors ────────────────────────────────────────────────────────────
+    \multicolumn{6}{l}{\textit{Capacitors}} \\
+    \midrule
+    C1, C3, C5, C6, C9, C10, C11, C16 & Decoupling capacitor & 100\,nF & 0402 & 8 & C14663 \\
+    C4, C7, C8 & Bulk decoupling capacitor & 10\,\textmu F & 0402 & 3 & C15525 \\
+    C2  & Filter capacitor & 4.7\,\textmu F & 0603 & 1 & C19666 \\
+    C13 & Filter capacitor & 2.2\,\textmu F & 1206 & 1 & C12530 \\
+    C12 & Bulk filter capacitor & 100\,\textmu F & 1206 & 1 & C15008 \\[4pt]
+
+    % ── Resistors ─────────────────────────────────────────────────────────────
+    \multicolumn{6}{l}{\textit{Resistors}} \\
+    \midrule
+    R1, R2, R5, R9, R10, R11 & Pull-up / pull-down resistor & 10\,k$\Omega$ & 0402 & 6 & C25744 \\
+    R3, R4, R7 & Current-limiting resistor & 1\,k$\Omega$ & 0402 & 3 & C11702 \\
+    R8, R12 & LED current-limiting resistor & 100\,$\Omega$ & 0603 & 2 & C22775 \\
+    R15, R16 & USB-C CC pull-down resistor & 5.1\,k$\Omega$ & 0402 & 2 & C25905 \\
+    R13 & Battery voltage divider (high-side) & 330\,k$\Omega$ & 0603 & 1 & C23137 \\
+    R14 & Battery voltage divider (low-side) & 470\,k$\Omega$ & 0603 & 1 & C23178 \\
+    R6  & Charge-current programming resistor & 6.8\,k$\Omega$ & 0402 & 1 & C2906876 \\[4pt]
+\end{longtable}
+\endgroup
+
+\vspace{4pt}
+\noindent\textsuperscript{1}\,The RFM95W-868S2 module was sourced directly from
+AliExpress and hand-soldered; it is therefore absent from the JLCPCB LCSC BOM.\\
+\noindent\textsuperscript{2}\,The JST-PH 2-pin battery connector was sourced from Amazon and hand-soldered; it is therefore absent from the JLCPCB LCSC BOM.
 
 \chapter{Source Code Repositories}
-% GitHub links and structure
+\label{ch:appendix_repos}
+
+All source code produced for this project is hosted on GitHub under the user
+\texttt{alcaaron}. The LaTeX manuscript itself is the root repository and
+contains the remaining four artefacts as git submodules, so that a single
+\texttt{git clone -{}-recurse-submodules} retrieves the complete project tree.
+The top-level layout is shown below.
+
+\dirtree{%
+.1 tfg\_manuscript/.
+.2 tfe.tex\DTcomment{main LaTeX source}.
+.2 tfe.bib\DTcomment{BibTeX bibliography}.
+.2 tfgitic.cls\DTcomment{UPC/ITIS thesis document class}.
+.2 custom\_cmd.sty\DTcomment{custom LaTeX macros}.
+.2 images/\DTcomment{figures embedded in the document}.
+.2 tfg\_firmware/\DTcomment{[submodule] ESP32 node firmware}.
+.2 tfg\_hardware/\DTcomment{[submodule] KiCad PCB design}.
+.2 tfg\_software/\DTcomment{[submodule] Android companion app}.
+.2 MeshtasticatorMeshAlgoComp/\DTcomment{[submodule] network simulator}.
+.2 tfg\_3d/\DTcomment{[submodule] mechanical enclosure}.
+}
+
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Node Firmware}
+\label{sec:repo_firmware}
+
+\noindent\textbf{Repository:}
+\url{https://github.com/alcaaron/tfg_firmware}
+
+\medskip
+The firmware is a PlatformIO project targeting the ESP32 (Heltec WiFi LoRa 32
+V3 board definition). All application logic is written in C++17 on top of the
+Arduino framework and FreeRTOS. The build entry point is
+\texttt{platformio.ini}; flashing requires only \texttt{pio run -{}-target
+upload}.
+
+{\small
+\dirtree{%
+.1 tfg\_firmware/firmware/.
+.2 platformio.ini\DTcomment{board, framework and library dependencies}.
+.2 include/.
+.3 config.h\DTcomment{all compile-time constants (SF, BW, TTL, keys...)}.
+.3 PassiveACK.h\DTcomment{passive-ACK forward-cancel interface}.
+.2 src/.
+.3 main.cpp\DTcomment{FreeRTOS task wiring + AT command parser}.
+.2 lib/.
+.3 ble/\DTcomment{NUS GATT server; BLE TX/RX tasks}.
+.3 crypto/\DTcomment{AES-256-GCM layer (AESGCM, CryptoManager, CryptoKeys, NonceManager, ReplayProtection)}.
+.3 lora/\DTcomment{LoRa radio driver (RadioLib wrapper); TX/RX tasks}.
+.3 mesh/\DTcomment{A3MESHManager (neighbor table, Smart Gossip, duplicate cache) + neighbor-check task}.
+.3 packet/\DTcomment{A3MESH packet serialization / deserialization}.
+.3 power/\DTcomment{Battery LUT + adaptive CPU-frequency manager}.
+}
+}
+
+\noindent The only file a developer needs to touch for most changes is
+\texttt{include/config.h} (radio parameters, hop limits, gossip tuning
+constants) and the \texttt{lib/mesh/} module (routing logic). The AT command
+set is implemented exclusively in \texttt{src/main.cpp} in the
+\texttt{BLE2LoRaTask} function.
+
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{PCB Hardware Design}
+\label{sec:repo_hardware}
+
+\noindent\textbf{Repository:}
+\url{https://github.com/alcaaron/tfg_hardware}
+
+\medskip
+The hardware design is a two-layer KiCad~8 project. Opening
+\texttt{a3mesh\_kicad\_project.kicad\_pro} in KiCad loads both the schematic
+and the PCB layout. Custom symbols and footprints that are not available in the
+standard KiCad libraries are stored alongside the project.
+
+{\small
+\dirtree{%
+.1 tfg\_hardware/a3mesh\_kicad\_project/.
+.2 a3mesh\_kicad\_project.kicad\_pro\DTcomment{KiCad project file}.
+.2 a3mesh\_kicad\_project.kicad\_sch\DTcomment{Electrical schematic}.
+.2 a3mesh\_kicad\_project.kicad\_pcb\DTcomment{PCB layout}.
+.2 a3mesh\_kicad\_project.csv\DTcomment{Exported BOM (KiCad format)}.
+.2 New\_Library.kicad\_sym\DTcomment{Custom schematic symbol library}.
+.2 symbol\_lib/.
+.3 dw01.kicad\_sym\DTcomment{DW01A battery protection IC}.
+.3 fs8205.kicad\_sym\DTcomment{FS8205A dual N-MOSFET}.
+.3 tp4056.kicad\_sym\DTcomment{TP4056 Li-ion charger IC}.
+.2 RF\_Library.pretty/.
+.3 ANTENNA\_868\_915\_955\_MONOPOLE\_PCB.kicad\_mod\DTcomment{PCB monopole antenna footprint}.
+.2 production/.
+.3 bom.csv\DTcomment{LCSC-referenced BOM}.
+.3 positions.csv\DTcomment{Pick-and-place centroids}.
+.3 netlist.ipc\DTcomment{IPC-D-356 netlist}.
+.2 KICAD\_OUTPUT\_FILES/GBR/\DTcomment{Gerber and drill files for manufacture}.
+}
+}
+
+
+% ─────────────────────────────────────────────────────────────────────────────
+\newpage
+\section{Android Companion Application}
+\label{sec:repo_software}
+
+\noindent\textbf{Repository:}
+\url{https://github.com/alcaaron/tfg_software}
+
+\medskip
+The companion app is written in Kotlin and built with Gradle. It requires
+Android Studio (Hedgehog or later) and a device running Android~10 or above.
+The project follows the single-activity, multi-fragment navigation pattern and
+persists contacts and messages with the Room database.
+
+{\small
+\dirtree{%
+.1 tfg\_software/.
+.2 build.gradle\DTcomment{Root Gradle configuration}.
+.2 settings.gradle\DTcomment{Project module declarations}.
+.2 app/src/main/.
+.3 AndroidManifest.xml\DTcomment{Android application manifest}.
+.3 java/com/punchthrough/blestarterappandroid/.
+.4 MainActivity.kt\DTcomment{Application entry point and BLE device scanning interface}.
+.4 BleConnectionService.kt\DTcomment{Foreground service managing the BLE connection lifecycle}.
+.4 BleViewModel.kt\DTcomment{AT command dispatcher and shared UI/application state holder}.
+.4 ble/\DTcomment{Low-level BLE communication layer}.
+.5 ConnectionManager.kt\DTcomment{GATT operation queue and callback handling}.
+.5 BleExtensions.kt\DTcomment{Helper extensions for BLE/GATT operations}.
+.4 crypto/\DTcomment{Cryptographic key exchange, derivation, and storage}.
+.5 EcdhHelper.kt\DTcomment{ECDH-P256 key agreement implementation}.
+.5 HkdfSha256.kt\DTcomment{HKDF-SHA256 key derivation functions}.
+.5 A3MeshKeyStore.kt\DTcomment{Peer and group key storage}.
+.5 NetworkKeyManager.kt\DTcomment{Network-wide key management}.
+.4 data/\DTcomment{Room persistence layer}.
+.5 model/\DTcomment{Entity definitions such as Contact.kt and Message.kt}.
+.5 dao/\DTcomment{Data access objects such as ContactDao.kt and MessageDao.kt}.
+.5 database/\DTcomment{Room database configuration and AppDatabase.kt}.
+.4 ui/\DTcomment{User interface fragments and adapters}.
+.5 ChatsFragment.kt\DTcomment{Conversation list screen}.
+.5 ChatActivity.kt\DTcomment{Message thread view}.
+.5 ContactsFragment.kt\DTcomment{Contact management interface}.
+.5 DeviceFragment.kt\DTcomment{Node diagnostics and device information view}.
+.5 SettingsFragment.kt\DTcomment{Language settings and key provisioning interface}.
+.3 res/.
+.4 layout/\DTcomment{XML layout definitions for Android views}.
+.4 navigation/\DTcomment{Navigation Component graph}.
+.4 values[-ca|-es|-night]/\DTcomment{Localized strings (EN/CA/ES) and theme resources}.
+}
+}
+
+
+% ─────────────────────────────────────────────────────────────────────────────
+\newpage
+\section{Network Simulator}
+\label{sec:repo_sim}
+
+\noindent\textbf{Repository:}
+\url{https://github.com/alcaaron/MeshtasticatorMeshAlgoComp}
+
+\medskip
+The simulator is a Python~3 discrete-event framework built on SimPy, derived
+from Meshtasticator and extended with a pluggable routing-algorithm interface.
+Install dependencies with \texttt{pip install -r requirements.txt} and run
+\texttt{python batchSim.py} to reproduce the thesis results.
+
+{\small
+\dirtree{%
+.1 MeshtasticatorMeshAlgoComp/.
+.2 batchSim.py\DTcomment{Multi-seed parallel batch simulation runner}.
+.2 loraMesh.py\DTcomment{Main entry point for single-run simulations}.
+.2 tuneSmartGossip.py\DTcomment{Differential-evolution tuner for Smart Gossip parameters}.
+.2 interactiveSim.py\DTcomment{Interactive GUI-based simulation runner}.
+.2 plotExample.py\DTcomment{Result plotting and visualization helpers}.
+.2 requirements.txt\DTcomment{Python dependencies (e.g., SimPy, NumPy, SciPy)}.
+.2 lib/.
+.3 config.py\DTcomment{Simulation configuration parameters such as SF, bandwidth, and scenario settings}.
+.3 node.py\DTcomment{Node model and routing algorithm implementations, including Managed Flood and Adaptive Gossip}.
+.3 phy.py\DTcomment{Physical-layer channel model based on the 3GPP Suburban Macro scenario}.
+.3 mac.py\DTcomment{LoRa airtime computation and duty-cycle enforcement logic}.
+.3 packet.py\DTcomment{Packet representation and duplicate-detection mechanisms}.
+.3 discrete\_event.py\DTcomment{Integration with the SimPy discrete-event simulation engine}.
+.3 common.py\DTcomment{Metric collection, statistics, and result aggregation utilities}.
+.3 point.py\DTcomment{Node placement, geometry, and topology utility functions}.
+.3 gui.py\DTcomment{Interactive visualization layer based on Pygame and Matplotlib}.
+.2 tests/.
+.3 test\_phy.py\DTcomment{Unit tests for the physical-layer model}.
+.3 test\_point.py\DTcomment{Unit tests for topology and point utilities}.
+.3 test\_common.py\DTcomment{Unit tests for shared utility and metric modules}.
+.3 test\_full\_discrete\_sim.py\DTcomment{End-to-end test for the complete discrete-event simulator}.
+}
+}
+
+\noindent To implement a new routing algorithm, add a handler in
+\texttt{lib/node.py} following the \texttt{ADAPTATIVE\_GOSSIP} pattern and
+register it in \texttt{lib/config.py}.
+
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Mechanical Enclosure}
+\label{sec:repo_3d}
+
+\noindent\textbf{Repository:}
+\url{https://github.com/alcaaron/tfg_3d}
+
+\medskip
+The enclosure was designed in Autodesk Fusion~360. The repository contains a
+single \texttt{.f3z} archive, which is a self-contained Fusion~360 project
+file embedding all bodies, components, and manufacturing history.
+
+{\small
+\dirtree{%
+.1 tfg\_3d/.
+.2 a3mesh\_fusion\_project.f3z\DTcomment{Fusion 360 project containing the mechanical enclosure design}.
+}
+}
+
+\noindent The \texttt{.f3z} file can be imported directly into Fusion~360 via
+\emph{File $\to$ Open $\to$ Open from my computer}. STL exports for 3D
+printing can be generated from within Fusion~360 by right-clicking each body
+and selecting \emph{Save as Mesh}.
 
 
 % =============================================================================
