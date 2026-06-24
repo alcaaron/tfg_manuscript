@@ -134,6 +134,19 @@
 #define A3M_FW_VERSION               "1.0.0"
 
 
+// ================================
+// === POWER MANAGEMENT ===
+// ================================
+// When no LoRa mesh activity is detected for POWER_IDLE_TIMEOUT_MS the CPU
+// clock is reduced to POWER_IDLE_MHZ to save ~60-70 mW.  Any valid received
+// LoRa packet restores the clock immediately to POWER_ACTIVE_MHZ.
+
+#define POWER_ACTIVE_MHZ          240      // Normal operating frequency (MHz)
+#define POWER_IDLE_MHZ            80       // Reduced frequency after idle timeout
+#define POWER_IDLE_TIMEOUT_MS     600000UL // 10 min without mesh activity → idle
+#define POWER_CHECK_INTERVAL_MS   120000UL // How often the power task polls (2 min)
+
+
 // ===============================
 // === BATTERY CONFIGURATION ===
 // ===============================

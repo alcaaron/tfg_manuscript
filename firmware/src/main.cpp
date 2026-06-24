@@ -9,6 +9,8 @@
 #include "A3MESHManagerTasks.h"
 #include "PassiveACK.h"
 #include "CryptoManager.hh"
+#include "Battery.hh"
+#include "PowerManager.hh"
 
 // ======================
 // === Global Objects ===
@@ -18,6 +20,8 @@ lib::ble::BLEDriver ble;
 lib::lora::LoRaDriver lora;
 lib::mesh::A3MESHManager a3mesh;
 lib::crypto::CryptoManager crypto;
+lib::power::Battery battery;
+lib::power::PowerManager power_mgr;
 
 // Current LoRa radio parameters — updated by AT+LORA= and reported by AT+INFO?
 // CR uses arduino-LoRa denominator convention: 5=4/5, 6=4/6, 7=4/7, 8=4/8.
@@ -224,6 +228,8 @@ MeshRxState handleClassify(a3mesh_rx_ctx_t &ctx)
 
 MeshRxState handleDiscovery(a3mesh_rx_ctx_t &ctx)
 {
+  power_mgr.notify_activity();
+
   lib::mesh::Neighbor neighbor;
 
   neighbor.node_id = ctx.pkt.src;
@@ -244,6 +250,8 @@ MeshRxState handleDiscovery(a3mesh_rx_ctx_t &ctx)
 
 MeshRxState handleData(a3mesh_rx_ctx_t &ctx)
 {
+  power_mgr.notify_activity();
+
   MESH_LOG("[A3MESH] dst=%08x me=%08x\r\n", ctx.pkt.dst, a3mesh.get_node_id());
   ctx.is_for_me =
       (ctx.pkt.dst == a3mesh.get_node_id()) ||
@@ -869,12 +877,8 @@ void BLE2LoRaTask(void *pvParameters)
     // -------------------------
     if (strcmp(rx_buffer, "AT+INFO?\r\n") == 0)
     {
-      // --- Battery percentage ---
-      // ADC returns 0-4095 for 0-3.3 V; multiply by BATTERY_ADC_FACTOR for actual voltage.
-      float adc_v   = (analogRead(BATTERY_VOLTAGE_PIN) / 4095.0f) * 3.3f * BATTERY_ADC_FACTOR;
-      int   bat_pct = (int)(((adc_v - BATTERY_MIN_V) / (BATTERY_MAX_V - BATTERY_MIN_V)) * 100.0f);
-      if (bat_pct > 100) bat_pct = 100;
-      if (bat_pct <   0) bat_pct =   0;
+      // --- Battery percentage (LUT-based via Battery class) ---
+      int bat_pct = (int)battery.get_battery_percentage();
 
       // --- Uptime ---
       uint32_t uptime_s = millis() / 1000UL;
@@ -1041,6 +1045,11 @@ bool setup_A3MESH()
 
   if (xTaskCreatePinnedToCore(vNeighborCheckTask, "NeighborCheckTask", 4096, NULL, 1, NULL, 0) != pdPASS) return false;
   MESH_LOG("[MESH] Neighbor Check Task Initialized!\r\n");
+
+  // --------- Init Power Manager ---------
+  if (!power_mgr.start_task()) return false;
+  MESH_LOG("[PWR] Power Manager Task Initialized!\r\n");
+
   return true;
 }
 

@@ -45,7 +45,7 @@ namespace lib::power
         Battery();
         uint8_t get_battery_percentage();
     private:
-        uint8_t voltage_to_percent(uint16_t &voltage);
-        uint16_t read_battery_voltage();
+        uint8_t  voltage_to_percent(float voltage_v);
+        uint16_t read_raw_adc();
     };
 }
