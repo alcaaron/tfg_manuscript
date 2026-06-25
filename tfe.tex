@@ -926,12 +926,6 @@ Each value admits a coherent physical reading, which lends confidence that the o
  
 Two real-world implications follow. First, because all inputs to the decision are already available in the firmware (transceiver \acro{rssi}, neighbor table, duplicate cache), the algorithm's implementation cost is a handful of floating-point operations per received packet---negligible on the ESP32---and its parameters are stored as configuration constants that can be updated without protocol changes. Second, $p_{\text{floor}}$ doubles as an application-level policy knob: deployments prioritizing delivery certainty over efficiency (for instance, emergency alert dissemination) can raise the floor toward 1, continuously trading channel efficiency back for the redundancy of full flooding without any other modification. The validation of these parameters on real hardware is presented in Chapter~\ref{ch:results}.
 
-% =============================================================================
-% HARDWARE
-% =============================================================================
-
-% TARGET: 7-9 pages
-
 \chapter{Hardware Design}
 \label{ch:hardware}
 
@@ -940,19 +934,19 @@ Two real-world implications follow. First, because all inputs to the decision ar
 
 The system-level requirements established in Section~\ref{sec:design_requirements}
 translate into a concrete set of hardware constraints that shaped every design
-decision in the custom printed circuit board (PCB). Four principal constraints govern
+decision in the custom printed circuit board (\acro{pcb}). Four principal constraints govern
 the design space.
 
 \paragraph{Autonomy.}
-Because of the device is intended for deployment scenarios in which mains power is unavailable
-for extended periods, together with a target runtime of several days of continuous mesh operation
+The device is intended for deployment scenarios in which mains power is unavailable
+for extended periods. A target runtime of several days of continuous mesh operation
 on a single lithium polymer (LiPo) cell demands that the combined average current
 draw of the microcontroller, LoRa transceiver, BLE radio, and all ancillary
 circuitry remains in the range of a few milliamperes.
 
 \paragraph{Compactness.}
 The node is designed to be carried alongside a smartphone, so the PCB form factor
-must be kept to a minimum consistent with the required component area. In fact, the resulting
+must be kept to a minimum consistent with the required component area. The resulting
 board measures 74.5\,mm\,$\times$\,89.8\,mm, a footprint that accommodates the
 integrated PCB antenna, the USB-C connector, the battery header, and all active
 circuitry without requiring multi-board stacking.
@@ -968,9 +962,8 @@ at the configured transmit power.
 \paragraph{Cost and manufacturability.}
 As a prototype research platform, the design targets standard two-layer PCB
 fabrication and commercially available, off-the-shelf components sourced from LCSC.
-No exotic materials, controlled-impedance inner layers, or hand-wound inductors are
-required. The complete bill of materials contains fewer than thirty distinct line
-items, all available in standard SMD packages ranging from 0402 to SOIC-16.
+The complete bill of materials contains fewer than thirty distinct line
+items, all available in standard SMD packages ranging from 0402 to SOIC-16, check out appendix~\ref{ch:appendix_bom}.
 
 
 \section{System Block Diagram}
@@ -978,7 +971,7 @@ items, all available in standard SMD packages ranging from 0402 to SOIC-16.
 
 The hardware platform is organised around four functional subsystems that interact
 through well-defined electrical interfaces, as illustrated in
-Figure~\ref{fig:hw_block}. In first place, the \emph{processing subsystem} which is anchored by the
+Figure~\ref{fig:hw_block}. First, the \emph{processing subsystem} is anchored by the
 Espressif ESP32-WROOM-32UE module~\cite{espressif2023esp32wroom}, which hosts the
 application processor, the BLE radio, and the SPI master that controls the LoRa
 transceiver. Second, the \emph{RF subsystem} comprises the HopeRF RFM95W-868S2
@@ -990,14 +983,6 @@ protection, and buck-boost stage. Finally, the \emph{programming and user-interf
 subsystem} provides USB connectivity through a CH340C USB-to-UART bridge~\cite{ch340c2023},
 two tactile pushbuttons for manual boot selection and reset, and two indicator LEDs
 reflecting battery charging status.
-
-% \begin{figure}[htbp]
-%     \centering
-%     \includegraphics[width=\textwidth]{images/pcb_subsystems_overlay.png}
-%     \caption{Top-level hardware block diagram of the A3MESH node, showing the four
-%     functional subsystems and their principal electrical interfaces.}
-%     \label{fig:hw_block}
-% \end{figure}
 
 \img{images/pcb_subsystems_overlay.png}{Top-level hardware block diagram of the A3MESH node, showing the four functional subsystems and their principal electrical interfaces.}{0.5}{hw_block}
 
@@ -1050,7 +1035,7 @@ transistors) through 1\,k$\Omega$ current-limiting resistors, which in turn
 illuminate D1 (red) during active charging and D2 (green) when the cell has reached
 full charge.
 
-Last but not least, a Schottky diode D3 (SS34, SMA package, 3\,A rated) is placed in the power path to
+A Schottky diode D3 (SS34, SMA package, 3\,A rated) is placed in the power path to
 prevent reverse conduction from the battery back into the USB supply when the latter
 is absent or at a lower potential than the battery, ensuring that the system can
 be powered from either source without contention between the two rails.
@@ -1085,7 +1070,7 @@ In order to monitor the state of charge of the LiPo cell, the firmware measures 
 voltage through a resistive divider connected to one of the ESP32's 12-bit analogue
 inputs. Given that the resistors R13 (330\,k$\Omega$) and R14 (470\,k$\Omega$) form a divider with
 ratio $470/(330+470)\approx0.59$, scaling the 3.0--4.2\,V battery range to
-approximately 1.76--2.47\,V, comfortably within the 0--3.3\,V ADC input range of
+approximately 1.76--2.47\,V, comfortably within the 0--3.3\,V \acro{adc} input range of
 the ESP32~\cite{espressif2023esp32trm}. Thus, the firmware applies a multiplicative
 correction factor to reconstruct the actual battery voltage from the sampled reading,
 and reports a low-battery warning when the reconstructed voltage falls below 3.0\,V.
@@ -1114,8 +1099,8 @@ radios, together with the matching network required for antenna connection. The
 printed trace antenna, which was selected to avoid desensitisation of the 2.4\,GHz
 radio from the proximity of the 868\,MHz LoRa circuitry.
 
-Besides, the ESP32 communicates with the RFM95W LoRa module via a dedicated SPI bus, using
-the GPIO assignments listed in Table~\ref{tab:hw_spi}. Along with that, the pin mapping follows the constraints of the ESP32's IOMUX
+The ESP32 communicates with the RFM95W LoRa module via a dedicated SPI bus, using
+the GPIO assignments listed in Table~\ref{tab:hw_spi}. The pin mapping follows the constraints of the ESP32's IOMUX
 multiplexer, which pre-assigns high-speed SPI signals to specific GPIO banks to
 avoid the additional propagation delay of the GPIO matrix~\cite{espressif2023esp32trm}.
 
@@ -1124,16 +1109,16 @@ avoid the additional propagation delay of the GPIO matrix~\cite{espressif2023esp
     \caption{SPI and control GPIO assignments between the ESP32 and the RFM95W.}
     \label{tab:hw_spi}
     \begin{tabular}{llc}
-        \hline
+        \toprule
         Signal & Function & ESP32 GPIO \\
-        \hline
+        \midrule
         SCK   & SPI clock                  & 5  \\
         MOSI  & Master Out Slave In        & 25 \\
         MISO  & Master In Slave Out        & 15 \\
         NSS   & Chip Select (active low)   & 18 \\
         RST   & Hardware Reset (active low)& 14 \\
         DIO0  & RX/TX interrupt            & 26 \\
-        \hline
+        \bottomrule
     \end{tabular}
 \end{table}
 
@@ -1142,8 +1127,8 @@ avoid the additional propagation delay of the GPIO matrix~\cite{espressif2023esp
 
 The ESP32's integrated 2.4\,GHz radio supports Bluetooth 4.2, including the BLE
 stack required for the smartphone interface described in Chapter~\ref{ch:mobileapp}.
-In fact, the BLE subsystem operates exclusively in peripheral role, advertising as a GATT
-server and maintaining a single connection to the paired smartphone. What's more, no external RF components are
+The BLE subsystem operates exclusively in the peripheral role, advertising as a GATT
+server and maintaining a single connection to the paired smartphone. No external RF components are
 required for the BLE link: the module's internal antenna provides sufficient gain for
 the short-range smartphone pairing scenario.
 
@@ -1151,7 +1136,7 @@ the short-range smartphone pairing scenario.
 \label{subsec:hw_memory}
 
 The 4\,MB flash within the module is partitioned into a bootloader region, the
-primary firmware image, and a non-volatile storage (NVS) partition that persists
+primary firmware image, and a non-volatile storage (\acro{nvs}) partition that persists
 configuration parameters. The 520\,KB of on-chip SRAM is shared
 between the FreeRTOS task stacks, the Bluedroid BLE host stack, and the application
 data structures, including the duplicate packet cache and the neighbour table. Under the profiling conducted during
@@ -1180,7 +1165,7 @@ receive current of approximately 10.3\,mA~\cite{semtech2019sx1276}; these figure
 directly inform the firmware duty-cycling strategy.
 
 The module exposes a 16-pad castellated interface providing power supply, SPI bus,
-interrupt outputs, and an RF port and the RF port connects directly
+interrupt outputs, and an RF port that connects directly
 to the integrated PCB antenna, forgoing an external coaxial connector and its
 associated insertion loss.
 
