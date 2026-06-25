@@ -2014,21 +2014,19 @@ Additionally, two small elements made of a transparent material can be observed.
 
 \section{Development Workflow}
 
-To summarise the development process, it was structured around a three-layer management model that connected the highest level of planning to the day-to-day engineering workflow. At the top level, Scrum sprints provided the iteration cadence and the mechanism for regular alignment with the project supervisor. At the intermediate level, Jira served as the task-tracking tool in which each sprint's work items were formalised, assigned a unique ticket identifier, and tracked to completion. At the lowest level, a Git branching strategy tied each task identifier to a specific version-control branch, creating unambiguous traceability between project planning and repository history. The interaction between these three tools is described in the sections that follow.
+Development was structured around three interlocking tools: Scrum sprints for iteration cadence and supervisor alignment, Jira for task tracking and sprint planning, and Git for version control with branch names tied directly to Jira ticket identifiers.
 
 \section{Agile Methodology}
 
-A lightweight variant of the Scrum framework~\cite{schwaber2020scrum} was adopted for the duration of the project. Sprints of two weeks each provided the iteration unit. At the opening of each sprint, a planning meeting with the project supervisor was held to review the work completed in the preceding iteration, identify any deviations from the original plan, and select the tasks to be addressed in the forthcoming two weeks. At the close of each sprint, a brief review meeting served to demonstrate the increment produced---whether a functioning firmware feature, a set of simulation results, or a drafted thesis chapter---and to gather feedback before proceeding further.
+A lightweight variant of the Scrum framework~\cite{schwaber2020scrum} was adopted for the duration of the project. Sprints of two weeks each provided the iteration unit. At the opening of each sprint, a planning meeting with the project supervisor was held to review the work completed in the preceding iteration, identify any deviations from the original plan, and select the tasks to be addressed in the forthcoming two weeks.
 
-The two-week cadence was chosen as a balance between feedback frequency and iteration overhead. Shorter cycles would have imposed disproportionate planning cost in a project where some tasks---such as \acro{pcb} fabrication or simulation campaigns---have an inherent minimum duration of several days. Longer cycles would have risked accumulating divergence from the supervisor's expectations before a correction could be applied. In practice, the sprint boundary also served as a forcing function for integration: at the end of each sprint, the increment was required to be testable on physical hardware or demonstrable in a running application, which prevented the gradual accumulation of partially finished work.
-
-When a technical challenge proved larger than anticipated within a sprint---as occurred, for instance, during the implementation of the AES-256-GCM encryption pipeline in the firmware, which required a full sprint extension---the scope of the subsequent sprint was adjusted to compensate, rather than deferring indefinitely. This continuous re-prioritisation is precisely the mechanism that Scrum is designed to support and that distinguishes it from a rigid waterfall plan.
+The two-week cadence balanced feedback frequency against iteration overhead: shorter cycles would have imposed disproportionate planning cost given tasks such as \acro{pcb} fabrication, while longer cycles risked accumulating divergence from the supervisor's expectations before a correction could be applied. When a sprint's scope proved larger than anticipated, the subsequent sprint was adjusted to compensate rather than deferring indefinitely.
 
 \section{Sprint Planning with Jira}
 
-Each sprint's work items were recorded in a Jira project board maintained throughout the development period. Every discrete deliverable---a subsystem design, a firmware module, a simulation experiment, and a thesis chapter---was represented as a Jira issue assigned a unique ticket identifier of the form \texttt{TFG-\textit{N}}, where $N$ is a monotonically increasing integer. The ticket captured the acceptance criteria for the item, the sprint to which it was assigned, and the time estimate.
+Each sprint's work items were recorded in a Jira project board maintained throughout the development period. Every discrete deliverable---a subsystem design, a firmware module, a simulation experiment, and a thesis chapter---was represented as a Jira issue assigned a unique ticket identifier of the form \texttt{TFG-\textit{N}}, where $N$ is a monotonically increasing integer.
 
-To prevent the backlog from becoming a flat, undifferentiated list as the project grew, tickets were grouped under six parent epics that aligned with the principal concerns of the project. The \emph{Documentation} epic collected all tasks related to the drafting of thesis chapters and the recording of design notes for later reference. The \emph{Debugging and Testing} epic covered real-world validation activities, including field tests and hardware bring-up sessions. The \emph{FW Architecture} epic tracked the implementation of all firmware modules described in Chapter~\ref{ch:firmware}. The \emph{HW Architecture} epic grouped the KiCad schematic design, PCB layout, and manufacturing tasks of Chapter~\ref{ch:hardware}. The \emph{System Architecture} epic covered the network simulation framework and the Smart Gossip algorithm development of Chapter~\ref{ch:simulation}. Finally, the \emph{Mobile SW} epic contained all tasks associated with the Android application described in Chapter~\ref{ch:mobileapp}. This two-level hierarchy---epics grouping individual tickets---made it possible to assess progress at a subsystem granularity during planning meetings without losing sight of the individual task level.
+Tickets were grouped under six epics---\emph{Documentation}, \emph{Debugging and Testing}, \emph{FW Architecture}, \emph{HW Architecture}, \emph{System Architecture}, and \emph{Mobile SW}---one per major subsystem, allowing progress to be assessed at a subsystem granularity during planning meetings.
 
 This ticket-centric representation served two purposes beyond simple task tracking. First, it made the scope of each sprint explicit and negotiable at the planning meeting, preventing scope creep from being introduced informally between meetings. Second, and more importantly for day-to-day engineering, the ticket identifier was embedded directly in the version-control branch name, as described in the following section, creating a direct and auditable link between a Jira ticket and all the commits that contributed to resolving it.
 
@@ -2046,88 +2044,42 @@ Figure~\ref{fig:git_workflow} illustrates this sequence as a branch diagram, sho
 
 \section{Repository Organisation}
 
-The entire project is maintained within a single repository whose directory structure enforces the orthogonality of its constituent subsystems. The root of the repository contains the LaTeX source of this thesis alongside five subdirectories, each of which corresponds to one self-contained technical component:
-\begin{itemize}
-    \item \texttt{tfg\_firmware/} contains the ESP-IDF firmware project, including all source code, build scripts, and configuration files.
-    \item \texttt{tfg\_hardware/} contains the KiCad PCB schematic and layout files, along with any associated design documentation.
-    \item \texttt{tfg\_software/} contains the Android application Gradle project, including source code, resources, and build configurations.
-    \item \texttt{MeshtasticatorMeshAlgoComp/} contains the modified Meshtasticator simulation framework, including all source code and simulation scripts.
-    \item \texttt{tfg\_3d/} contains the Fusion 360 CAD files for the mechanical enclosure and smartphone integration.
-\end{itemize}
+The entire project is maintained within a single repository whose directory structure enforces the orthogonality of its constituent subsystems. The root of the repository contains the LaTeX source of this thesis alongside five subdirectories, each of which corresponds to one self-contained technical component, check out Appendix~\ref{ch:appendix_repos} for details.
 
 This monorepo organisation was chosen deliberately so that a complete snapshot of the project at any point in history---including the thesis text, the firmware, the hardware design, and the simulation code---is recoverable from a single commit hash. The orthogonality of the subdirectories ensures that changes to one subsystem do not generate noise in the diffs of another: a firmware commit touches only files under \texttt{tfg\_firmware/}, a thesis chapter commit touches only \texttt{tfe.tex} and \texttt{tfe.bib}, and the two are never conflated. This discipline also makes it straightforward to understand the scope of any given feature branch from its commit history alone.
-
-% =============================================================================
-% RESULTS
-% =============================================================================
-
-% TARGET: 5-6 pages
 
 \chapter{Experimental Results and Evaluation}
 \label{ch:results}
 
 \section{Test Methodology}
-% Explain:
-% - Indoor/outdoor tests
-% - Metrics collected
 
 \section{Real-World Communication Tests}
-% Explain real deployment results
 
 \section{Power Consumption Analysis}
-% Add:
-% - Current consumption plots
-% - Battery life estimations
 
 \section{Range Evaluation}
-% Explain distance testing
 
 \section{Mesh Scalability Tests}
-% Explain multi-node tests
 
 \section{Comparison with Existing Systems}
-% Compare against Meshtastic
 
 \section{Limitations}
-% IMPORTANT:
-% Be honest and critical
-
-% =============================================================================
 
 \part{Conclusions}
 \label{part:conclusions}
-
-% TARGET: 3-4 pages
 
 \chapter{Conclusions and Future Work}
 \label{ch:conclusions}
 
 \section{Achieved Objectives}
-% Revisit objectives
 
 \section{Main Contributions}
-% Summarize contributions
 
 \section{Lessons Learned}
-% Explain technical insights
 
 \section{Future Improvements}
-% Explain:
-% - Future routing improvements
-% - Better hardware
-% - iOS support
-% - Security extensions
-
-% =============================================================================
 
 \printbibliography
-
-% =============================================================================
-% APPENDICES
-% =============================================================================
-
-% No strict limit.
-% Use appendices to avoid overloading main text.
 
 \appendix
 \part{Appendices}
