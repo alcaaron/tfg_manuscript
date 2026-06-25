@@ -1969,26 +1969,21 @@ The use of AI-assisted development introduced specific trade-offs that should be
 
 The total development effort invested in the mobile application was approximately two weeks of part-time work, compared with the three months devoted to the simulation framework, the Smart Gossip algorithm, and the custom hardware design. This allocation reflects the primary objectives of the thesis. The application is sufficiently complete for its intended purpose: it enables real-world field testing of the full A3MESH platform, provides an accessible user interface that validates the accessibility requirement of Section~\ref{subsec:req_accessibility}, and demonstrates that the firmware AT interface is expressive enough to support a fully featured messaging application with end-to-end encryption. Future extensions, including iOS support, push notification integration, and message acknowledgement indicators, are deferred to future work.
 
-% =============================================================================
-% MECHANICAL DESIGN
-% =============================================================================
-
-% TARGET: 2-3 pages
-
 \chapter{Mechanical Integration}
+\label{ch:mechanical}
 
 \section{Design Objectives}
 \label{sec:design_objectives}
 
 The primary design objective was to create an accessory that the user would not need to consciously manage. Rather than requiring the user to remember to attach and detach the device, the goal was an "install once, forget it's there" experience: the board should become a permanent, unobtrusive extension of the phone rather than a separate object to keep track of.
 
-To achieve this, the PCBA was housed in a dedicated protective shell, conceptually similar to a small case of its own. This shell is then permanently bonded to the back of the phone's existing case using an adhesive layer, following the same attachment principle used by many "smart wallet" card holders available on the market. This approach removes the need for any manual connection or disconnection step, satisfying the core usability goal of the project.
+To achieve this, the \acro{pcba} was housed in a dedicated protective shell, conceptually similar to a small case of its own. This shell is then permanently bonded to the back of the phone's existing case using an adhesive layer, following the same attachment principle used by many "smart wallet" card holders available on the market. This approach removes the need for any manual connection or disconnection step, satisfying the core usability goal of the project.
 
 \section{Ergonomic Considerations}
 
 Building on the goal of making the accessory feel like a natural part of the phone, two main ergonomic decisions were made. First, all external edges of the enclosure were rounded, eliminating sharp corners and edges so that the device sits comfortably in the hand during normal phone use, in the same way that commercial phone cases avoid hard edges.
 
-Second, the enclosure was modeled to be 3D printed in a flexible, rubber-like plastic, matching the material commonly used in standard phone cases. This material choice provides a soft tactile feel consistent with the rest of the phone accessory, while also adding a degree of shock absorption to protect the PCBA inside.
+Second, the enclosure was modelled to be 3D printed in a flexible, rubber-like plastic, matching the material commonly used in standard phone cases. This material choice provides a soft tactile feel consistent with the rest of the phone accessory, while also adding a degree of shock absorption to protect the \acro{pcba} inside.
 
 \section{Smartphone Integration}
 
@@ -1999,45 +1994,39 @@ A second alternative considered was a MagSafe-style magnetic attachment. This op
 Given these constraints, the adhesive-backed shell was selected as the final solution, as it offers a reasonable compromise between universality, ease of installation, and signal integrity.
 
 
-\section{3D Modeling Process}
+\section{3D Modelling Process}
 
-The enclosure was designed using Autodesk Fusion 360 as the primary CAD tool. To ensure the design would integrate correctly with a real device, a 3D model of a phone similar to the target unit was sourced online and used as a reference geometry throughout the modeling process, allowing the enclosure's dimensions and curvature to closely match the actual phone form factor.
+The enclosure was designed using Autodesk Fusion 360 as the primary \acro{cad} tool. To ensure the design would integrate correctly with a real device, a 3D model of a phone similar to the target unit was sourced online and used as a reference geometry throughout the modelling process, allowing the enclosure's dimensions and curvature to closely match the actual phone form factor.
 
-In parallel, the 3D model of the PCBA was exported directly from KiCad. This ensured that the internal cavity of the enclosure was dimensioned to match the real board geometry as closely as possible, avoiding the tolerance issues that can arise when modeling component placement from datasheets alone.
+In parallel, the 3D model of the PCBA was exported directly from KiCad. This ensured that the internal cavity of the enclosure was dimensioned to match the real board geometry as closely as possible, avoiding the tolerance issues that can arise when modelling component placement from datasheets alone.
 
 
 \section{Enclosure Design}
 
-Figure~\ref{fig:enclosure_render} shows the final enclosure design housing the PCBA. The rounded edges, the rubber-like surface finish, and the discreet ventilation slots can be appreciated in the render, along with the engraved logo on the rear face. The bottom edge integrates the connector cutout required for charging and data access, keeping the silhouette as close as possible to that of a standard phone case.
+Figure~\ref{fig:enclosure_render} shows the final enclosure design housing the \acro{pcba}. The rounded edges, the rubber-like surface finish, and the discreet ventilation slots can be appreciated in the render, along with the engraved logo on the rear face. The bottom edge integrates the connector cutout required for charging and data access, keeping the silhouette as close as possible to that of a standard phone case.
 
-Additonally, two small elements made of a transparent material can be observed. These act as light diffusers for the red and green charging status LEDs mounted on the PCBA: since the LEDs themselves are fully enclosed within the opaque shell, these transparent inserts channel and scatter their light to the outer surface, allowing the user to clearly see the charging status indicators from outside the enclosure.
+Additionally, two small elements made of a transparent material can be observed. These act as light diffusers for the red and green charging status \acro{led}s mounted on the \acro{pcba}: since the \acro{led}s themselves are fully enclosed within the opaque shell, these transparent inserts channel and scatter their light to the outer surface, allowing the user to clearly see the charging status indicators from outside the enclosure.
 
-\img{images/a3mesh_case_enclosure.png}{Final enclosure design housing the PCBA.}{0.7}{enclosure_render}
-
-% =============================================================================
-% METHODOLOGY
-% =============================================================================
-
-% TARGET: 2-3 pages
+\img{images/a3mesh_case_enclosure.png}{Final enclosure design housing the \acro{pcba}.}{0.7}{enclosure_render}
 
 \chapter{Development Methodology and Project Management}
 \label{ch:methodology}
 
 \section{Development Workflow}
 
-To summarise the development process, it was structured around a three-layer management model that connected the highest level of planning to the day-to-day engineering workflow. At the top level, Scrum sprints provided the iteration cadence and the mechanism for regular alignment with the project supervisor. At the intermediate level, Jira served as the task-tracking tool in which each sprint's work items were formalized, assigned a unique ticket identifier, and tracked to completion. At the lowest level, a Git branching strategy tied each task identifier to a specific version-control branch, creating unambiguous traceability between project planning and repository history. The interaction between these three tools is described in the sections that follow.
+To summarise the development process, it was structured around a three-layer management model that connected the highest level of planning to the day-to-day engineering workflow. At the top level, Scrum sprints provided the iteration cadence and the mechanism for regular alignment with the project supervisor. At the intermediate level, Jira served as the task-tracking tool in which each sprint's work items were formalised, assigned a unique ticket identifier, and tracked to completion. At the lowest level, a Git branching strategy tied each task identifier to a specific version-control branch, creating unambiguous traceability between project planning and repository history. The interaction between these three tools is described in the sections that follow.
 
 \section{Agile Methodology}
 
 A lightweight variant of the Scrum framework~\cite{schwaber2020scrum} was adopted for the duration of the project. Sprints of two weeks each provided the iteration unit. At the opening of each sprint, a planning meeting with the project supervisor was held to review the work completed in the preceding iteration, identify any deviations from the original plan, and select the tasks to be addressed in the forthcoming two weeks. At the close of each sprint, a brief review meeting served to demonstrate the increment produced---whether a functioning firmware feature, a set of simulation results, or a drafted thesis chapter---and to gather feedback before proceeding further.
 
-The two-week cadence was chosen as a balance between feedback frequency and iteration overhead. Shorter cycles would have imposed disproportionate planning cost in a project where some tasks---such as PCB fabrication or simulation campaigns---have an inherent minimum duration of several days. Longer cycles would have risked accumulating divergence from the supervisor's expectations before a correction could be applied. In practice, the sprint boundary also served as a forcing function for integration: at the end of each sprint, the increment was required to be testable on physical hardware or demonstrable in a running application, which prevented the gradual accumulation of partially finished work.
+The two-week cadence was chosen as a balance between feedback frequency and iteration overhead. Shorter cycles would have imposed disproportionate planning cost in a project where some tasks---such as \acro{pcb} fabrication or simulation campaigns---have an inherent minimum duration of several days. Longer cycles would have risked accumulating divergence from the supervisor's expectations before a correction could be applied. In practice, the sprint boundary also served as a forcing function for integration: at the end of each sprint, the increment was required to be testable on physical hardware or demonstrable in a running application, which prevented the gradual accumulation of partially finished work.
 
-When a technical challenge proved larger than anticipated within a sprint---as occurred, for instance, during the implementation of the AES-256-GCM encryption pipeline in the firmware, which required a full sprint extension---the scope of the subsequent sprint was adjusted to compensate, rather than deferring indefinitely. This continuous re-prioritization is precisely the mechanism that Scrum is designed to support and that distinguishes it from a rigid waterfall plan.
+When a technical challenge proved larger than anticipated within a sprint---as occurred, for instance, during the implementation of the AES-256-GCM encryption pipeline in the firmware, which required a full sprint extension---the scope of the subsequent sprint was adjusted to compensate, rather than deferring indefinitely. This continuous re-prioritisation is precisely the mechanism that Scrum is designed to support and that distinguishes it from a rigid waterfall plan.
 
 \section{Sprint Planning with Jira}
 
-Each sprint's work items were recorded in a Jira project board maintained throughout the development period. Every discrete deliverable---a subsystem design, a firmware module, a simulation experiment, a thesis chapter---was represented as a Jira issue assigned a unique ticket identifier of the form \texttt{TFG-\textit{N}}, where $N$ is a monotonically increasing integer. The ticket captured the acceptance criteria for the item, the sprint to which it was assigned, and the time estimate.
+Each sprint's work items were recorded in a Jira project board maintained throughout the development period. Every discrete deliverable---a subsystem design, a firmware module, a simulation experiment, and a thesis chapter---was represented as a Jira issue assigned a unique ticket identifier of the form \texttt{TFG-\textit{N}}, where $N$ is a monotonically increasing integer. The ticket captured the acceptance criteria for the item, the sprint to which it was assigned, and the time estimate.
 
 To prevent the backlog from becoming a flat, undifferentiated list as the project grew, tickets were grouped under six parent epics that aligned with the principal concerns of the project. The \emph{Documentation} epic collected all tasks related to the drafting of thesis chapters and the recording of design notes for later reference. The \emph{Debugging and Testing} epic covered real-world validation activities, including field tests and hardware bring-up sessions. The \emph{FW Architecture} epic tracked the implementation of all firmware modules described in Chapter~\ref{ch:firmware}. The \emph{HW Architecture} epic grouped the KiCad schematic design, PCB layout, and manufacturing tasks of Chapter~\ref{ch:hardware}. The \emph{System Architecture} epic covered the network simulation framework and the Smart Gossip algorithm development of Chapter~\ref{ch:simulation}. Finally, the \emph{Mobile SW} epic contained all tasks associated with the Android application described in Chapter~\ref{ch:mobileapp}. This two-level hierarchy---epics grouping individual tickets---made it possible to assess progress at a subsystem granularity during planning meetings without losing sight of the individual task level.
 
@@ -2055,7 +2044,7 @@ Figure~\ref{fig:git_workflow} illustrates this sequence as a branch diagram, sho
 
 \img{images/git_workflow.png}{Git branching workflow.}{0.8}{git_workflow}
 
-\section{Repository Organization}
+\section{Repository Organisation}
 
 The entire project is maintained within a single repository whose directory structure enforces the orthogonality of its constituent subsystems. The root of the repository contains the LaTeX source of this thesis alongside five subdirectories, each of which corresponds to one self-contained technical component:
 \begin{itemize}
@@ -2066,7 +2055,7 @@ The entire project is maintained within a single repository whose directory stru
     \item \texttt{tfg\_3d/} contains the Fusion 360 CAD files for the mechanical enclosure and smartphone integration.
 \end{itemize}
 
-This monorepo organization was chosen deliberately so that a complete snapshot of the project at any point in history---including the thesis text, the firmware, the hardware design, and the simulation code---is recoverable from a single commit hash. The orthogonality of the subdirectories ensures that changes to one subsystem do not generate noise in the diffs of another: a firmware commit touches only files under \texttt{tfg\_firmware/}, a thesis chapter commit touches only \texttt{tfe.tex} and \texttt{tfe.bib}, and the two are never conflated. This discipline also makes it straightforward to understand the scope of any given feature branch from its commit history alone.
+This monorepo organisation was chosen deliberately so that a complete snapshot of the project at any point in history---including the thesis text, the firmware, the hardware design, and the simulation code---is recoverable from a single commit hash. The orthogonality of the subdirectories ensures that changes to one subsystem do not generate noise in the diffs of another: a firmware commit touches only files under \texttt{tfg\_firmware/}, a thesis chapter commit touches only \texttt{tfe.tex} and \texttt{tfe.bib}, and the two are never conflated. This discipline also makes it straightforward to understand the scope of any given feature branch from its commit history alone.
 
 % =============================================================================
 % RESULTS
