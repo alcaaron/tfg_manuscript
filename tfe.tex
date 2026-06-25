@@ -1291,9 +1291,6 @@ Furthermore, the BOM was compiled with LCSC part numbers so that JLCPCB could so
 
 % =============================================================================
 % FIRMWARE
-% =============================================================================
-
-% TARGET: 10-12 pages
 \chapter{Firmware Architecture and Implementation}
 \label{ch:firmware}
 
@@ -1318,14 +1315,14 @@ creating a circular header dependency between library directories.
 \paragraph{Non-blocking interrupt handling.} Follows the deferred-processing pattern
 standard in FreeRTOS embedded designs~\cite{freertos2024}. In particular, the SX1276's DIO0 pin
 asserts on RxDone and triggers an ISR declared \texttt{IRAM\_ATTR}, so that it
-executes from instruction RAM regardless of flash cache state. Especially, the ISR does nothing but
-release a binary semaphore and optionally request a context switch. Apart from that all SPI transfers
-and frame parsing happen in a dedicated high-priority task, ensuring that the radio
+executes from instruction RAM regardless of flash cache state. The ISR itself does nothing but
+release a binary semaphore and optionally request a context switch. All SPI transfers
+and frame parsing occur in a dedicated high-priority task, ensuring that the radio
 FIFO is emptied before a subsequent preamble can corrupt it.
 
 \paragraph{Static memory allocation.} Eliminates heap fragmentation and non-deterministic
 latency on the critical path. For instance, a pool of eight statically allocated frame slots
-accommodates bursts of arriving frames, then inter-task transfers pass a 32-bit pointer to
+accommodates bursts of arriving frames; inter-task transfers then pass a 32-bit pointer to
 a pool slot rather than copying the payload, reducing queue-transfer overhead to a
 single word. As a result, no dynamic allocation occurs on any path between frame reception and
 forwarding decision.
@@ -1343,9 +1340,9 @@ state estimation, and periodic housekeeping. Finally, the \emph{Application and 
 Layer} exposes an AT-command interface over BLE to the companion mobile application
 and manages the bidirectional data pipelines between radio and smartphone.
 
-Seven FreeRTOS tasks are created at boot time. Four are pinned to Core~0, dedicated
-to all radio activity; three are pinned to Core~1, which handles BLE and pipeline
-processing (Table~\ref{tab:fw_tasks}).
+Eight FreeRTOS tasks are created at boot time. Four are pinned to Core~0, dedicated
+to all radio activity; four are pinned to Core~1, which handles BLE, pipeline
+processing, and power management (Table~\ref{tab:fw_tasks}).
 
 \begin{table}[htbp]
     \centering
@@ -1360,6 +1357,7 @@ processing (Table~\ref{tab:fw_tasks}).
         \texttt{vBLETxTask}         & 1 & 1 & BLE GATT notification drain \\
         \texttt{BLE2LoRaTask}       & 1 & 1 & AT command parser; upstream packet injector \\
         \texttt{LoRa2BLETask}       & 1 & 1 & Mesh receive state machine \\
+        \texttt{PowerTask}          & 1 & 1 & Adaptive CPU frequency scaling \\
         \bottomrule
     \end{tabular}
     \caption{FreeRTOS task inventory.}
@@ -1408,9 +1406,9 @@ blocks indefinitely on the corresponding \texttt{xSemaphoreTake()} until the ISR
 wakes it. Once woken, it first calls \texttt{LoRa.parsePacket()} to confirm frame
 availability and obtain its length, then allocates a pool slot via
 \texttt{alloc\_frame()} using a volatile round-robin index~\cite[Ch.~2]{tanenbaum2015modern}, and reads the payload
-bytes with \texttt{LoRa.readBytes()}. Along the way it also records the RSSI,
+bytes with \texttt{LoRa.readBytes()}. It also records the RSSI,
 before re-entering continuous-receive mode with \texttt{LoRa.receive()} and
-finally posting the pool-slot pointer to \texttt{xLoRaRxQueue}. Throughout this
+posting the pool-slot pointer to \texttt{xLoRaRxQueue}. Throughout this
 path, no copying takes place: the bytes written by the SPI driver into the pool
 slot are the same bytes later consumed by the mesh pipeline.
 
@@ -1641,20 +1639,13 @@ Chapter~\ref{ch:simulation} using the compiled parameter values that correspond 
 the differential evolution optimum and are embedded as compile-time constants in
 \texttt{config.h}, that returns a fixed-point percentage.
 
-Apart from this, the forwarding decision in
+The forwarding decision in
 \texttt{should\_forward()} draws a uniform random integer from
 \texttt{esp\_random()}\,\%\,100 and forwards if it falls below the threshold.
 \texttt{esp\_random()} reads the ESP32 hardware random number generator, which is
 continuously seeded from RF thermal noise when the BLE radio is
 active~\cite{espressif2023esp32trm}, providing statistically independent draws
 without the sequential correlations of a software PRNG.
-
-% A demonstration mode, toggled via \texttt{AT+DEMO=1}, replaces the optimised
-% parameters with near-unity values ($p_{\mathrm{floor}} = 0.95$, $\alpha = 0.03$,
-% $\beta = 0.05$, $\gamma = 0.05$), causing the node to behave as a pure flood relay
-% suitable for live demonstrations where delivery reliability outweighs channel
-% efficiency. The mode flag is a \texttt{std::atomic} boolean to avoid mutex overhead
-% on the forwarding hot path.
 
 \subsection{Duplicate Detection and Passive ACK Suppression}
 \label{sec:fw_passive_ack}
@@ -1708,21 +1699,52 @@ $3 \times 5 = 15$ on-air copies within its 30-second cache lifetime.
 \subsection{Power Management and Battery Monitoring}
 \label{sec:fw_power}
 
-The A3MESH node operates as a continuously active relay; no deep-sleep or light-sleep
-mode is implemented, as passive ACK timers and neighbour-table state must remain
-consistent across forwarding events. Transmit energy is bounded instead by the
-duty-cycle enforcement mechanism in Section~\ref{sec:fw_lora_driver}, which limits
-on-air activity to at most 36\,s per hour without imposing any reception blackout.
+\paragraph{Sleep modes and their unsuitability.}
+The A3MESH node must remain continuously active as a mesh relay, which rules out both
+ESP32 sleep modes. Deep sleep would discard all volatile state---the passive-ACK
+pending-forward table, the neighbour table, and the duplicate cache---and terminate
+the BLE GATT connection, requiring a full re-initialisation on each wake-up cycle and
+making sustained mesh participation impossible. Light sleep is equally unsuitable for
+two independent reasons. First, the ESP32 BLE radio requires a minimum CPU clock of
+80\,MHz for its timing constraints to be met~\cite{espressif2023esp32trm}; below this
+threshold the Bluetooth controller ceases to function correctly. Second, the SX1276
+LoRa transceiver has no autonomous wake-up capability over SPI: packets received
+while the CPU is asleep fill the transceiver FIFO, which overflows silently if the
+processor does not service the DIO0 interrupt promptly, causing frame loss. Transmit
+energy is bounded through the duty-cycle enforcement mechanism of
+Section~\ref{sec:fw_lora_driver}.
 
-Battery state is estimated by the \texttt{Battery} class from a 20-point look-up
-table of empirically characterised (voltage, percentage) pairs, ranging from
-4.20\,V at 100\,\% down to 3.00\,V at~0\,\%. The input voltage is obtained by
-reading the 12-bit ADC on GPIO36 (pin~A0) and scaling by the hardware divider factor
-$k = 2.0$, derived from the R13/R14 resistive divider described in
-Chapter~\ref{ch:hardware}. Battery percentage and the RSSI of the last received frame
-are reported to the companion application via the \texttt{AT+INFO?} command. The
-DW01A\,+\,FS8205A protection stage provides a hard cut-off near 2.4\,V as a secondary
-safeguard independent of firmware state.
+\paragraph{Adaptive CPU frequency scaling.}
+Since the node must remain awake but is frequently idle between mesh events, dynamic
+power consumption is reduced through adaptive clock scaling, implemented by the
+\texttt{PowerManager} class. The CPU nominally runs at \texttt{POWER\_ACTIVE\_MHZ}
+$= 240$\,MHz. A dedicated FreeRTOS task (\texttt{PowerTask}), pinned to Core~1 at
+priority~1 and polling every \texttt{POWER\_CHECK\_INTERVAL\_MS} $= 2$\,min, monitors
+the elapsed time since the last call to \texttt{notify\_activity()}. When this
+interval exceeds \texttt{POWER\_IDLE\_TIMEOUT\_MS} $= 10$\,min---indicating that no
+valid LoRa packet has been received---the task invokes
+\texttt{setCpuFrequencyMhz(POWER\_IDLE\_MHZ)}, reducing the clock to 80\,MHz. This
+is precisely the minimum frequency at which both the BLE radio and the LoRa SPI
+driver continue to operate correctly, making it the lowest safe operating point with
+no radio disruption. On the next valid packet reception, the receive path calls
+\texttt{notify\_activity()}, which immediately restores the clock to 240\,MHz. The
+idle-to-active transition is detected by an atomic compare-and-exchange on a
+\texttt{std::atomic<bool>} flag, so no mutex is required on the forwarding hot path.
+
+\paragraph{Battery state estimation.}
+The \texttt{Battery} class converts a raw \acro{adc} sample into a state-of-charge
+percentage using a 20-point look-up table of (voltage, percentage) pairs that
+characterises a typical LiPo discharge curve, spanning 4.20\,V at 100\,\% down to
+3.00\,V at~0\,\%. A 12-bit \acro{adc} reading from pin~A0 (GPIO36) is first scaled
+to the actual cell voltage by $V_{\mathrm{bat}} = (\mathrm{raw}/4095) \times 3.3
+\times k$, where $k = \texttt{BATTERY\_ADC\_FACTOR} = 2.0$ compensates for the
+R13/R14 resistive divider described in Chapter~\ref{ch:hardware}. The corresponding
+look-up entry is then located by a linear scan; if the measured voltage falls between
+two adjacent entries, the percentage is determined by linear interpolation, yielding a
+smooth continuous estimate rather than a coarse staircase. The resulting percentage is
+reported to the companion application via the \texttt{AT+INFO?} command. As a
+hardware safeguard independent of firmware state, the DW01A\,+\,FS8205A protection
+stage provides a hard cut-off near 2.4\,V to prevent deep discharge.
 
 \subsection{Node Identity}
 \label{sec:fw_identity}
@@ -1753,44 +1775,7 @@ protocol~\cite{itu1999v250} carried over the BLE NUS service. Each command is a
 CRLF-terminated ASCII string, and the node replies with zero or more unsolicited result
 lines followed by a final status code: \texttt{+OK} indicates that the command was
 executed successfully, while \texttt{+ERR=n} indicates failure, with the integer
-\texttt{n} identifying the specific error condition. Table~\ref{tab:fw_at_commands}
-documents the complete command set implemented in \texttt{BLE2LoRaTask}.
-
-\begin{table}[htbp]
-    \centering
-    \caption{A3MESH AT command reference. \tcmp{arg} denotes a mandatory argument.}
-    \label{tab:fw_at_commands}
-    \begin{tabular}{lp{8.5cm}}
-        \toprule
-        \textbf{Command} & \textbf{Description} \\
-        \midrule
-        \texttt{AT}                              & No-operation; Used for connectivity checks. \\
-        \texttt{AT+SEND=\tcmp{msg}}              & Broadcast \texttt{k\_data\_plain} to all reachable nodes. \\
-        \texttt{AT+SENDE2E=\tcmp{dst},\tcmp{msg}} & Send AES-256-GCM node-to-node encrypted message to \tcmp{dst}. \\
-        \texttt{AT+SENDGRP=\tcmp{msg}}           & Send AES-256-GCM group-encrypted broadcast. \\
-        \texttt{AT+SENDNET=\tcmp{msg}}           & Send AES-256-GCM network-encrypted broadcast. \\
-        \texttt{AT+SENDKX=\tcmp{dst},\tcmp{key}} & Transmit a \texttt{k\_key\_exchange} packet to provision a remote peer key. \\
-        \texttt{AT+NEIGHBORS?}                  & Return each neigbhor table entry, together with their RSSI and last seen time. \\
-        \texttt{AT+NODEID?}                     & Return local node ID. \\
-        \texttt{AT+INFO?}                       & Return firmware version, battery percentage, node uptime, LoRa parameters and neighbor count. \\
-        \texttt{AT+SETNETKEY=\tcmp{key}}         & Provision the shared network key (hex string). \\
-        \texttt{AT+SETPEERKEY=\tcmp{dst},\tcmp{key}} & Provision the node-to-node peer key for destination \tcmp{dst}. \\
-        \texttt{AT+SETGRPKEY=\tcmp{key}}         & Provision the group key. \\
-        \texttt{AT+CLRKEYS}                     & Erase all provisioned keys from volatile memory. \\
-        % \texttt{AT+DEMO=\tcmp{0|1}}              & Enable~(1) or disable~(0) demonstration mode. \\
-        % \texttt{AT+DEMO?}                       & Query current demonstration mode state. \\
-        \bottomrule
-    \end{tabular}
-\end{table}
-
-Unsolicited notifications from node to smartphone follow a parallel naming convention:
-\begin{itemize}
-    \item \texttt{+RCV=\tcmp{src},\tcmp{msg}} for received plain messages.
-    \item \texttt{+RCVE2E=\tcmp{src},\tcmp{msg}} for decrypted end-to-end unicast.
-    \item \texttt{+RCVGRP=\tcmp{src},\tcmp{msg}} for decrypted group messages.
-    \item \texttt{+DISC=\tcmp{id}} for newly discovered neighbours.
-    \item \texttt{+KX=\tcmp{src},\tcmp{key}} for received key-exchange payloads.
-\end{itemize}
+\texttt{n} identifying the specific error condition. Appendix~\ref{ch:appendix_at} lists the complete command set.
 
 
 \subsection{BLE-to-LoRa Pipeline}
@@ -1805,8 +1790,9 @@ encryption to \texttt{CryptoManager} when required) before posting it to
 node-ID register and write their responses directly to \texttt{xBLETxQueue}.
 
 
-\img{images/at_sende2e_sequence_diagram_outline.png}{BLE-to-LoRa sequence diagram.}{0.9}{fw_ble2lora}
+\img{images/at_sende2e_sequence_diagram_outline.png}{BLE-to-LoRa sequence diagram.}{0.75}{fw_ble2lora}
 
+\newpage
 \subsection{LoRa-to-BLE Pipeline}
 \label{sec:fw_lora2ble}
 
@@ -1826,7 +1812,7 @@ broadcast packet with an affirmative gossip decision triggers both local deliver
 forwarded copy in the same pass through the state machine.
 
 
-\img{images/lora2ble_sequence_diagram_outline_v3.png}{LoRa-to-BLE sequence diagram.}{0.9}{fw_lora2ble}
+\img{images/lora2ble_sequence_diagram_outline_v3.png}{LoRa-to-BLE sequence diagram.}{0.75}{fw_lora2ble}
 
 \section{Security Architecture}
 \label{sec:fw_security}
