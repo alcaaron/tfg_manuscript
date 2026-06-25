@@ -330,7 +330,7 @@ brand and the 2.4~GHz \acro{ism} band with its predecessor, \acro{ble} is a dist
 protocol stack: it uses 40 channels of 2~MHz with \acro{gfsk} modulation, three of
 which are reserved for advertising, and it replaces the connection-oriented
 complexity of classic Bluetooth with a lightweight, asynchronous design
-oriented towards the sporadic exchange of small amounts of data.
+oriented toward the sporadic exchange of small amounts of data.
 
 \subsection{Architecture}
 
@@ -449,7 +449,7 @@ Meshtastic is an open-source firmware and application ecosystem that turns inexp
 
 Routing in Meshtastic follows a \emph{managed flooding} strategy. A node that originates a message broadcasts it; every node that receives it rebroadcasts it once, until a hop-limit counter (three by default, seven at most) is exhausted~\cite{meshtastic2024mesh}. The flooding is «managed» through a handful of heuristics: duplicate packets are recognized and suppressed via a per-packet identifier cache; rebroadcasts are delayed by a contention window weighted by the received \acro{snr}, so that distant nodes---which extend coverage the most---tend to retransmit first; and a node that overhears another copy of the packet during its back-off cancels its own retransmission. Since version 2.6, unicast messages additionally learn a next-hop after the first flooded delivery, although broadcast traffic, which dominates typical usage, continues to flood~\cite{meshtastic2024mesh}.
 
-The strengths of this design are clear. Flooding requires no routing state, no topology knowledge and no control traffic; it is maximally robust to mobility and node failure, since any available path is implicitly used; and it guarantees that broadcasts reach every reachable node. These properties explain Meshtastic's popularity for hiking groups, events and emergency-preparedness communities. The weaknesses, however, are equally structural. Every message triggers up to one transmission per node within the hop horizon, so channel occupancy grows with node density rather than with traffic demand---a particularly serious problem over LoRa, where airtime is long and duty-cycle budgets are tight. Experimental and community evidence consistently reports degraded delivery rates and channel saturation as dense meshes grow towards the order of a hundred nodes, aggravated by periodic telemetry and position broadcasts that the protocol itself generates~\cite{wong2024multihop,meshtastic2024mesh}. In other words, Meshtastic inherits the classical \emph{broadcast storm} pathology discussed in Section~\ref{sec:gossip}, mitigated but not solved by its heuristics.
+The strengths of this design are clear. Flooding requires no routing state, no topology knowledge and no control traffic; it is maximally robust to mobility and node failure, since any available path is implicitly used; and it guarantees that broadcasts reach every reachable node. These properties explain Meshtastic's popularity for hiking groups, events and emergency-preparedness communities. The weaknesses, however, are equally structural. Every message triggers up to one transmission per node within the hop horizon, so channel occupancy grows with node density rather than with traffic demand---a particularly serious problem over LoRa, where airtime is long and duty-cycle budgets are tight. Experimental and community evidence consistently reports degraded delivery rates and channel saturation as dense meshes grow toward the order of a hundred nodes, aggravated by periodic telemetry and position broadcasts that the protocol itself generates~\cite{wong2024multihop,meshtastic2024mesh}. In other words, Meshtastic inherits the classical \emph{broadcast storm} pathology discussed in Section~\ref{sec:gossip}, mitigated but not solved by its heuristics.
 
 A3MESH takes Meshtastic's architectural premises---full decentralisation, role-free nodes, BLE smartphone integration---as a baseline, but replaces blind rebroadcasting with a probabilistic, adaptive forwarding discipline. The goal is to retain flooding's robustness and statelessness while decoupling channel load from node density, so that the network degrades gracefully precisely in the dense, high-stress scenarios where flooding performs worst.
 
@@ -458,7 +458,7 @@ A3MESH takes Meshtastic's architectural premises---full decentralisation, role-f
 
 LocalMesh is a community initiative, originating in the Netherlands and the United Kingdom, that deploys volunteer-operated LoRa repeaters to provide free, subscription-less emergency messaging when cellular and Internet infrastructure fail~\cite{localmesh2026}. Technically, LocalMesh networks run MeshCore, an open-source mesh protocol released in 2025 as a direct response to the scalability limits of flood-based systems~\cite{meshcore2025}.
 
-MeshCore abandons the egalitarian model in favour of explicit device roles. Ordinary user devices (\emph{companions}) never forward traffic; forwarding is reserved for dedicated \emph{repeaters}, intentionally placed at elevated locations, while \emph{room servers} provide store-and-forward group messaging. Routing is hybrid: the first message towards an unknown destination is flooded through the repeater backbone for path discovery; the acknowledgement returns the ordered sequence of repeaters traversed, and subsequent messages embed this source-routed path in their headers, so that only the designated next-hop repeater forwards each packet. If a cached path fails, the sender falls back to flooding to discover a fresh one~\cite{meshcore2025}. The result is a much quieter channel: after path discovery, most traffic is directed unicast rather than network-wide broadcast, which is why MeshCore networks scale comfortably beyond the practical limits of Meshtastic.
+MeshCore abandons the egalitarian model in favour of explicit device roles. Ordinary user devices (\emph{companions}) never forward traffic; forwarding is reserved for dedicated \emph{repeaters}, intentionally placed at elevated locations, while \emph{room servers} provide store-and-forward group messaging. Routing is hybrid: the first message toward an unknown destination is flooded through the repeater backbone for path discovery; the acknowledgement returns the ordered sequence of repeaters traversed, and subsequent messages embed this source-routed path in their headers, so that only the designated next-hop repeater forwards each packet. If a cached path fails, the sender falls back to flooding to discover a fresh one~\cite{meshcore2025}. The result is a much quieter channel: after path discovery, most traffic is directed unicast rather than network-wide broadcast, which is why MeshCore networks scale comfortably beyond the practical limits of Meshtastic.
 
 These gains, however, are bought with assumptions that cannot be made in this project. MeshCore's efficiency depends on a \emph{planned, static backbone} of well-placed, always-on repeaters---volunteer infrastructure that takes months to build and that constitutes, in aggregate, a dependency not unlike the one resilient networks try to escape. Cached source routes also presume topological stability: under mobility or node loss, the protocol repeatedly falls back to flooding, eroding its advantage exactly when conditions are most adverse. A3MESH targets the complementary scenario: spontaneous, fully ad-hoc deployments of homogeneous, possibly mobile nodes, with no pre-positioned infrastructure and no role assignment. The research question is therefore whether the channel-load discipline that MeshCore achieves through \emph{structure} can instead be achieved through \emph{statistics}---that is, through gossip-based forwarding.
 
@@ -568,54 +568,31 @@ Finally, the system must be operable by users with no technical background whats
 \label{ch:simulation}
 
 \section{Purpose of the Simulator}
-% Explain:
-% - Why simulation was necessary
-% - Why real testing alone is insufficient
-% - Parameter exploration problem
 There are several reasons why a network simulator was necessary for this thesis.
 
 The first is the \emph{parameter exploration problem}. The adaptive forwarding function developed in this chapter is governed by five continuous parameters, where each evaluation of a single parameter combination requires observing the network for a statistically meaningful period. In other words, performing even a coarse exploration of this space on real hardware would require thousands of multi-hour field deployments, which is materially impossible within the scope of this work. In contrast, in simulation the same exploration is reduced to minutes of computation.
 
-The second obstacle is \emph{scale and controllability}. The phenomena of interest---broadcast storms, channel congestion, gossip die-out---only emerge at network sizes of tens of nodes spread over kilometres, far beyond the prototype fleet that can realistically be manufactured and deployed. Moreover, physical experiments cannot hold conditions constant: interference, weather and node placement vary between runs, making it impossible to attribute performance differences to the routing algorithm rather than to the environment. 
+The second obstacle is \emph{scale and controllability}. The phenomena of interest---broadcast storms, channel congestion, gossip die-out---only emerge at network sizes of tens of nodes spread over kilometres, far beyond the prototype fleet that can realistically be manufactured and deployed. Moreover, physical experiments cannot hold conditions constant: interference, weather, and node placement vary between runs, making it impossible to attribute performance differences to the routing algorithm rather than to the environment. 
 
-Finally, a discrete-event simulator provides perfectly repeatable conditions in which two algorithms can be compared on \emph{identical} topologies, traffic patterns and channel realisations.
+Finally, a discrete-event simulator provides perfectly repeatable conditions in which two algorithms can be compared on \emph{identical} topologies, traffic patterns, and channel realizations.
 
 
 \section{Simulation Environment}
-% Explain:
-% - Simulator architecture
-% - Node model
-% - Packet model
-% - RF assumptions
-% - Randomness/reproducibility
-%
-% Add:
-% - Simulator screenshots
-% - Architecture diagram
 
 \subsection{Simulator Architecture}
-The experimental platform is built upon \emph{Meshtasticator}, the open-source discrete-event simulator of the Meshtastic project~\cite{meshtasticator2024}. Meshtasticator models a LoRa mesh as a set of node processes coordinated by the SimPy discrete-event engine~\cite{simpy2024}: nodes exchange packets through a broadcast pipe that emulates the shared radio medium, and every transmission is propagated to all other nodes, where it may be received, lost due to insufficient signal strength, or destroyed by collision. The simulator implements the relevant PHY and MAC behaviour of real Meshtastic devices as well as LoRa time-on-air computation, capture-effect collision modelling, listen-before-talk channel access with random back-off, and the official \emph{managed flood} routing algorithm of the Meshtastic firmware, which provides a faithful baseline for comparison.
+The experimental platform is built upon \emph{Meshtasticator}, the open-source discrete-event simulator of the Meshtastic project~\cite{meshtasticator2024}. Meshtasticator models a LoRa mesh as a set of node processes coordinated by the SimPy discrete-event engine~\cite{simpy2024}: nodes exchange packets through a broadcast pipe that emulates the shared radio medium, and every transmission is propagated to all other nodes, where it may be received, lost due to insufficient signal strength, or destroyed by collision. The simulator implements the relevant \acro{phy} and \acro{mac} behavior of real Meshtastic devices as well as LoRa time-on-air computation, capture-effect collision modeling, listen-before-talk channel access with random back-off, and the official \emph{managed flood} routing algorithm of the Meshtastic firmware, which provides a faithful baseline for comparison.
 
-On top of that, the simulator was extended for this thesis in two main directions. First, the routing layer was refactored to support pluggable forwarding policies, and the candidate strategies described in Section~\ref{sec:sim_strategies} were implemented as selectable router types, culminating in the Smart Gossip router. Second, the configuration system was instrumented so that the parameters of the Smart Gossip decision function are exposed as runtime variables, a prerequisite for the automated optimisation process of Section~\ref{sec:sim_optimization}. Finally, a batch-execution harness and an optimisation driver were developed on top of the simulator to run large experiment campaigns and collect the metrics defined in Section~\ref{sec:sim_metrics}.
-
-% --- FIGURE PLACEHOLDER -------------------------------------
-% \begin{figure}[htbp]
-%     \centering
-%     % \includegraphics[width=0.85\textwidth]{figures/simulator_architecture.pdf}
-%     \caption{Architecture of the simulation platform: Meshtasticator core (SimPy engine, propagation model, MAC layer), the pluggable routing layer added in this work, and the batch/optimisation harness built on top.}
-%     \label{fig:sim_architecture}
-% \end{figure}
-% ------------------------------------------------------------
+On top of that, the simulator was extended for this thesis in two main directions. First, the routing layer was refactored to support pluggable forwarding policies, and the candidate strategies described in Section~\ref{sec:sim_strategies} were implemented as selectable router types, culminating in the Smart Gossip router. Second, the configuration system was instrumented so that the parameters of the Smart Gossip decision function are exposed as runtime variables, a prerequisite for the automated optimization process of Section~\ref{sec:sim_optimization}. Finally, a batch-execution harness and an optimization driver were developed on top of the simulator to run large experiment campaigns and collect the metrics defined in Section~\ref{sec:sim_metrics}.
 
 \subsection{Node, Packet and Channel Models}
-Each simulated node generates application messages, maintains a duplicate cache, executes the configured forwarding policy and respects the half-duplex constraint of the radio. Nodes are placed uniformly at random over a 15$\times$15~km area, subject to a minimum-separation constraint, and approximately 30\% of the nodes are mobile, exercising the protocols under topological change.
+Each simulated node generates application messages, maintains a duplicate cache, executes the configured forwarding policy, and respects the half-duplex constraint of the radio. Nodes are placed uniformly at random over a 15$\times$15~km area, subject to a minimum-separation constraint, and approximately 30\% of the nodes are mobile, exercising the protocols under topological change.
 
-A part from this, the radio configuration corresponds to the \texttt{LONG\_FAST} preset on the EU~868 band: SF11, 250~kHz bandwidth and coding rate 4/5, yielding a time-on-air of approximately 550~ms per packet; transmit power is 27~dBm and receiver sensitivity $-131.5$~dBm. Path loss follows the 3GPP Suburban Macro model (Model~5), which produces realistic link ranges of roughly 1.8~km in this configuration. Two refinements increase realism: log-normal shadowing and per-link asymmetric gain offsets (normally distributed, $\sigma = 3$~dB), so that link quality differs between directions, as observed in real LoRa deployments~\cite{cattani2017reliability}. The hop limit is fixed at 3, matching the Meshtastic default.
+Apart from this, the radio configuration corresponds to the \texttt{LONG\_FAST} preset on the EU~868 band: SF11, 250~kHz bandwidth and coding rate 4/5, yielding a time-on-air of approximately 550~ms per packet; transmit power is 27~dBm and receiver sensitivity $-131.5$~dBm. Path loss follows the 3GPP Suburban Macro model (Model~5), which produces realistic link ranges of roughly 1.8~km in this configuration. Two refinements increase realism: log-normal shadowing and per-link asymmetric gain offsets (normally distributed, $\sigma = 3$~dB), so that link quality differs between directions, as observed in real LoRa deployments~\cite{cattani2017reliability}. The hop limit is fixed at 3, matching the Meshtastic default.
 
 
 \subsection{Randomness and Reproducibility}
  
-Every stochastic element of the simulation---node placement, traffic generation, link asymmetries, mobility and the gossip coin flips themselves---derives from explicitly seeded pseudo-random generators. Each repetition of a scenario uses a distinct, documented seed (0--29), and node positions are pre-generated and cached per seed, so that all routing algorithms are evaluated on \emph{exactly} the same sequence of topologies. What is more, this pairing eliminates topology variance from inter-algorithm comparisons and makes every result in this chapter exactly reproducible from the configuration files listed in Appendix~E.
+Every stochastic element of the simulation---node placement, traffic generation, link asymmetries, mobility, and the gossip coin flips themselves---derives from explicitly seeded pseudo-random generators. Each repetition of a scenario uses a distinct, documented seed (0--29), and node positions are pre-generated and cached per seed, so that all routing algorithms are evaluated on \emph{exactly} the same sequence of topologies. What is more, this pairing eliminates topology variance from inter-algorithm comparisons and makes every result in this chapter exactly reproducible from the configuration files listed in Appendix~\ref{ch:appendix_repos}.
 
 \section{Evaluated Routing Strategies}
 \label{sec:sim_strategies}
@@ -623,53 +600,28 @@ Every stochastic element of the simulation---node placement, traffic generation,
 The design of the final algorithm proceeded incrementally: a sequence of forwarding strategies of increasing sophistication was implemented and evaluated, each addressing a weakness identified in its predecessor. This section describes the progression conceptually; quantitative results are deferred to Section~\ref{sec:sim_results}.
 
 \subsection{Pure Flooding}
-% Explain:
-% - Operation
-% - Advantages
-% - Massive redundancy problem
-Pure flooding is the natural baseline: every node retransmits every packet it has not seen before, until the hop limit is exhausted. Its virtues are simplicity and maximal coverage---if any path exists within the hop horizon, flooding finds it. Its pathology, anticipated analytically in Section~\ref{sec:gossip}, was confirmed immediately in simulation: the number of transmissions grows linearly with node count regardless of traffic demand, and with LoRa airtimes of half a second per packet the channel saturates rapidly, manifesting as collisions, queueing delays and duty-cycle exhaustion. Meshtastic's managed flood, which adds SNR-weighted contention windows and rebroadcast cancellation, mitigates the worst simultaneity but, as the results of Section~\ref{sec:sim_results} show, does not alter the fundamental scaling behaviour. Managed flood, being the algorithm deployed in the most widely used comparable system, serves as the reference baseline throughout this chapter.
+Pure flooding is the natural baseline: every node retransmits every packet it has not seen before, until the hop limit is exhausted. Its virtues are simplicity and maximal coverage---if any path exists within the hop horizon, flooding finds it. Its pathology, anticipated analytically in Section~\ref{sec:gossip}, was confirmed immediately in simulation: the number of transmissions grows linearly with node count regardless of traffic demand, and with LoRa airtimes of half a second per packet the channel saturates rapidly, manifesting as collisions, queueing delays, and duty-cycle exhaustion. Meshtastic's managed flood, which adds SNR-weighted contention windows and rebroadcast cancellation, mitigates the worst simultaneity but, as the results of Section~\ref{sec:sim_results} show, does not alter the fundamental scaling behavior. Managed flood, being the algorithm deployed in the most widely used comparable system, serves as the reference baseline throughout this chapter.
 
 \subsection{Probabilistic Gossip}
-% Explain:
-% - Random forwarding probability
-% - Trade-offs
 The first refinement replaces the deterministic rebroadcast with a Bernoulli trial: each node forwards a new packet with fixed probability $p$ and stays silent otherwise, following the classical gossip scheme of Haas et al.~\cite{haas2006gossip}. After simulation, several values of $p$ were tested, and the scheme's weakness is equally clear: no single value of $p$ suits all regions of a heterogeneous network. Therefore, a probability low enough to relieve congestion in dense clusters causes premature die-out in sparse areas, where a silent node may be the only bridge between partitions; a probability high enough to protect sparse areas forfeits most of the savings in dense ones. Consequently, the optimal $p$ is, in short, a \emph{local} quantity---which motivates making the decision adaptive.
 
 This routing logic is defined as \emph{GOSSIP0N} in the simulator, where N value is represented between 2 and 8, related to the values of $p$ tested.
 \subsection{RSSI-Aware Gossip}
-% Explain:
-% - Link quality usage
-The second refinement modulates the forwarding probability with the received signal strength of the incoming packet. The intuition exploits a geometric fact of broadcast propagation: a packet received weakly arrives from far away, meaning the receiver lies near the edge of the transmitter's coverage area and is precisely the kind of node that extends the packet's reach furthest if it relays; conversely, a packet received strongly comes from a nearby transmitter whose coverage area largely overlaps the receiver's, making a relay largely redundant. RSSI thus acts as a zero-cost proxy for geographic progress, an idea well established in WSN and LPWAN routing~\cite{senel2011relay,cattani2017reliability}. This strategy concentrates retransmissions at the periphery of each broadcast wave, improving the usefulness of each transmission, but it remains blind to how many \emph{other} candidates surround the receiver.
+The second refinement modulates the forwarding probability with the received signal strength of the incoming packet. The intuition exploits a geometric fact of broadcast propagation: a packet received weakly arrives from far away, meaning the receiver lies near the edge of the transmitter's coverage area and is precisely the kind of node that extends the packet's reach furthest if it relays; conversely, a packet received strongly comes from a nearby transmitter whose coverage area largely overlaps the receiver's, making a relay largely redundant. \acro{rssi} thus acts as a zero-cost proxy for geographic progress, an idea well established in \acro{wsn} and \acro{lpwan} routing~\cite{senel2011relay,cattani2017reliability}. This strategy concentrates retransmissions at the periphery of each broadcast wave, improving the usefulness of each transmission, but it remains blind to how many \emph{other} candidates surround the receiver.
 
 This routing logic is defined as \emph{RSSI\_BASED} in the simulator.
 
 
 \subsection{Density-Aware Gossip}
-% Explain:
-% - Neighbor density adaptation
-% - Congestion mitigation
 The third refinement addresses exactly that blindness: the forwarding probability is made inversely dependent on the number of neighbors a node currently observes, following the neighbor-knowledge principle of Tseng et al.~\cite{tseng2002broadcast}. A node surrounded by many peers can afford to stay silent, since the expected number of other relays is high; a node with few neighbors must forward, since it may be an articulation point of the topology. This mechanism attacks the broadcast storm at its root---it decouples the aggregate retransmission count from node density---and proved in simulation to be the single most effective congestion-mitigation ingredient. In isolation, however, it ignores both link quality and the redundancy already observed on the channel.
 
 Each of the three signals---link quality, local density, observed redundancy---thus captures a complementary aspect of the forwarding decision. The natural conclusion is to combine them, which leads to the algorithm at the core of this thesis.
 
-This routing logic is defined as \emph{ADAPTATIVE\_GOSSIP} in the simulator.
+This routing logic is defined as \emph{ADAPTIVE\_GOSSIP} in the simulator.
 
 
 \section{Smart Gossip Algorithm}
 \label{sec:sim_smartgossip}
-% VERY IMPORTANT
-%
-% Explain in depth:
-% - Final algorithm
-% - Mathematical model
-% - Decision function
-% - Parameters
-% - Why each variable matters
-%
-% Add:
-% - Equations
-% - Flowcharts
-% - Probability curves
 
 \subsection{Decision Function}
  
@@ -700,81 +652,50 @@ Smart Gossip computes, for every newly received packet, a retransmission probabi
     \label{eq:fdupe}
 \end{equation}
  
-The node then draws a uniform random number and retransmits if it falls below $p$, after the randomised back-off described in Section~\ref{sec:communication_flow}. All inputs to Equation~\eqref{eq:smartgossip} are locally observable at zero communication cost: RSSI is reported by the transceiver with every reception, the neighbor count is maintained by passive overhearing, and the copy counter is a by-product of the duplicate cache. The algorithm therefore adds no control traffic whatsoever.
- 
-% --- FIGURE PLACEHOLDER -------------------------------------
-\begin{figure}[htbp]
-    \centering
-    % \includegraphics[width=0.7\textwidth]{figures/smartgossip_flowchart.pdf}
-    \caption{Decision flowchart executed upon packet reception: duplicate filtering, local delivery check, computation of Equation~\eqref{eq:smartgossip} and probabilistic scheduling of the rebroadcast.}
-    \label{fig:sg_flowchart}
-\end{figure}
-% ------------------------------------------------------------
+The node then draws a uniform random number and retransmits if it falls below $p$, after the randomized back-off described in Section~\ref{sec:communication_flow}. All inputs to Equation~\eqref{eq:smartgossip} are locally observable at zero communication cost: \acro{rssi} is reported by the transceiver with every reception, the neighbor count is maintained by passive overhearing, and the copy counter is a by-product of the duplicate cache. The algorithm therefore adds no control traffic whatsoever.
  
 \subsection{Rationale of Each Factor}
  
-\paragraph{The RSSI factor.} Equation~\eqref{eq:frssi} encodes the edge-of-coverage heuristic introduced above: it approaches 1 as the RSSI approaches the sensitivity limit ($-131.5$~dBm), where the receiver is likely one of very few nodes to have heard the packet, and approaches 0 for strong signals from nearby transmitters whose coverage the receiver cannot meaningfully extend. A sigmoid is preferred over a hard threshold because RSSI in a shadowed channel is a noisy quantity; a continuous transition prevents abrupt behavioural changes from decibel-level fluctuations, and its shape is consistent with the coverage probability induced by log-normal fading~\cite{senel2011relay,cattani2017reliability}. The parameter $\alpha$ controls the steepness of the transition and $\mathrm{RSSI}_{\text{ref}}$ its centre.
+\paragraph{The \acro{rssi} factor.} Equation~\eqref{eq:frssi} encodes the edge-of-coverage heuristic introduced above: it approaches 1 as the \acro{rssi} approaches the sensitivity limit ($-131.5$~dBm), where the receiver is likely one of very few nodes to have heard the packet, and approaches 0 for strong signals from nearby transmitters whose coverage the receiver cannot meaningfully extend. A sigmoid is preferred over a hard threshold because \acro{rssi} in a shadowed channel is a noisy quantity; a continuous transition prevents abrupt behavioral changes from decibel-level fluctuations, and its shape is consistent with the coverage probability induced by log-normal fading~\cite{senel2011relay,cattani2017reliability}. The parameter $\alpha$ controls the steepness of the transition and $\mathrm{RSSI}_{\text{ref}}$ its center.
  
 \paragraph{The density factor.} Equation~\eqref{eq:fdensity} is the direct counter-measure to the broadcast storm~\cite{ni1999broadcast,tseng2002broadcast}: it scales the individual forwarding probability inversely with the local neighbor count $n$, so that the \emph{expected number of relays} in a neighborhood---roughly $n \cdot f_{\text{density}}$, which approaches the constant $1/\beta$ for large $n$---remains bounded as density grows, instead of growing linearly as under flooding. The rational form $1/(1+\beta n)$ is the simplest function with value 1 at $n=0$, smooth decay and a zero asymptote.
  
-\paragraph{The duplicate factor.} Equation~\eqref{eq:fdupe} is a continuous reformulation of the counter-based scheme of Tseng et al.~\cite{tseng2002broadcast}: every copy of a packet a node overhears is direct evidence that the packet is already well disseminated in its vicinity, so the incentive to add yet another copy decays exponentially. Unlike the original binary threshold, the exponential form degrades gracefully, halving the probability roughly every two additional copies (for the optimised $\gamma$).
+\paragraph{The duplicate factor.} Equation~\eqref{eq:fdupe} is a continuous reformulation of the counter-based scheme of Tseng et al.~\cite{tseng2002broadcast}: every copy of a packet a node overhears is direct evidence that the packet is already well disseminated in its vicinity, so the incentive to add yet another copy decays exponentially. Unlike the original binary threshold, the exponential form degrades gracefully, halving the probability roughly every two additional copies (for the optimized $\gamma$).
  
-\paragraph{The probability floor.} Finally, $p_{\text{floor}}$ guarantees that no combination of inputs ever silences a node completely. It is the safeguard against gossip die-out identified in Section~\ref{sec:gossip}: in pathological cases---a sparse bridge node that happens to receive a strong signal, for instance---the multiplicative factors could otherwise drive $p$ arbitrarily close to zero and sever the network. The floor also provides a single, intuitive operational knob: raising $p_{\text{floor}}$ towards 1 continuously morphs Smart Gossip back into flooding, a property exploited in Section~\ref{sec:sim_final_params}.
+\paragraph{The probability floor.} Finally, $p_{\text{floor}}$ guarantees that no combination of inputs ever silences a node completely. It is the safeguard against gossip die-out identified in Section~\ref{sec:gossip}: in pathological cases---a sparse bridge node that happens to receive a strong signal, for instance---the multiplicative factors could otherwise drive $p$ arbitrarily close to zero and sever the network. The floor also provides a single, intuitive operational knob: raising $p_{\text{floor}}$ toward 1 continuously morphs Smart Gossip back into flooding, a property exploited in Section~\ref{sec:sim_final_params}.
  
-\subsection{Behaviour in Representative Scenarios}
+\subsection{Behavior in Representative Scenarios}
  
-Table~\ref{tab:sg_examples} evaluates Equation~\eqref{eq:smartgossip} with the optimised parameters of Section~\ref{sec:sim_optimization} in five representative situations, illustrating how the factors interact. A node at the coverage edge with few neighbors forwards with high probability (0.70); an average node halves that; observed duplicates suppress it further; and well-connected nodes near the transmitter fall to the floor, retransmitting only 11\% of the time.
+Table~\ref{tab:sg_examples} evaluates Equation~\eqref{eq:smartgossip} with the optimized parameters of Section~\ref{sec:sim_optimization} in five representative situations, illustrating how the factors interact. A node at the coverage edge with few neighbors forwards with high probability (0.70); an average node halves that; observed duplicates suppress it further; and well-connected nodes near the transmitter fall to the floor, retransmitting only 11\% of the time.
 
-% Check again that values are correct
 \begin{table}[htbp]
     \centering
-    \caption{Smart Gossip forwarding probability in representative scenarios (optimised parameters).}
+    \caption{Smart Gossip forwarding probability in representative scenarios (optimized parameters).}
     \label{tab:sg_examples}
     \begin{tabular}{lcccccc}
-        \hline
+        \toprule
         Scenario & RSSI (dBm) & $n$ & $c$ & $f_{\text{rssi}}$ & $f_{\text{density}} \cdot f_{\text{dupe}}$ & $p$ \\
-        \hline
+        \midrule
         Coverage edge, sparse      & $-130$ & 2  & 1 & 0.91 & $0.77 \cdot 1.00$ & \textbf{0.70} \\
         Mid-range, average density & $-115$ & 5  & 1 & 0.73 & $0.58 \cdot 1.00$ & \textbf{0.42} \\
         Mid-range, redundancy seen & $-115$ & 5  & 3 & 0.73 & $0.58 \cdot 0.54$ & \textbf{0.23} \\
         Near transmitter, dense    & $-95$  & 10 & 2 & 0.43 & $0.41 \cdot 0.73$ & \textbf{0.11}$^{\dagger}$ \\
         Adjacent transmitter, dense& $-80$  & 15 & 4 & 0.11 & $0.31 \cdot 0.39$ & \textbf{0.11}$^{\dagger}$ \\
-        \hline
+        \bottomrule
         \multicolumn{7}{r}{\footnotesize $^{\dagger}$clamped to $p_{\text{floor}}$}
     \end{tabular}
 \end{table}
  
-% --- FIGURE PLACEHOLDER -------------------------------------
-% \begin{figure}[htbp]
-%     \centering
-%     % \includegraphics[width=\textwidth]{figures/sg_probability_curves.pdf}
-%     \caption{Probability curves of the three factors with optimised parameters: $f_{\text{rssi}}$ as a function of RSSI, $f_{\text{density}}$ as a function of neighbor count, and $f_{\text{dupe}}$ as a function of received copies.}
-%     \label{fig:sg_curves}
-% \end{figure}
-% ------------------------------------------------------------
- 
 \section{Evolutionary Optimization Process}
 \label{sec:sim_optimization}
-% VERY IMPORTANT
-%
-% Explain:
-% - Why manual tuning is insufficient
-% - Fitness function
-% - Mutation/crossover
-% - Selection process
-% - Optimization goals
-%
-% Add:
-% - Evolution graphs
-% - Parameter convergence plots
 
 \subsection{Why Manual Tuning Is Insufficient}
  
-Equation~\eqref{eq:smartgossip} introduces five free parameters: $\theta = (\alpha, \mathrm{RSSI}_{\text{ref}}, \beta, \gamma, p_{\text{floor}})$. Owing to their effects are strongly coupled---a steeper sigmoid changes the operating point at which the density factor matters, the duplicate penalty interacts with the floor---so tuning them one at a time is methodologically unsound. Also, exhaustive search fares no better: a modest grid of ten values per dimension yields $10^5$ combinations, each requiring multiple full network simulations to average out stochastic noise. Finally, the objective surface is non-convex and \emph{noisy}, since every evaluation is itself a random experiment, which rules out gradient-based methods. The problem calls for a derivative-free global optimiser that is sample-efficient in moderate dimensions.
+Equation~\eqref{eq:smartgossip} introduces five free parameters: $\theta = (\alpha, \mathrm{RSSI}_{\text{ref}}, \beta, \gamma, p_{\text{floor}})$. Because their effects are strongly coupled---a steeper sigmoid changes the operating point at which the density factor matters, the duplicate penalty interacts with the floor---tuning them one at a time is methodologically unsound. Also, exhaustive search fares no better: a modest grid of ten values per dimension yields $10^5$ combinations, each requiring multiple full network simulations to average out stochastic noise. Finally, the objective surface is non-convex and \emph{noisy}, since every evaluation is itself a random experiment, which rules out gradient-based methods. The problem calls for a derivative-free global optimizer that is sample-efficient in moderate dimensions.
  
 \subsection{Differential Evolution}
  
-Differential evolution (DE)~\cite{storn1997de,price2005de} satisfies these requirements and was adopted through its \texttt{scipy.optimize} implementation~\cite{virtanen2020scipy}. DE maintains a population of candidate parameter vectors and evolves it through three operators. \emph{Mutation} creates, for each individual $\mathbf{x}_i$, a mutant vector from three distinct randomly chosen members of the population,
+Differential evolution (\acro{de})~\cite{storn1997de,price2005de} satisfies these requirements and was adopted through its \texttt{scipy.optimize} implementation~\cite{virtanen2020scipy}. DE maintains a population of candidate parameter vectors and evolves it through three operators. \emph{Mutation} creates, for each individual $\mathbf{x}_i$, a mutant vector from three distinct randomly chosen members of the population,
 \begin{equation}
     \mathbf{v}_i = \mathbf{x}_a + F \cdot (\mathbf{x}_b - \mathbf{x}_c),
     \label{eq:de_mutation}
@@ -788,12 +709,12 @@ Each candidate $\theta$ is evaluated by running full network simulations at size
     \text{fitness}(\theta) = 0.40\,\overline{\text{reach}} + 0.40\,\overline{\text{useful}} - 0.10\,\overline{\text{col}} - 0.10\,\overline{\text{tx}},
     \label{eq:fitness}
 \end{equation}
-where $\overline{\text{reach}}$ is the mean reachability, $\overline{\text{useful}}$ the mean usefulness, $\overline{\text{col}}$ the mean collision rate (all in \%) and $\overline{\text{tx}}$ the mean per-node transmission airtime normalised to a comparable scale. The weights encode the design intent: coverage and channel efficiency are rewarded equally and dominantly, while collisions and raw airtime act as soft penalties. The search ranges of the five parameters (Table~\ref{tab:sg_params}) were chosen generously around physically meaningful values. The optimisation converged after approximately 160 fitness evaluations, completing in under ten minutes of computation---itself a demonstration of why the exploration had to be conducted in simulation.
+where $\overline{\text{reach}}$ is the mean reachability, $\overline{\text{useful}}$ the mean usefulness, $\overline{\text{col}}$ the mean collision rate (all in \%) and $\overline{\text{tx}}$ the mean per-node transmission airtime normalised to a comparable scale. The weights encode the design intent: coverage and channel efficiency are rewarded equally and dominantly, while collisions and raw airtime act as soft penalties. The search ranges of the five parameters (Table~\ref{tab:sg_params}) were chosen generously around physically meaningful values. The optimization converged after approximately 160 fitness evaluations, completing in under ten minutes of computation---itself a demonstration of why the exploration had to be conducted in simulation.
 
 
 \subsection{Limitations of the Optimization}
  
-Three limitations of this process must be acknowledged. First, to keep the campaign tractable, each fitness evaluation averaged over a small number of repetitions, so the optimum is estimated under residual noise; a larger budget would yield a more robust optimum. Second, fitness was evaluated only at 15 and 30 nodes; including the extremes (5 and 50) might have shifted the optimum towards higher coverage in small networks. Third, Equation~\eqref{eq:fitness} does not impose a hard reachability constraint, which explains the coverage deficit observed in the smallest networks in Section~\ref{sec:sim_results}. These limitations delimit the validity of the chosen parameters and directly motivate the future-work directions of Chapter~\ref{ch:conclusions}.
+Three limitations of this process must be acknowledged. First, to keep the campaign tractable, each fitness evaluation averaged over a small number of repetitions, so the optimum is estimated under residual noise; a larger budget would yield a more robust optimum. Second, fitness was evaluated only at 15 and 30 nodes; including the extremes (5 and 50) might have shifted the optimum toward higher coverage in small networks. Third, Equation~\eqref{eq:fitness} does not impose a hard reachability constraint, which explains the coverage deficit observed in the smallest networks in Section~\ref{sec:sim_results}. These limitations delimit the validity of the chosen parameters and directly motivate the future-work directions of Chapter~\ref{ch:conclusions}.
 
 
 \section{Performance Metrics}
@@ -819,30 +740,20 @@ Usefulness is the fraction of received packets that carried new information to t
 
 \section{Simulation Results and Analysis}
 \label{sec:sim_results}
-% IMPORTANT
-%
-% Add:
-% - MANY graphs
-% - Comparative tables
-%
-% Explain:
-% - Why smart gossip performs better
-% - Trade-offs observed
-% - Failure scenarios
 
-The final evaluation campaign compared Smart Gossip, with the optimised parameters of Table~\ref{tab:sg_params}, against Meshtastic's managed flood across four network sizes (5, 15, 30 and 50 nodes), with 30 seeded repetitions per algorithm and size---240 simulations of 30 minutes each. Both algorithms faced identical topologies, traffic and channel realisations in every repetition. Tables~\ref{tab:res_reach}--\ref{tab:res_delay} report means and standard deviations; Figures (\texttt{plot\_reachability}, \texttt{plot\_collisions}, \texttt{plot\_usefulness}, \texttt{plot\_txair}, \texttt{plot\_delay}) present the same data graphically.
+The final evaluation campaign compared Smart Gossip, with the optimized parameters of Table~\ref{tab:sg_params}, against Meshtastic's managed flood across four network sizes (5, 15, 30 and 50 nodes), with 30 seeded repetitions per algorithm and size---240 simulations of 30 minutes each. Both algorithms faced identical topologies, traffic, and channel realizations in every repetition. Tables~\ref{tab:res_reach}--\ref{tab:res_delay} report means and standard deviations; Figures~\ref{fig:plot_reachability}--\ref{fig:plot_delay} present the same data graphically.
  
 \begin{table}[htbp]
     \centering
     \begin{tabular}{rcccc}
-        \hline
+        \toprule
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
-        \hline
+        \midrule
         5  & $68.7 \pm 19.0$ & $76.8 \pm 19.1$ & $-8.1$ pp  & $-10.6\%$ \\
         15 & $50.0 \pm 11.1$ & $62.5 \pm 11.5$ & $-12.4$ pp & $-19.9\%$ \\
         30 & $38.2 \pm 7.3$  & $47.1 \pm 6.4$  & $-8.9$ pp  & $-18.9\%$ \\
         50 & $29.3 \pm 4.1$  & $33.8 \pm 3.0$  & $-4.5$ pp  & $-13.4\%$ \\
-        \hline
+        \bottomrule
     \end{tabular}
     \caption{Reachability (\%), mean $\pm$ standard deviation over 30 repetitions.}
     \label{tab:res_reach}
@@ -852,14 +763,14 @@ The final evaluation campaign compared Smart Gossip, with the optimised paramete
     \centering
 
     \begin{tabular}{rcccc}
-        \hline
+        \toprule
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
-        \hline
+        \midrule
         5  & $4.0 \pm 2.8$  & $6.3 \pm 3.9$  & $-2.3$ pp & $-36.6\%$ \\
         15 & $11.5 \pm 2.5$ & $17.1 \pm 4.4$ & $-5.6$ pp & $-32.8\%$ \\
         30 & $16.3 \pm 2.8$ & $19.9 \pm 2.2$ & $-3.7$ pp & $-18.3\%$ \\
         50 & $20.6 \pm 2.4$ & $19.1 \pm 2.3$ & $+1.5$ pp & $+7.9\%$ \\
-        \hline
+        \bottomrule
     \end{tabular}
     \caption{Collision rate (\%), mean $\pm$ standard deviation over 30 repetitions.}
     \label{tab:res_col}
@@ -868,14 +779,14 @@ The final evaluation campaign compared Smart Gossip, with the optimised paramete
 \begin{table}[htbp]
     \centering
     \begin{tabular}{rcccc}
-        \hline
+        \toprule
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
-        \hline
+        \midrule
         5  & $48.0 \pm 3.1$ & $47.9 \pm 2.7$ & $+0.1$ pp & $+0.2\%$ \\
         15 & $50.1 \pm 2.5$ & $45.8 \pm 4.0$ & $+4.3$ pp & $+9.5\%$ \\
         30 & $51.0 \pm 2.7$ & $45.4 \pm 3.4$ & $+5.6$ pp & $+12.3\%$ \\
         50 & $49.9 \pm 2.3$ & $45.2 \pm 2.4$ & $+4.8$ pp & $+10.6\%$ \\
-        \hline
+        \bottomrule
     \end{tabular}
     \caption{Usefulness (\%), mean $\pm$ standard deviation over 30 repetitions.}
     \label{tab:res_useful}
@@ -884,14 +795,14 @@ The final evaluation campaign compared Smart Gossip, with the optimised paramete
 \begin{table}[htbp]
     \centering
     \begin{tabular}{rcccc}
-        \hline
+        \toprule
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
-        \hline
+        \midrule
         5  & $54\,498 \pm 5\,628$ & $61\,246 \pm 9\,847$  & $-6\,748$  & $-11.0\%$ \\
         15 & $67\,862 \pm 4\,519$ & $97\,268 \pm 10\,525$ & $-29\,406$ & $-30.2\%$ \\
         30 & $73\,873 \pm 4\,574$ & $109\,104 \pm 6\,396$ & $-35\,232$ & $-32.3\%$ \\
         50 & $79\,802 \pm 2\,479$ & $109\,958 \pm 7\,701$ & $-30\,156$ & $-27.4\%$ \\
-        \hline
+        \bottomrule
     \end{tabular}
     \caption{Per-node transmission air utilization (ms), mean $\pm$ standard deviation over 30 repetitions.}
     \label{tab:res_txair}
@@ -900,53 +811,88 @@ The final evaluation campaign compared Smart Gossip, with the optimised paramete
 \begin{table}[htbp]
     \centering
     \begin{tabular}{rcccc}
-        \hline
+        \toprule
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
-        \hline
+        \midrule
         5  & $5\,556 \pm 867$      & $4\,318 \pm 1\,356$     & $+1\,238$    & $+28.7\%$ \\
         15 & $6\,766 \pm 925$      & $16\,199 \pm 8\,123$    & $-9\,433$    & $-58.2\%$ \\
         30 & $11\,362 \pm 5\,623$  & $78\,592 \pm 34\,365$   & $-67\,230$   & $-85.5\%$ \\
         50 & $27\,112 \pm 16\,709$ & $160\,440 \pm 50\,484$  & $-133\,328$  & $-83.1\%$ \\
-        \hline
+        \bottomrule
     \end{tabular}
     \caption{Average end-to-end delay (ms), mean $\pm$ standard deviation over 30 repetitions.}
     \label{tab:res_delay}
 \end{table}
- 
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.55\textwidth]{images/plot_reachability}
+  \caption{Reachability (\%) versus network size for Smart Gossip and Managed Flood, averaged over 30 repetitions.}
+  \label{fig:plot_reachability}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.55\textwidth]{images/plot_collisions}
+  \caption{Collision rate (\%) versus network size for Smart Gossip and Managed Flood, averaged over 30 repetitions.}
+  \label{fig:plot_col}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.55\textwidth]{images/plot_usefulness}
+  \caption{Usefulness (\%) versus network size for Smart Gossip and Managed Flood, averaged over 30 repetitions.}
+  \label{fig:plot_useful}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.55\textwidth]{images/plot_meanTxAirUtils}
+  \caption{Per-node transmission air utilization (ms) versus network size for Smart Gossip and Managed Flood, averaged over 30 repetitions.}
+  \label{fig:plot_txair}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.55\textwidth]{images/plot_meanDelays}
+  \caption{Average end-to-end delay (ms) versus network size for Smart Gossip and Managed Flood, averaged over 30 repetitions.}
+  \label{fig:plot_delay}
+\end{figure}
+
 \subsection{Channel Efficiency}
  
 The most robust result of the campaign is the reduction in air utilization: for networks of 15 nodes and above, Smart Gossip occupies 27--32\% less channel time per node than managed flood, with small variance across 30 repetitions. The practical significance is twofold. In energy terms, transmission is the dominant consumer in a LoRa node, so this reduction translates directly into battery lifetime. In regulatory terms, with the \texttt{LONG\_FAST} airtime of ${\sim}550$~ms per packet, managed flood at 15 nodes already consumes 5.4\% of duty cycle over the 30-minute window against Smart Gossip's 3.8\%; under heavier traffic or larger networks, flooding approaches the regulatory ceiling first, at which point nodes are legally forced to silence. The usefulness metric explains where the savings come from: under managed flood, fewer than half of all received packets carry new information, whereas Smart Gossip raises usefulness by a consistent ${\sim}10\%$ relative for all networks of 15 nodes and above---the same information is disseminated with substantially fewer transmissions.
  
 \subsection{Congestion Collapse under Flooding}
  
-The delay results expose the broadcast storm in its most dramatic form. At 30 nodes, managed flood exhibits a mean delay of 78.6~s---and 160~s at 50 nodes---against 11.4~s and 27.1~s for Smart Gossip, reductions of 85\% and 83\% respectively. The mechanism is the one anticipated in Section~\ref{sec:gossip}: when every node contends to retransmit, the listen-before-talk MAC forces packets to queue for tens of seconds awaiting clear channel, and collisions force further retries. Smart Gossip removes the bulk of this contention at the source by silencing redundant relays, so the packets that are forwarded traverse a comparatively idle channel. The collision-rate results corroborate the picture at 5--30 nodes (reductions of 18--37\%); only at 50 nodes does managed flood show marginally fewer collisions ($+1.5$~pp for Smart Gossip), an artefact of its channel being so saturated that its contention windows serialise transmissions---at the cost of the 160-second delays just described.
+The delay results expose the broadcast storm in its most dramatic form. At 30 nodes, managed flood exhibits a mean delay of 78.6~s---and 160~s at 50 nodes---against 11.4~s and 27.1~s for Smart Gossip, reductions of 85\% and 83\% respectively. The mechanism is the one anticipated in Section~\ref{sec:gossip}: when every node contends to retransmit, the listen-before-talk MAC forces packets to queue for tens of seconds awaiting clear channel, and collisions force further retries. Smart Gossip removes the bulk of this contention at the source by silencing redundant relays, so the packets that are forwarded traverse a comparatively idle channel. The collision-rate results corroborate the picture at 5--30 nodes (reductions of 18--37\%); only at 50 nodes does managed flood show marginally fewer collisions ($+1.5$~pp for Smart Gossip), an artifact of its channel being so saturated that its contention windows serialize transmissions---at the cost of the 160-second delays just described.
  
 \subsection{The Coverage Trade-off and Failure Scenarios}
  
-The cost of these gains is a reachability deficit of 4.5--12.4 percentage points, largest at intermediate sizes. This is the inherent gossip trade-off anticipated theoretically~\cite{haas2006gossip}: every suppressed retransmission is also a suppressed redundancy opportunity, and in a sparse topology some of those opportunities were load-bearing. Three observations contextualise the deficit. First, absolute reachability is bounded by physical connectivity in these sparse scenarios---both algorithms range from ${\sim}30$ to ${\sim}77\%$---so part of the gap reflects marginal links that only brute-force redundancy can cross. Second, the deficit \emph{shrinks} in the largest network ($-4.5$~pp at 50 nodes) while the efficiency advantages persist, indicating that the trade-off improves exactly where it matters. Third, the deficit is largest precisely in the configurations excluded from the optimisation fitness, suggesting it is partly an artefact of the tuning procedure rather than of the algorithm itself.
+The cost of these gains is a reachability deficit of 4.5--12.4 percentage points, largest at intermediate sizes. This is the inherent gossip trade-off anticipated theoretically~\cite{haas2006gossip}: every suppressed retransmission is also a suppressed redundancy opportunity, and in a sparse topology some of those opportunities were load-bearing. Three observations contextualize the deficit. First, absolute reachability is bounded by physical connectivity in these sparse scenarios---both algorithms range from ${\sim}30$ to ${\sim}77\%$---so part of the gap reflects marginal links that only brute-force redundancy can cross. Second, the deficit \emph{shrinks} in the largest network ($-4.5$~pp at 50 nodes) while the efficiency advantages persist, indicating that the trade-off improves exactly where it matters. Third, the deficit is largest precisely in the configurations excluded from the optimization fitness, suggesting it is partly an artifact of the tuning procedure rather than of the algorithm itself.
  
-The clear failure scenario for Smart Gossip is the small, sparse network. At 5 nodes, congestion is a non-problem---there is nothing to optimise away---while every retransmission matters for coverage; managed flood is the better algorithm there, also winning the composite comparison below and incurring lower delay ($+28.7\%$ for Smart Gossip). Conversely, the failure scenario for managed flood is density: its delay and airtime diverge with network size, which is incompatible with the scalability requirement of Section~\ref{subsec:req_scalability}.
+The clear failure scenario for Smart Gossip is the small, sparse network. At 5 nodes, congestion is a non-problem---there is nothing to optimize away---while every retransmission matters for coverage; managed flood is the better algorithm there, also winning the composite comparison below and incurring lower delay ($+28.7\%$ for Smart Gossip). Conversely, the failure scenario for managed flood is density: its delay and airtime diverge with network size, which is incompatible with the scalability requirement of Section~\ref{subsec:req_scalability}.
  
 \subsection{Composite Comparison}
  
-To aggregate the four metrics into a single comparative figure, a composite score was defined weighing effectiveness and efficiency equally and penalising channel costs:
+To aggregate the four metrics into a single comparative figure, a composite score was defined weighing effectiveness and efficiency equally and penalizing channel costs:
 \begin{equation}
     \text{score} = 0.35\,\text{reach} + 0.35\,\text{useful} - 0.15\,\text{col} - 0.15\,\frac{\text{tx}_{\text{air}}}{1000}.
     \label{eq:composite}
 \end{equation}
-The weighting differs slightly from the optimisation fitness of Equation~\eqref{eq:fitness}, placing heavier emphasis on channel costs, precisely to verify that the optimised parameters do not merely overfit their own objective. Table~\ref{tab:res_score} shows the outcome: Smart Gossip wins in three of the four network sizes, with an advantage that grows with density, and loses only in the 5-node scenario where coverage dominates.
+The weighting differs slightly from the optimization fitness of Equation~\eqref{eq:fitness}, placing heavier emphasis on channel costs, precisely to verify that the optimized parameters do not merely overfit their own objective. Table~\ref{tab:res_score} shows the outcome: Smart Gossip wins in three of the four network sizes, with an advantage that grows with density, and loses only in the 5-node scenario where coverage dominates.
  
 \begin{table}[htbp]
     \centering
     \begin{tabular}{rcccc}
-        \hline
+        \toprule
         Nodes & Smart Gossip & Managed Flood & Winner & Margin \\
-        \hline
+        \midrule
         5  & 32.06 & \textbf{33.50} & MF & $+1.44$ \\
         15 & \textbf{23.15} & 20.73 & SG & $+2.42$ \\
         30 & \textbf{17.70} & 13.03 & SG & $+4.68$ \\
         50 & \textbf{12.65} & 8.28  & SG & $+4.38$ \\
-        \hline
+        \bottomrule
     \end{tabular}
     \caption{Composite score (Equation~\eqref{eq:composite}) per network size.}
     \label{tab:res_score}
@@ -956,33 +902,29 @@ In summary, the simulations demonstrate that Smart Gossip delivers comparable in
  
 \section{Final Parameter Selection}
 \label{sec:sim_final_params}
-% Explain:
-% - Final chosen constants
-% - Why they were selected
-% - Real-world implications
- 
-Table~\ref{tab:sg_params} lists the parameter values produced by the optimisation, which are adopted as the firmware defaults of Chapter~\ref{ch:firmware}.
+
+Table~\ref{tab:sg_params} lists the parameter values produced by the optimization, which are adopted as the firmware defaults of Chapter~\ref{ch:firmware}.
  
 \begin{table}[htbp]
     \centering
     \begin{tabular}{llccl}
-        \hline
+        \toprule
         Parameter & Symbol & Value & Search range & Interpretation \\
-        \hline
+        \midrule
         RSSI sigmoid steepness & $\alpha$ & $0.145$~dBm$^{-1}$ & $[0.02,\,0.20]$ & high-to-low transition over ${\sim}28$~dB \\
         RSSI inflection point  & $\mathrm{RSSI}_{\text{ref}}$ & $-103.8$~dBm & $[-120,\,-80]$ & ${\sim}600$--$800$~m in the 3GPP model \\
         Density weight         & $\beta$ & $0.146$ & $[0.01,\,0.15]$ & 7 neighbors $\rightarrow f_{\text{density}} \approx 0.49$ \\
         Duplicate penalty      & $\gamma$ & $0.311$ & $[0.10,\,0.60]$ & each extra copy reduces $p$ by ${\sim}27\%$ \\
         Probability floor      & $p_{\text{floor}}$ & $0.111$ & $[0.10,\,0.40]$ & guaranteed minimum relay probability \\
-        \hline
+        \bottomrule
     \end{tabular}
-    \caption{Optimised Smart Gossip parameters, search ranges and physical interpretation.}
+    \caption{Optimized Smart Gossip parameters, search ranges, and physical interpretation.}
     \label{tab:sg_params}
 \end{table}
  
-Each value admits a coherent physical reading, which lends confidence that the optimiser converged to a meaningful operating point rather than a noise artefact. The inflection point of $-103.8$~dBm places the centre of the RSSI transition at roughly 600--800~m under the simulated propagation model---comfortably inside coverage, so that only genuinely close receivers are suppressed. The steepness $\alpha = 0.145$ spreads the transition over approximately 28~dB, wide enough to absorb shadowing fluctuations. The density weight $\beta = 0.146$ halves the forwarding probability at around 7 neighbors, bounding the expected relay count per neighborhood near $1/\beta \approx 7$ for very dense regions. The duplicate penalty $\gamma = 0.311$ attenuates each additional overheard copy by roughly 27\%, and the floor of $p_{\text{floor}} = 0.111$ guarantees that even maximally suppressed nodes relay about one packet in nine. Notably, the optimiser drove both $\beta$ towards the top of its search range and $p_{\text{floor}}$ towards the bottom, confirming that in the evaluated regime the dominant lever is aggressive density-based suppression.
+Each value admits a coherent physical reading, which lends confidence that the optimizer converged to a meaningful operating point rather than a noise artifact. The inflection point of $-103.8$~dBm places the center of the \acro{rssi} transition at roughly 600--800~m under the simulated propagation model---comfortably inside coverage, so that only genuinely close receivers are suppressed. The steepness $\alpha = 0.145$ spreads the transition over approximately 28~dB, wide enough to absorb shadowing fluctuations. The density weight $\beta = 0.146$ halves the forwarding probability at around 7 neighbors, bounding the expected relay count per neighborhood near $1/\beta \approx 7$ for very dense regions. The duplicate penalty $\gamma = 0.311$ attenuates each additional overheard copy by roughly 27\%, and the floor of $p_{\text{floor}} = 0.111$ guarantees that even maximally suppressed nodes relay about one packet in nine. Notably, the optimizer drove both $\beta$ toward the top of its search range and $p_{\text{floor}}$ toward the bottom, confirming that in the evaluated regime the dominant lever is aggressive density-based suppression.
  
-Two real-world implications follow. First, because all inputs to the decision are already available in the firmware (transceiver RSSI, neighbor table, duplicate cache), the algorithm's implementation cost is a handful of floating-point operations per received packet---negligible on the ESP32---and its parameters are stored as configuration constants that can be updated without protocol changes. Second, $p_{\text{floor}}$ doubles as an application-level policy knob: deployments prioritising delivery certainty over efficiency (for instance, emergency alert dissemination) can raise the floor towards 1, continuously trading channel efficiency back for the redundancy of full flooding without any other modification. The validation of these parameters on real hardware is presented in Chapter~\ref{ch:results}.
+Two real-world implications follow. First, because all inputs to the decision are already available in the firmware (transceiver \acro{rssi}, neighbor table, duplicate cache), the algorithm's implementation cost is a handful of floating-point operations per received packet---negligible on the ESP32---and its parameters are stored as configuration constants that can be updated without protocol changes. Second, $p_{\text{floor}}$ doubles as an application-level policy knob: deployments prioritizing delivery certainty over efficiency (for instance, emergency alert dissemination) can raise the floor toward 1, continuously trading channel efficiency back for the redundancy of full flooding without any other modification. The validation of these parameters on real hardware is presented in Chapter~\ref{ch:results}.
 
 % =============================================================================
 % HARDWARE
