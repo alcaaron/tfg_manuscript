@@ -36,7 +36,7 @@ El projecte integra una PCB compacta de baix consum (ESP32, transceptor LoRa SX1
 
 
 \begin{abstract}
-Modern messaging systems depend almost entirely on cellular networks and Internet infrastructure, a dependency that becomes critical during disasters, blackouts, or in areas without coverage---precisely when reliable communication matters most. This thesis presents \emph{A3MESH}, a decentralized communication platform based on LoRa and Bluetooth Low Energy (BLE) that allows smartphones to exchange messages through a multi-hop mesh network without relying on any pre-existing infrastructure.
+Modern messaging systems depend almost entirely on cellular networks and Internet infrastructure, a dependency that becomes critical during disasters, blackouts, or in areas without coverage---precisely when reliable communication matters most. This thesis presents \emph{A3MESH}, a decentralized communication platform based on LoRa and \acro{ble} that allows smartphones to exchange messages through a multi-hop mesh network without relying on any pre-existing infrastructure.
 
 The project integrates a compact, low-power PCB (ESP32, SX1276 LoRa transceiver, custom antenna), a layered, modular firmware, and an Android application that hides the network's complexity behind an experience similar to conventional messaging. Its central contribution is \emph{Smart Gossip}, an adaptive forwarding algorithm that adjusts each node's relay probability based on link quality (RSSI), duplicate messages, and neighbor density, overcoming the congestion and energy limitations of traditional flooding. Its parameters were tuned through evolutionary optimization on a simulator built upon Meshtasticator, with results showing reduced delay and congestion versus conventional flooding and a comparable delivery ratio. The work is completed with a portable enclosure and experimental validation in laboratory and real-world conditions.
 \end{abstract}
@@ -79,7 +79,7 @@ This interest extends beyond technical enthusiasts; the telecommunications indus
 
 Nevertheless, despite the technical advantages of these systems, significant accessibility barriers remain for non-technical users. Since existing platforms require non-trivial technical configuration to deploy and operate, a primary objective of this thesis is to develop a mesh communication platform that is not only efficient and resilient, but also accessible and intuitive for ordinary users. To achieve this, smartphone integration and a user experience similar to a conventional messaging app will be key characteristics of this project.
 
-Driven by this motivation, this work presents the development of \emph{A3MESH}, a decentralized communication platform based on LoRa and Bluetooth Low Energy (\acro{ble}). It is designed to provide resilient, energy-efficient, and easily deployable communication in off-grid or emergency scenarios.
+Driven by this motivation, this work presents the development of \emph{A3MESH}, a decentralized communication platform based on LoRa and \acro{ble}. It is designed to provide resilient, energy-efficient, and easily deployable communication in off-grid or emergency scenarios.
 
 
 \section{Objectives}
@@ -91,7 +91,7 @@ To achieve this objective, the project combines hardware design, firmware develo
 The specific objectives of this work are summarized as follows:
 
 \begin{itemize}
-\item Design a portable hardware platform based on LoRa and Bluetooth Low Energy technologies capable of supporting infrastructure-free mesh communication.
+\item Design a portable hardware platform based on LoRa and \acro{ble} technologies capable of supporting infrastructure-free mesh communication.
 
 \item Develop a modular firmware architecture implementing packet forwarding, neighbor discovery, power management, and communication pipelines between LoRa and BLE interfaces.
 
@@ -135,7 +135,7 @@ The main contributions of this thesis are listed below:
 
 \item The application of evolutionary optimization techniques \cite{eiben_2003} to automatically tune the forwarding parameters of the proposed smart gossip algorithm, enabling efficient exploration of the parameter space and improving overall network performance.
 
-\item The implementation of a modular layered firmware architecture supporting LoRa communication, Bluetooth Low Energy integration, packet forwarding, neighbor discovery, power management, and bidirectional communication pipelines between mobile devices and the mesh network.
+\item The implementation of a modular layered firmware architecture supporting LoRa communication, \acro{ble} integration, packet forwarding, neighbor discovery, power management, and bidirectional communication pipelines between mobile devices and the mesh network.
 
 \item The development of an Android-based messaging platform designed to abstract the complexity of mesh networking and provide a user experience similar to conventional messaging applications, improving accessibility for non-technical users.
 
@@ -154,7 +154,7 @@ This thesis is organized into four main parts covering the theoretical backgroun
 
 Part~\ref{part:introduction} introduces the motivation behind the project, defines the problem addressed by the thesis, presents the main objectives, and outlines the scope and contributions of the proposed work.
 
-Part~\ref{part:state_of_the_art} reviews the technological and theoretical background related to decentralized mesh communication systems. This includes an overview of LoRa and Bluetooth Low Energy technologies, existing infrastructure-free communication platforms, and routing approaches.
+Part~\ref{part:state_of_the_art} reviews the technological and theoretical background related to decentralized mesh communication systems. This includes an overview of LoRa and \acro{ble} technologies, existing infrastructure-free communication platforms, and routing approaches.
 
 Part~\ref{part:thesis_body} contains the core technical development of the thesis. It begins by presenting the overall system architecture and communication model. The following chapters describe the development of the network simulator and the proposed smart gossip routing algorithm, including the evolutionary optimization process used for parameter tuning. The hardware design chapter explains the development of the custom low-power communication board, while the firmware chapter details the layered embedded architecture implementing mesh networking functionality, communication pipelines, and power management mechanisms. The mobile application chapter describes the Android-based user interface and smartphone integration approach. Additionally, the mechanical integration chapter presents the enclosure and portability considerations, while the development methodology chapter summarizes the engineering workflow and project management strategy adopted throughout the project. Finally, the experimental evaluation chapter analyzes the performance of the proposed system through simulation and real-world testing.
 
@@ -322,7 +322,7 @@ the following chapters.
 \section{Bluetooth Low Energy}
 \label{sec:ble}
 
-Bluetooth Low Energy (\acro{ble}), introduced in version 4.0 of the Bluetooth Core
+\acro{ble} was introduced in version 4.0 of the Bluetooth Core
 Specification, is a short-range wireless technology designed from the ground
 up for ultra-low-power operation rather than as a mere optimization of classic
 Bluetooth~\cite{bluetooth2023core,gomez2012overview}. Although it shares the
@@ -481,92 +481,57 @@ Pure probabilistic forwarding has a known weakness: dissemination can die premat
 
 The protocols above still share a limitation: $p$ and its companion thresholds are fixed at design time, while the optimal operating point depends on local density, traffic load and link quality, all of which vary across the network and over time. \emph{Adaptive} gossip closes this loop by letting each node tune its forwarding probability from locally observable signals. Kyasanur et al.'s Smart Gossip, for instance, infers parent--child dependencies from overheard traffic and assigns each node a forwarding probability proportional to how much its neighbours actually depend on it, converging automatically to high probabilities in sparse regions and low ones in dense regions, with no manual configuration~\cite{kyasanur2006smartgossip}. Related adaptive schemes modulate $p$ using neighbour counts, overheard duplicate counters or received signal strength~\cite{williams2002comparison}.
 
-This body of work, however, was developed and evaluated almost exclusively for IEEE~802.11 ad-hoc networks and classical wireless sensor networks---radios with millisecond airtimes, effective carrier sensing and no duty-cycle constraints. Its translation to LoRa is far from mechanical: long airtimes magnify the cost of every redundant transmission, half-duplex operation means a forwarding node is deaf while it helps others, SNR is cheaply observable and unusually informative thanks to CSS, and the duty cycle imposes a hard budget. Meanwhile, the deployed LoRa mesh systems reviewed in Section~\ref{sec:existing-solutions} occupy the two extremes of the spectrum---managed flooding without probabilistic suppression (Meshtastic) and structured routing requiring planned infrastructure (MeshCore)---leaving the middle ground essentially unexplored. This is the research gap addressed by this thesis: A3MESH brings \emph{smart, adaptive gossip} to a fully decentralised LoRa mesh, using locally available information such as RSSI and overheard duplicates to modulate each node's forwarding probability, with the aim of approaching the channel efficiency of structured routing while preserving the zero-infrastructure, zero-configuration resilience of flooding.
+This body of work, however, was developed and evaluated almost exclusively for IEEE~802.11 ad-hoc networks and classical wireless sensor networks---radios with millisecond airtimes, effective carrier sensing and no duty-cycle constraints. Its translation to LoRa is far from mechanical: long airtimes magnify the cost of every redundant transmission, half-duplex operation means a forwarding node is deaf while it helps others, SNR is cheaply observable and unusually informative thanks to CSS, and the duty cycle imposes a hard budget. Meanwhile, the deployed LoRa mesh systems reviewed in Section~\ref{sec:existing-solutions} occupy the two extremes of the spectrum---managed flooding without probabilistic suppression (Meshtastic) and structured routing requiring planned infrastructure (MeshCore)---leaving the middle ground essentially unexplored. This is the research gap addressed by this thesis: A3MESH brings \emph{smart, adaptive gossip} to a fully decentralized LoRa mesh, using locally available information such as \acro{rssi} and overheard duplicates to modulate each node's forwarding probability, with the aim of approaching the channel efficiency of structured routing while preserving the zero-infrastructure, zero-configuration resilience of flooding.
 
 
 
 \part{Thesis Body}
 \label{part:thesis_body}
 
-% =============================================================================
-% SYSTEM OVERVIEW
-% =============================================================================
-
-% TARGET: 4-5 pages
-
 \chapter{System Architecture}
+\label{ch:sysarch}
 
 \section{General Architecture}
 \label{sec:general_architecture}
-% IMPORTANT FIGURE
-%
-% Add:
-% - Full architecture diagram
-%
-% Explain:
-% - Smartphone
-% - BLE
-% - ESP32
-% - LoRa mesh
-% - Data flow
-The architecture of the platform comprises four principal components: the mobile application, the BLE communication interface, the ESP32-based gateway node, and the LoRa mesh network.
+
+The architecture of the platform comprises four principal components: the mobile application, the \acro{ble} communication interface, the ESP32-based gateway node, and the LoRa mesh network.
  
 From the end user's perspective, the mobile application constitutes a user-friendly front end designed to mediate all interaction with the mesh network. Through it, users can send and receive messages, manage contacts, and configure network parameters as advanced settings. This component provides the accessibility and usability layer of the system, enabling users without any technical background to participate in the mesh network in a simple and intuitive manner.
  
-Since smartphones lack native LoRa radio capabilities, an intermediary channel between the handset and the mesh network is required. This role is fulfilled by Bluetooth Low Energy (BLE).
- 
-To structure this communication, an AT-command-based interface has been implemented, through which the mobile application issues instructions to the node firmware. The ESP32 microcontroller, which provides native BLE support, is responsible for parsing these commands and translating them into concrete actions, either within the mesh network or on the node itself including: packet processing, routing logic, encryption mechanisms, and the management of the LoRa radio.
- 
+Since smartphones lack native LoRa radio capabilities, an intermediary channel between the handset and the mesh network is required. This role is fulfilled by \acro{ble}.
+
+To structure this communication, an \acro{at}-command-based interface has been implemented, through which the mobile application issues instructions to the node firmware. The ESP32 microcontroller, which provides native \acro{ble} support, is responsible for parsing these commands and translating them into concrete actions, either within the mesh network or on the node itself, including packet processing, routing logic, encryption mechanisms, and the management of the LoRa radio.
+
 Finally, the outermost layer of the architecture is the LoRa mesh network, which provides long-range wireless communication between nodes. This network constitutes the backbone of the system, allowing nodes to communicate with one another.
-
-% TODO: image of the complete project architecture
-
 
 \section{Node Interaction Model}
 \label{sec:node_interaction_model}
-% Explain:
-% - Neighbor interaction
-% - Discovery
-% - Message forwarding
-% - Broadcast behavior
-The mesh layer is built on a deliberately egalitarian premise: all nodes are functionally identical peers. There are no coordinators, no dedicated repeaters and no infrastructure roles of any kind;
-every node is simultaneously an end point for its own user and a potential relay for the traffic of others.
-This design choice follow directly from the resilience objectives of the system and stands in explicit contrast to the role-based architecture of MeshCore discussed in Section~\ref{subsec:localmesh}.
 
-\paragraph{Neighbor awareness.} Each node maintains a local notion of its \emph{neighborhood}: the set of nodes whose transmissions it can hear directly. Crucially, this awareness is acquired \emph{passively}. Since every LoRa transmission is inherently a broadcast, a node learns of the existence, identity and link quality of its neighbors simply by overhearing the traffic that already flows through the channel.
+The mesh layer is built on a deliberately egalitarian premise: all nodes are functionally identical peers. There are no coordinators, no dedicated repeaters, and no infrastructure roles of any kind; every node is simultaneously an endpoint for its own user and a potential relay for the traffic of others. This design choice follows directly from the resilience objectives of the system and stands in explicit contrast to the role-based architecture of MeshCore discussed in Section~\ref{subsec:localmesh}.
 
-\paragraph{Message propagation.} Communication beyond direct radio range is achieved through multi-hop forwarding. Indeed, the logical level distinguishes between a direct message and a network-wide announcement, encoded in the packet's addressing fields. With regard to the latter a node receiving a packet that is not addressed to it does not discard it, but evaluates whether to act as a relay.
+\paragraph{Neighbor awareness.} Each node maintains a local notion of its \emph{neighborhood}: the set of nodes whose transmissions it can hear directly. Crucially, this awareness is acquired \emph{passively}. Since every LoRa transmission is inherently a broadcast, a node learns of the existence, identity, and link quality of its neighbors simply by overhearing the traffic that already flows through the channel.
 
-\paragraph{Forwarding decision.} The defining characteristic of A3MESH's interaction model is that this relaying decision is \emph{probabilistic and adaptive} rather than deterministic. Instead of rebroadcasting every new packet unconditionally---the flooding approach whose pathologies were analysed in Section~\ref{sec:gossip}---each node forwards with a probability modulated by locally observable signals, such as the quality of the link over which the packet arrived and the level of redundancy it observes in its vicinity. For instance: nodes in dense regions, where many candidate relays exist, suppress most of their retransmissions, whereas nodes in sparse regions, where they may constitute the only bridge between network segments, forward with near certainty. As a result the network as a whole thereby self-regulates its channel occupancy without any global coordination. Moreover, the design of this forwarding policy, its mathematical formulation and its optimisation constitute the central contribution of this thesis and are developed in Chapter~\ref{ch:simulation} together with its realisation in the firmware-dedicated Chapter~\ref{ch:firmware}.
+\paragraph{Message propagation.} Communication beyond direct radio range is achieved through multi-hop forwarding. The logical level distinguishes between a direct message and a network-wide announcement, encoded in the packet's addressing fields. With regard to the latter, a node receiving a packet that is not addressed to it does not discard it, but evaluates whether to act as a relay.
+
+\paragraph{Forwarding decision.} The defining characteristic of A3MESH's interaction model is that this relaying decision is \emph{probabilistic and adaptive} rather than deterministic. Instead of rebroadcasting every new packet unconditionally---the flooding approach whose pathologies were analyzed in Section~\ref{sec:gossip}---each node forwards with a probability modulated by locally observable signals, such as the quality of the link over which the packet arrived and the level of redundancy it observes in its vicinity. Nodes in dense regions, where many candidate relays exist, suppress most of their retransmissions, whereas nodes in sparse regions, where they may constitute the only bridge between network segments, forward with near certainty. As a result, the network as a whole self-regulates its channel occupancy without any global coordination. The design of this forwarding policy, its mathematical formulation, and its optimization constitute the central contribution of this thesis and are developed in Chapter~\ref{ch:simulation}, together with its realization in Chapter~\ref{ch:firmware}.
 
 
 \section{Communication Flow}
 \label{sec:communication_flow}
-% Add:
-% - Sequence diagrams
-%
-% Explain:
-% - Message lifecycle
-% - App -> BLE -> LoRa -> Mesh -> BLE -> App
 
 This section traces the complete lifecycle of a user message through the system, from the sender's smartphone to the recipient's, tying together the four architectural components introduced in Section~\ref{sec:general_architecture}. Figure~\ref{fig:sequence_message} presents the corresponding sequence diagram.
-% TODO: 
-% \begin{figure}[htbp]
-%     \centering
-%     % \includegraphics[width=\textwidth]{figures/sequence_message.pdf}
-%     \caption{End-to-end sequence diagram of a message exchanged between two users, traversing the BLE link, the originating node, the LoRa mesh and the destination node.}
-%     \label{fig:sequence_message}
-% \end{figure}
 
-\paragraph{Origination.} The lifecycle begins in the mobile application, where the user composes a message addressed to a contact. The application encodes the request as an AT command and writes it to the corresponding GATT characteristic of its paired node over BLE. From the user's perspective the interaction ends here: the experience is intentionally indistinguishable from that of a conventional messaging application.
+\img{images/a3mesh_sequence_diagram_bw.png}{End-to-end sequence diagram of a message exchanged between two users, traversing the \acro{ble} link, the originating node, the LoRa mesh, the destination node, and the final \acro{ble} link to the recipient's smartphone.}{0.85}{sequence_message}
 
-\paragraph{Ingestion at the originating node.} The node's firmware parses the AT command, validates it, and constructs a mesh packet: the payload is encrypted, the addressing fields, sequence number and time-to-live (TTL) counter are populated, and the resulting frame is serialised for transmission. The node then transmits the packet over the LoRa radio as a broadcast, subject to the channel-access and duty-cycle constraints enforced by the firmware.
+\paragraph{Origination.} The lifecycle begins in the mobile application, where the user composes a message addressed to a contact. The application encodes the request as an \acro{at} command and writes it to the corresponding \acro{gatt} characteristic of its paired node over \acro{ble}. From the user's perspective the interaction ends here: the experience is intentionally indistinguishable from that of a conventional messaging application.
 
-\paragraph{Mesh traversal.} Every node within radio range receives the frame. Each receiver first checks the packet against its duplicate cache; previously seen packets are silently discarded, which guarantees that no packet is relayed more than once by the same node. For a new packet, the node performs two independent actions. First, it checks whether the packet is addressed to itself, in which case it is passed up to the local delivery path. Second---and regardless of addressing---it evaluates the adaptive forwarding decision described in Section~\ref{sec:node_interaction_model}: with the computed probability, it schedules a rebroadcast after a randomised back-off that desynchronises concurrent relays; otherwise it remains silent. Each rebroadcast decrements the TTL, which bounds the propagation horizon and prevents indefinite circulation. The packet thus expands through the network in stochastic waves, hop by hop, until it reaches the destination, the TTL expires, or the gossip extinguishes naturally once coverage is achieved.
+\paragraph{Ingestion at the originating node.} The node's firmware parses the \acro{at} command, validates it, and constructs a mesh packet: the payload is encrypted, the addressing fields, sequence number, and time-to-live (\acro{ttl}) counter are populated, and the resulting frame is serialized for transmission. The node then transmits the packet over the LoRa radio as a broadcast, subject to the channel-access and duty-cycle constraints enforced by the firmware.
 
-\paragraph{Delivery.} When the packet reaches a node whose identity matches the destination address, the firmware decrypts and validates the payload, stores the message, and notifies the paired smartphone through a BLE notification on the corresponding GATT characteristic. The recipient's application then decodes the notification and renders the message in the conversation view. % If the destination smartphone is momentarily disconnected, the node retains the message and delivers it upon reconnection, so that the user's handset need not be permanently linked for the system to operate.
+\paragraph{Mesh traversal.} Every node within radio range receives the frame. Each receiver first checks the packet against its duplicate cache; previously seen packets are silently discarded, which guarantees that no packet is relayed more than once by the same node. For a new packet, the node performs two independent actions. First, it checks whether the packet is addressed to itself, in which case it is passed up to the local delivery path. Second---and regardless of addressing---it evaluates the adaptive forwarding decision described in Section~\ref{sec:node_interaction_model}: with the computed probability, it schedules a rebroadcast after a randomized back-off that desynchronizes concurrent relays; otherwise it remains silent. Each rebroadcast decrements the \acro{ttl}, which bounds the propagation horizon and prevents indefinite circulation. The packet thus expands through the network in stochastic waves, hop by hop, until it reaches the destination, the \acro{ttl} expires, or the gossip extinguishes naturally once coverage is achieved.
 
-It must be emphasised that this description captures the system-level journey of a message; the internal mechanics of each stage---the queueing and task structure of the BLE-to-LoRa pipelines, the channel-access procedure, and the encryption scheme---are implementation concerns addressed in Chapter~\ref{ch:firmware}.
+\paragraph{Delivery.} When the packet reaches a node whose identity matches the destination address, the firmware decrypts and validates the payload, stores the message, and notifies the paired smartphone through a \acro{ble} notification on the corresponding \acro{gatt} characteristic. The recipient's application then decodes the notification and renders the message in the conversation view.
+
+It must be emphasized that this description captures the system-level journey of a message; the internal mechanics of each stage---the queueing and task structure of the \acro{ble}-to-LoRa pipelines, the channel-access procedure, and the encryption scheme---are implementation concerns addressed in Chapter~\ref{ch:firmware}.
 
 
 \section{Design Requirements}
@@ -575,23 +540,23 @@ The architecture described above is shaped by four system-level requirements. Th
 
 \subsection{Low Power Consumption}
 \label{subsec:req_power}
-% Explain power constraints and goals
-A3MESH nodes are battery-powered devices intended for scenarios---emergencies, remote deployments, prolonged infrastructure outages---in which recharging opportunities cannot be assumed. Energy is therefore the most binding resource of the entire design, and the requirement is twofold. At the device level, a node must sustain multiple days of autonomous operation on a single battery charge, which demands aggressive duty cycling of both radios, exploitation of the ESP32 sleep modes and a power subsystem with high conversion efficiency. At the network level, the forwarding protocol itself must be energy-aware: every retransmission suppressed by the gossip policy is energy saved not by one node but by the network as a whole. This dual perspective---energy as a hardware constraint and as a protocol design criterion---recurs throughout this work.
+
+A3MESH nodes are battery-powered devices intended for scenarios---emergencies, remote deployments, prolonged infrastructure outages---in which recharging opportunities cannot be assumed. Energy is therefore the most binding resource of the entire design, and the requirement is twofold. At the device level, a node must sustain multiple days of autonomous operation on a single battery charge, which demands aggressive duty cycling of both radios, exploitation of the ESP32 sleep modes, and a power subsystem with high conversion efficiency. At the network level, the forwarding protocol itself must be energy-aware: every retransmission suppressed by the gossip policy is energy saved not by one node but by the network as a whole. This dual perspective---energy as a hardware constraint and as a protocol design criterion---recurs throughout this work.
 
 \subsection{Scalability}
 \label{subsec:req_scalability}
-% Explain node density concerns
-The system must remain functional as node density grows, precisely the regime in which flood-based LoRa meshes degrade. The requirement is therefore formulated in terms of \emph{graceful degradation}: channel load must grow with offered traffic rather than with the number of deployed nodes, and the addition of nodes to a region should improve, not erode, its connectivity. This requirement is the principal motivation for abandoning deterministic flooding in favour of the adaptive gossip policy, and it is evaluated quantitatively through the congestion metrics of Chapter~\ref{ch:simulation}.
+
+The system must remain functional as node density grows, precisely the regime in which flood-based LoRa meshes degrade. The requirement is therefore formulated in terms of \emph{graceful degradation}: channel load must grow with offered traffic rather than with the number of deployed nodes, and the addition of nodes to a region should improve, not erode, its connectivity. This requirement is the principal motivation for abandoning deterministic flooding in favor of the adaptive gossip policy, and it is evaluated quantitatively through the congestion metrics of Chapter~\ref{ch:simulation}.
 
 \subsection{Reliability}
 \label{subsec:req_reliability}
-% Explain delivery reliability goals
-A messaging system intended for emergency use must deliver messages with high probability under adverse conditions: lossy links, node failures, mobility and network partitions. Probabilistic forwarding introduces an inherent tension here, since every suppressed retransmission is also a lost redundancy opportunity. The requirement is therefore expressed as a target operating point: the forwarding policy must achieve a packet delivery ratio statistically indistinguishable from that of pure flooding---in particular in sparse topologies, where premature gossip die-out is the dominant failure mode---while consuming a substantially smaller airtime budget. Reliability is thus not pursued through end-to-end acknowledgements and retransmissions, which would multiply airtime consumption, but through the controlled redundancy that the gossip mechanism itself provides. The delivery-ratio metric defined in Chapter~\ref{ch:simulation} quantifies compliance with this requirement.
+
+A messaging system intended for emergency use must deliver messages with high probability under adverse conditions: lossy links, node failures, mobility, and network partitions. Probabilistic forwarding introduces an inherent tension here, since every suppressed retransmission is also a lost redundancy opportunity. The requirement is therefore expressed as a target operating point: the forwarding policy must achieve a packet delivery ratio statistically indistinguishable from that of pure flooding---in particular in sparse topologies, where premature gossip die-out is the dominant failure mode---while consuming a substantially smaller airtime budget. Reliability is thus not pursued through end-to-end acknowledgements and retransmissions, which would multiply airtime consumption, but through the controlled redundancy that the gossip mechanism itself provides. The delivery-ratio metric defined in Chapter~\ref{ch:simulation} quantifies compliance with this requirement.
 
 \subsection{User Accessibility}
 \label{subsec:req_accessibility}
-% Explain ease-of-use philosophy
-Finally, the system must be operable by users with no technical background whatsoever. In the intended scenarios, the people who most need resilient communication are not radio amateurs or engineers, and any configuration step---flashing firmware, selecting spreading factors, managing identifiers---constitutes a barrier that excludes them. This requirement drives the upper layers of the architecture: the smartphone, a device users already own and understand, is the sole human interface; the BLE link and pairing process require no networking knowledge; the mesh is self-configuring, with discovery, forwarding and adaptation occurring autonomously; and the application deliberately reproduces the interaction patterns of mainstream messaging applications. Accessibility also constrains the physical design, as reflected in the ergonomic and enclosure decisions of the mechanical integration chapter. In short, all technical complexity of the system is required to remain invisible below the application layer.
+
+Finally, the system must be operable by users with no technical background whatsoever. In the intended scenarios, the people who most need resilient communication are not radio amateurs or engineers, and any configuration step---flashing firmware, selecting spreading factors, managing identifiers---constitutes a barrier that excludes them. This requirement drives the upper layers of the architecture: the smartphone, a device users already own and understand, is the sole human interface; the \acro{ble} link and pairing process require no networking knowledge; the mesh is self-configuring, with discovery, forwarding, and adaptation occurring autonomously; and the application deliberately reproduces the interaction patterns of mainstream messaging applications. Accessibility also constrains the physical design, as reflected in the ergonomic and enclosure decisions of the mechanical integration chapter. In short, all technical complexity of the system is required to remain invisible below the application layer.
 
 % =============================================================================
 % SIMULATOR
@@ -2276,7 +2241,7 @@ This monorepo organization was chosen deliberately so that a complete snapshot o
 
 This appendix provides the complete reference for the A3MESH AT-command interface
 implemented in the node firmware (version~\texttt{1.0.0}). Commands are issued by the
-companion mobile application over Bluetooth Low Energy using the Nordic UART Service
+companion mobile application over \acro{ble} using the Nordic UART Service
 (NUS) write characteristic (\texttt{UUID 6E400002}).
 
 \bigskip
