@@ -2053,17 +2053,53 @@ This monorepo organisation was chosen deliberately so that a complete snapshot o
 
 \section{Test Methodology}
 
-\section{Real-World Communication Tests}
-
-\section{Power Consumption Analysis}
-
+The experimental evaluation was structured around three independent test campaigns, each targeting a distinct performance dimension of the platform. The first campaign measured the maximum single-hop radio range under near-ideal propagation conditions. The second validated the mesh relay capability in an urban environment, confirming that multi-hop forwarding compensates for obstructions that sever direct links. The third characterised the operational battery lifetime of a fully assembled node under two contrasting usage profiles.
 \section{Range Evaluation}
 
-\section{Mesh Scalability Tests}
+The range test was conducted along Avinguda de Madrid in Òdena (Igualada, Barcelona), a quasi-linear road in the Pla de les Gavarreres area that provides an extended, largely unobstructed corridor suited to single-hop range characterisation. To approach the theoretical ceiling of the SX1276 transceiver, the radio was configured with spreading factor~12 and bandwidth~125~kHz (\acro{sf}12/\acro{bw}125), the most link-budget-efficient combination available, achieving a receiver sensitivity of~$-$148~dBm at the cost of reduced data rate.
 
-\section{Comparison with Existing Systems}
+Node~A was stationed at a fixed reference point beside a parked lorry, as shown in Figure~\ref{fig:max_range}. Node~B was then carried progressively further along the road while receiving periodic packets from Node~A. Despite a moderate undulation along the corridor---visible in the elevation profile inset of Figure~\ref{fig:max_range}---a continuous line of sight was maintained throughout the test, making the experiment representative of open-terrain propagation conditions.
 
-\section{Limitations}
+Packet delivery remained reliable at 100\,\% \acro{pdr} up to approximately 1\,000~m. Beyond that threshold, losses became noticeable: in the 1\,000--1\,200~m range, roughly two out of five packets were lost, corresponding to a \acro{pdr} of approximately 60\,\%. The test was concluded at 1\,200~m, at which point the link had not yet failed completely. This result should be understood as a lower bound on the maximum achievable range rather than its definitive limit: as is characteristic of radiofrequency propagation, a cleaner line of sight---obtainable from an elevated vantage point or over perfectly flat terrain---would be expected to extend the usable range further still.
+
+\img{images/max_range.png}{Range test on Avinguda de Madrid, Òdena. Node~A is positioned beside the parked lorry in the foreground; the elevation profile inset confirms a largely continuous line of sight along the test corridor despite moderate road undulation.}{0.95}{max_range}
+
+\newpage
+\section{Mesh Relay Demonstration}
+\label{sec:results_relay}
+
+The mesh relay capability was validated through two urban deployment scenarios conducted in Vilanova del Camí. In each scenario, three nodes---referred to as Node~A, Node~B, and Node~C---were placed such that a direct radio link between Node~A and Node~C was obstructed, while Node~B maintained adequate signal margins to both endpoints.
+
+\subsection{Unobstructed-Street Scenario}
+
+In the first scenario, the three nodes were placed at intervals of approximately~100~m along a straight street. Figure~\ref{fig:relay_clear} illustrates the placement.
+
+
+\img{images/relay_clear.png}{Node placement in the unobstructed-street relay scenario. Node~A and Node~C are positioned on opposite sides of a street, with Node~B acting as an intermediate relay.}{0.95}{relay_clear}
+
+
+In order to make the result more evident, the \acro{sf} was reduced to its minimum value \acro{sf7} and the bandwidth was set to 250~kHz.
+Additionally, it was then verified through the application that the only neighboring node displayed for both Nodes~A and C was Node~B, confirming that communication between the two nodes was successfully established through the intermediate relay node.
+
+\subsection{Building-Obstruction Scenario}
+
+In the second scenario, each node was positioned on a different side of a different building block, such that no two nodes shared a direct line of sight, Figure~\ref{fig:obstructed_scenario} shows the arrangement.
+
+
+\img{images/obstructed_scenario.png}{Node placement in the building-obstruction relay scenario. Node~A and Node~C are positioned on opposite sides of different building blocks separated by $68,54$~m, with Node~B acting as an intermediate relay.}{0.95}{obstructed_scenario}
+
+Despite the more challenging propagation geometry, the mesh successfully relayed messages but with a worse link quality than in the unobstructed-street scenario as expected.
+
+
+\section{Power Consumption Analysis}
+\label{sec:results_power}
+
+Battery lifetime was characterised under two usage profiles that bracket the expected operational range of the platform. In both tests, the node was fully charged to~4.20~V prior to the experiment and left to operate autonomously until the DW01A\,+\,FS8205A hardware protection circuit disconnected the cell at approximately~2.4~V. Battery state was sampled periodically via \texttt{AT+INFO?} to track the discharge curve reported by the firmware's look-up-table estimator.
+
+\paragraph{Idle profile.} The node remained powered on with the \acro{ble} interface active and paired to the companion application, but no messages were sent and no user interaction took place. The node continued to transmit the neighbour-discovery beacon every~30~s as described in Chapter~\ref{ch:firmware}. The \texttt{PowerManager} task reduced the \acro{cpu} clock from~240~MHz to~80~MHz after the configured 10-minute inactivity timeout, as confirmed by the absence of \texttt{notify\_activity()} calls during the quiescent period. The node remained operational for~[X]~hours~[X]~minutes.
+
+\paragraph{Active profile.} A second node was placed within direct radio range and one message was sent every~~s throughout the test, with the remote node responding to each. This traffic pattern kept the \acro{cpu} continuously at~240~MHz, preventing the \texttt{PowerManager} from entering the idle state. The node exhausted its battery after~[X]~hours~[X]~minutes, yielding an average current draw of approximately~[X]~mA. The ratio between idle and active lifetimes---a factor of approximately~[X]---demonstrates the practical benefit of the adaptive frequency-scaling strategy: even a modest periodic traffic load sustains the~240~MHz clock and noticeably reduces autonomy relative to the quiescent case.
+
 
 \part{Conclusions}
 \label{part:conclusions}
