@@ -83,6 +83,7 @@ Driven by this motivation, this work presents the development of \emph{A3MESH}, 
 
 
 \section{Objectives}
+\label{sec:objectives}
 
 The main objective of this thesis is to design and develop a decentralized low-power mesh communication platform capable of operating without external infrastructure while maintaining scalability, energy efficiency, and accessibility for non-technical users.
 
@@ -2109,11 +2110,39 @@ Battery lifetime was characterised under two usage profiles that bracket the exp
 
 \section{Achieved Objectives}
 
+This thesis set out to design, implement, and validate a decentralized, infrastructure-free mesh communication platform suitable for emergency and off-grid scenarios. The seven specific objectives stated in Section~\ref{sec:objectives} have been addressed in full.
+
+A custom low-power hardware platform was designed from the ground up, integrating an ESP32-WROOM-32UE microcontroller, an RFM95W LoRa transceiver, a cascaded charging and buck-boost power subsystem, and a compact PCB monopole antenna derived from TI Design Note DN024---all on a single 74.5$\times$89.8\,mm two-layer board manufactured from commodity components. The layered firmware implements all required networking functions: LoRa and \acro{ble} communication pipelines, the Smart Gossip forwarding engine, neighbour discovery, AES-256-\acro{gcm} encryption with \acro{ecdh} key exchange, adaptive \acro{cpu} frequency scaling, and a battery monitoring subsystem.
+
+The central research question---whether adaptive gossip can replace flooding in a LoRa mesh---was addressed through a purpose-built discrete-event simulation environment, and the answer is affirmative with a clearly quantified trade-off. A dedicated Android application hides all networking complexity behind a messaging interface that requires no technical knowledge to operate. A 3D-printed flexible enclosure, bonded to the user's existing phone case, satisfies the portability objective without requiring any manual attachment step. Finally, real-world experiments confirmed mesh relay operation in two urban obstruction scenarios and established a single-hop range exceeding 1.2\,km under the SF12/BW125 configuration.
+
 \section{Main Contributions}
+
+The primary contribution of this thesis is the \emph{Smart Gossip} adaptive forwarding algorithm. Smart Gossip computes, for each received packet, a relay probability that combines three locally observable signals---received signal strength, neighbour count, and duplicate copies overheard---into a single multiplicative expression bounded from below by a configurable floor. The five parameters of the algorithm were tuned through Differential Evolution over a network simulator, an approach that reduced the exploration of a five-dimensional parameter space from thousands of physical deployments to minutes of computation, and produced a configuration that reduces per-node transmission air time by 27--32\%, end-to-end delay by 58--86\%, and collision rate by 18--37\% relative to managed flooding across networks of 15--50 nodes, while maintaining packet delivery ratios within 4.5--12.4 percentage points of the flooding baseline.
+
+A further contribution is the simulation infrastructure itself. The modified Meshtasticator environment, with its pluggable routing interface and batch evaluation harness, constitutes a reusable experimental platform for evaluating LoRa mesh forwarding policies under reproducible, statistically comparable conditions. The hardware platform, firmware architecture, and Android application are system contributions that collectively demonstrate the feasibility of the complete end-to-end vision: a user with no radio knowledge can exchange encrypted messages with another user over a multi-hop LoRa network by pairing their smartphones to inexpensive, pocket-sized nodes. The integration of an \acro{at}-command interface between the firmware and the application furthermore provides a well-defined contract that allows either subsystem to evolve independently.
 
 \section{Lessons Learned}
 
+Several insights emerged from the development process that are worth recording for future work in this domain.
+
+The most consequential lesson concerns the relationship between airtime and protocol design. LoRa's half-duplex constraint and the hundreds of milliseconds of time-on-air per packet at high spreading factors mean that forwarding decisions have consequences on a timescale that is orders of magnitude slower than in Wi-Fi or \acro{ble}. Algorithms that appear innocuous on conventional radios---flooding, acknowledgement-based retransmission---become catastrophic at LoRa airtimes: managed flooding collapses at 30--50 nodes to delays exceeding one minute, a regime in which the network is functionally unusable. This amplification effect makes the LoRa mesh problem both more interesting and more demanding than its counterparts in faster-radio networks.
+
+The simulation-first methodology proved indispensable. The five-parameter space of Smart Gossip cannot be explored manually: even a coarse ten-level grid yields $10^5$ combinations, each requiring statistical averaging over multiple 30-minute simulations. Differential Evolution converged to a meaningful optimum in approximately 160 fitness evaluations, completing in under ten minutes of computation. The lesson is that adaptive mesh protocols in constrained-radio environments are inherently a joint simulation-and-hardware problem; neither alone is sufficient.
+
+\acro{ai}-assisted development demonstrated clear but bounded value. The Android application's structural scaffolding---\acro{room} schema, \acro{mvvm} layer, Navigation graph, adapter infrastructure---was produced rapidly and correctly. Cryptographic code, however, required line-by-line human review: subtle errors in key size, nonce construction, or error propagation are syntactically valid yet semantically incorrect, and no tool reliably flags them. The lesson is that AI assistance is most effective as a force multiplier for well-understood engineering tasks, not as a substitute for domain expertise on security-critical code.
+
 \section{Future Improvements}
+
+Several directions for future work present themselves naturally from the limitations identified throughout this thesis.
+
+The most operationally impactful extension would be the integration of battery-aware network behaviour. The firmware already reports battery state of charge via \texttt{AT+INFO?}; a natural next step is to act on it. When a node's remaining capacity falls below a configurable threshold, the firmware could raise the Smart Gossip probability floor toward 1---effectively reverting to full flooding for maximum relay participation---and simultaneously switch to a more robust radio configuration such as SF12/BW125. This dual response would ensure that a node nearing exhaustion contributes maximally to the mesh for its remaining operational lifetime rather than silently degrading, and could additionally generate an unsolicited \acro{sos} notification to paired smartphones with the node's identity and last-known battery level, a lightweight emergency signalling mechanism that requires no additional hardware.
+
+A second line of improvement concerns the physical form factor. The current node thickness is dominated by the LiPo cell rather than the \acro{pcb} itself; replacing the standard pouch cell with a thinner, purpose-sized flat cell of equivalent capacity would significantly reduce the overall profile of the assembled accessory. Alternatively, a revised \acro{pcb} layout that places the tallest components---the module shields, the buck-boost inductor, and the USB-C connector---on opposite faces of the board would allow the cell to be recessed into a relief pocket in the enclosure, reducing the combined stack height without compromising capacity. Either approach would improve wearability and reduce the perceived intrusiveness of the device.
+
+On the software side, the companion application currently targets Android exclusively. Extending it to iOS would substantially broaden the platform's reach, particularly in emergency response communities in regions where iOS market share is high. The firmware \acro{at} interface is already platform-agnostic; the principal effort would be the reimplementation of the \acro{ble} communication layer and the cryptographic subsystem using the iOS Core Bluetooth and CommonCrypto frameworks, which offer comparable capabilities to their Android counterparts. A shared cross-platform logic layer implemented in Kotlin Multiplatform or similar technology could reduce the duplication of business logic between the two applications.
+
+Finally, the Smart Gossip parameters are currently fixed constants compiled into the firmware. A natural evolution would be an online adaptation mechanism that adjusts $\beta$ and $p_{\text{floor}}$ at runtime in response to observed network conditions---raising the density weight when the neighbour count grows and relaxing the floor when the duplicate rate indicates good coverage. Such closed-loop adaptation would remove the need for pre-optimised parameters altogether and make the algorithm self-tuning across the full range of network densities, including the small-network regime where the current static parameterisation underperforms managed flooding.
 
 \printbibliography
 
