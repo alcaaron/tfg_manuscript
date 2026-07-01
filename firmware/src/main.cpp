@@ -23,7 +23,7 @@ lib::crypto::CryptoManager crypto;
 lib::power::Battery battery;
 lib::power::PowerManager power_mgr;
 
-// Current LoRa radio parameters — updated by AT+LORA= and reported by AT+INFO?
+// Current LoRa radio parameters; updated by AT+LORA= and reported by AT+INFO?
 // CR uses arduino-LoRa denominator convention: 5=4/5, 6=4/6, 7=4/7, 8=4/8.
 // A3MESH_CR (config.h) = 1 is clamped to 5 by the library, so we start at 5.
 static uint8_t  g_lora_sf = A3MESH_SF;
@@ -47,7 +47,7 @@ static bool parse_hex_bytes(const char *hex, uint8_t *out, size_t out_len)
     return true;
 }
 
-// PassiveACK.h wrappers — implemented here so lower-level libs
+// PassiveACK.h wrappers; implemented here so lower-level libs
 // can call them without depending on the mesh include chain.
 void mesh_register_pending_forward(uint16_t pkt_id, uint32_t src) {
     a3mesh.register_pending_forward(pkt_id, src);
@@ -58,15 +58,6 @@ void mesh_cancel_pending_forward(uint16_t pkt_id, uint32_t src) {
 bool mesh_consume_pending_forward(uint16_t pkt_id, uint32_t src) {
     return a3mesh.consume_pending_forward(pkt_id, src);
 }
-
-
-// ======================
-// === Task Handles =====
-// ======================
-
-// TaskHandle_t tx_BLE_task_handle;
-// TaskHandle_t rx_LoRa_task_handle;
-// TaskHandle_t tx_LoRa_task_handle;
 
 
 // ======================
@@ -174,7 +165,7 @@ MeshRxState handleValidate(a3mesh_rx_ctx_t &ctx)
   if (ctx.pkt.node_id == a3mesh.get_node_id())
     return MeshRxState::k_rx_drop;
 
-  // A neighbor is forwarding this packet — cancel our own pending forward if any.
+  // A neighbor is forwarding this packet, then cancel our own pending forward if any.
   // Must run before get_copies so it fires even for packets already in our dup cache.
   a3mesh.cancel_pending_forward(ctx.pkt.pkt_id, ctx.pkt.src);
 
@@ -470,6 +461,8 @@ void BLE2LoRaTask(void *pvParameters)
 
     // -------------------------
     // AT command
+    // Format: AT\r\n
+    // Firmware responds with +OK\r\n
     // -------------------------
     if (strcmp(rx_buffer, "AT\r\n") == 0)
     {
@@ -484,6 +477,7 @@ void BLE2LoRaTask(void *pvParameters)
     // -------------------------
     // SEND command
     // Format: AT+SEND=<dst>,<payload>\r\n
+    // Firmware sends the payload as a plain data packet, unencrypted.
     // -------------------------
     if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SEND="))
     {
@@ -532,7 +526,9 @@ void BLE2LoRaTask(void *pvParameters)
 
 
     // -------------------------
-    // NEIGHBORS
+    // NEIGHBORS command
+    // Format: AT+NEIGHBORS?\r\n
+    // Firmware responds with a list of neighbors and their RSSI values and timestamp.
     // -------------------------
     if (strcmp(rx_buffer, "AT+NEIGHBORS?\r\n") == 0)
     {
@@ -582,7 +578,9 @@ void BLE2LoRaTask(void *pvParameters)
 
 
     // -------------------------
-    // NODE ID
+    // NODEID command
+    // Format: AT+NODEID?\r\n
+    // Firmware responds with the node's unique ID in hex format.
     // -------------------------
     if (strcmp(rx_buffer, "AT+NODEID?\r\n") == 0)
     {
@@ -597,9 +595,13 @@ void BLE2LoRaTask(void *pvParameters)
       continue;
     }
 
+    // -------------------------
+    // SENDKX command
+    // Format: AT+SENDKX=<dst_hex>,<payload>\r\n
+    // Firmware sends the payload as a key exchange packet, unencrypted.
+    // -------------------------
     if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SENDKX="))
     {
-      // Format: AT+SENDKX=<dst_hex>,<payload>\r\n
       uint32_t dst = 0;
       char msg[A3MESH_MAX_PAYLOAD + 1];
       const char *args = rx_buffer + 10;
@@ -775,10 +777,10 @@ void BLE2LoRaTask(void *pvParameters)
 
     // -------------------------
     // Key management commands
-    // AT+SETNETKEY=<64hex>              — set 32-byte shared network key
-    // AT+SETPEERKEY=<08hex>,<64hex>     — set node-to-node key for peer
-    // AT+SETGRPKEY=<08hex>,<64hex>      — set group key for group_id
-    // AT+CLRKEYS                        — wipe all stored keys
+    // AT+SETNETKEY=<64hex>              --> set 32-byte shared network key
+    // AT+SETPEERKEY=<08hex>,<64hex>     --> set node-to-node key for peer
+    // AT+SETGRPKEY=<08hex>,<64hex>      --> set group key for group_id
+    // AT+CLRKEYS                        --> wipe all stored keys
     // -------------------------
     if (BLE_MSG_STARTS_WITH(rx_buffer, "AT+SETNETKEY="))
     {
@@ -901,8 +903,8 @@ void BLE2LoRaTask(void *pvParameters)
 
     // -------------------------
     // LORA config
-    // AT+LORA=<SF>,<BW>,<CR>   — reconfigure radio (SF: 7-12, BW: 125/250/500 kHz, CR: 5-8)
-    // AT+LORA?                 — query current config
+    // AT+LORA=<SF>,<BW>,<CR>   --> reconfigure radio (SF: 7-12, BW: 125/250/500 kHz, CR: 5-8)
+    // AT+LORA?                 --> query current config
     // -------------------------
     if (strcmp(rx_buffer, "AT+LORA?\r\n") == 0)
     {

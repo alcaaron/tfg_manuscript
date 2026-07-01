@@ -11,7 +11,7 @@ namespace lib::crypto {
  *   - 96-bit nonce (12 bytes, RFC 5116)
  *   - 128-bit authentication tag (16 bytes)
  *
- * The mbedTLS context is stack-allocated per call — no concurrency issues.
+ * The mbedTLS context is stack-allocated per call --> no concurrency issues.
  * Internally delegates to mbedtls_gcm_* which maps to esp_aes_gcm_* (HW).
  */
 class AESGCM {

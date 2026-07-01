@@ -16,7 +16,7 @@ namespace lib::power
         if (_is_idle.exchange(false, std::memory_order_acq_rel))
         {
             setCpuFrequencyMhz(POWER_ACTIVE_MHZ);
-            MESH_LOG("[PWR] Activity — CPU restored to %d MHz\r\n", POWER_ACTIVE_MHZ);
+            MESH_LOG("[PWR] Activity --> CPU restored to %d MHz\r\n", POWER_ACTIVE_MHZ);
         }
     }
 
@@ -44,7 +44,7 @@ namespace lib::power
                 {
                     self->_is_idle.store(true, std::memory_order_release);
                     setCpuFrequencyMhz(POWER_IDLE_MHZ);
-                    MESH_LOG("[PWR] Idle (%lu s) — CPU reduced to %d MHz\r\n",
+                    MESH_LOG("[PWR] Idle (%lu s) --> CPU reduced to %d MHz\r\n",
                              elapsed / 1000UL, POWER_IDLE_MHZ);
                 }
             }

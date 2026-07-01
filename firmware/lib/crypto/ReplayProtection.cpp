@@ -37,7 +37,7 @@ bool ReplayProtection::accept(uint32_t sender_id, uint64_t counter)
         e.max_counter = counter;
         ok = true;
     } else if (e.max_counter - counter < REPLAY_WINDOW) {
-        // Within the window — out-of-order but not a replay
+        // Within the window --> out-of-order but not a replay
         ok = true;
     }
 

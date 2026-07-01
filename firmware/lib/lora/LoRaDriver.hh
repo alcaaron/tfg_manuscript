@@ -84,7 +84,7 @@ namespace lib::lora
         bool send_raw_pkt(const uint8_t &data, size_t len);
 
         /*!
-         * \brief DIO0 rising-edge ISR — signals the RX semaphore to wake vLoRaRxTask.
+         * \brief DIO0 rising-edge ISR -- signals the RX semaphore to wake vLoRaRxTask.
          *
          * Must be placed in IRAM (IRAM_ATTR) to be callable during flash cache
          * misses on the ESP32.  Yields to a higher-priority task if one was
@@ -104,7 +104,7 @@ namespace lib::lora
          * \brief Allocates the next frame slot from the static pool (round-robin).
          *
          * The pool holds 8 slots; the caller fills rx_data[] and len before
-         * posting the pointer to xLoRaRxQueue.  Slots are reused cyclically —
+         * posting the pointer to xLoRaRxQueue.  Slots are reused cyclically --
          * the consumer (mesh pipeline) must process each frame before the pool
          * wraps around (8 unprocessed frames).
          *
@@ -145,7 +145,7 @@ namespace lib::lora
         };
 
         /*!< Ring buffer of the most recent LORA_AIRTIME_RECORDS TX durations.
-         *   Accessed only from vLoRaTxTask — no mutex required. */
+         *   Accessed only from vLoRaTxTask -- no mutex required. */
         AirtimeEntry _airtime_log[LORA_AIRTIME_RECORDS] = {};
 
         /*!< Write index into _airtime_log[]; advances modulo LORA_AIRTIME_RECORDS. */
