@@ -55,105 +55,73 @@ The project integrates a compact, low-power PCB (ESP32, SX1276 LoRa transceiver,
 \chapter{Introduction}
 \label{ch:introduction}
 
+Modern smartphones excel at communication as long as an operator's cellular network or a working internet connection is available. When either fails---during a natural disaster, a large-scale power outage, or simply out in the countryside where there is no coverage---the device becomes essentially mute for messaging purposes, precisely when reaching family, friends, or emergency services matters most. This thesis addresses that gap by combining three familiar technologies: \emph{mesh networking}, in which every device forwards traffic for its neighbours instead of relying on a central tower; \emph{offline operation}, meaning that the system works without any pre-existing infrastructure or internet access; and two low-power radios, \emph{LoRa} for the multi-kilometre links between nodes and \emph{Bluetooth Low Energy} (\acro{ble}) for the short link between each smartphone and its companion node.
+
+The concrete outcome of this work is a platform called \emph{A3MESH}. It consists of a pocket-sized custom electronic board that can be adhered to the back of a phone case and paired to the phone over \acro{ble}, an Android application that behaves like a conventional messaging app, and a novel forwarding algorithm---\emph{Smart Gossip}---that lets these nodes cooperate as a self-organising mesh with no configuration on the part of the user. Together they enable two smartphones to exchange encrypted text messages across several kilometres of urban or rural terrain, hopping through intermediate nodes when necessary, without any cellular network, Wi-Fi, or internet connection being involved.
+
 \section{Motivation}
 
-During the past few years, the demand for centralized infrastructure has grown considerably. The majority of modern messaging systems rely heavily on cellular networks, internet access, and cloud services. While these infrastructures offer near-global connectivity, they also introduce a Single Point of Failure (\acro{spof}) in the event of natural disasters, blackouts, or network congestion, as well as in remote areas where no coverage is available.
+The dependence of modern messaging on cellular networks and cloud services turns every centralized infrastructure into a Single Point of Failure (\acro{spof}). The Spain-wide blackout of April~2025 made this concrete: for several hours a large fraction of the population lost the ability to reach family, friends, or emergency services precisely when reaching them mattered most~\cite{dsme_lora_2022}. Similar failure modes recur during fires, floods, earthquakes, and prolonged power outages, and they extend permanently to remote areas where no coverage exists in the first place.
 
-Recent events have exposed the fragility of these infrastructures in emergency scenarios. For instance, a major blackout in Spain on April 18th, 2025, clearly demonstrated this vulnerability. During fires, floods, earthquakes, or massive power outages, cellular networks can be rendered useless or congested, hindering coordination and information exchange. As a consequence, interest in off-grid communication systems, which enable operations without any prior infrastructure dependency, has grown substantially.
+The response from both the research community and the telecommunications industry has been to explore infrastructure-independent alternatives. Open-source projects such as Meshtastic have demonstrated that low-cost LoRa hardware can sustain useful messaging without any operator involvement~\cite{meshtastic}, and, at the 2026 Mobile World Congress, established vendors such as Viasat and Qualcomm presented satellite and hybrid connectivity solutions targeting the same class of scenarios~\cite{viasat_mwc_2026}. In both cases the technical viability is no longer in question; the remaining barrier is usability. Existing infrastructure-independent platforms require non-trivial technical configuration and therefore exclude the very users who most benefit from resilient communication.
 
-Mesh networks play a key role in this context because every node can act simultaneously as a transmitter, receiver, and relay, allowing messages to spread between devices via multiple hops. This approach avoids \acro{spof}s and increases tolerance to partial network failures.
-
-Among the wide range of wireless technologies available, LoRa (Long Range) has emerged as an especially suitable option for low-power, long-range communications \cite{dsme_lora_2022}. These characteristics make this technology ideal for off-grid systems, battery-powered devices, and networks deployed in resource-constrained environments.
-
-Furthermore, open-source projects such as Meshtastic reflect growing community interest in LoRa-based off-grid communications \cite{meshtastic}. These systems allow sending text messages and data without the need for cellular coverage or internet access, using low-cost and low-power devices.
-
-This interest extends beyond technical enthusiasts; the telecommunications industry is also exploring hybrid and resilient solutions designed to maintain connectivity even outside traditional coverage. During the 2026 edition of the Mobile World Congress (\acro{mwc}), companies such as Viasat and Qualcomm presented satellite communication technologies and alternative connectivity systems for vehicles and mobile phones \cite{viasat_mwc_2026}, evidencing the increasing relevance of resilient and off-grid communications.
-
-Nevertheless, despite the technical advantages of these systems, significant accessibility barriers remain for non-technical users. Since existing platforms require non-trivial technical configuration to deploy and operate, a primary objective of this thesis is to develop a mesh communication platform that is not only efficient and resilient, but also accessible and intuitive for ordinary users. To achieve this, smartphone integration and a user experience similar to a conventional messaging app will be key characteristics of this project.
-
-Driven by this motivation, this work presents the development of \emph{A3MESH}, a decentralized communication platform based on LoRa and \acro{ble}. It is designed to provide resilient, energy-efficient, and easily deployable communication in off-grid or emergency scenarios.
+This thesis therefore treats usability as a first-class design requirement alongside range, autonomy, and reliability. Smartphone integration, a self-configuring mesh, and a familiar user interface are pursued as explicit goals, so that the resulting platform can be adopted without any radio-networking knowledge.
 
 
 \section{Objectives}
 \label{sec:objectives}
 
-The main objective of this thesis is to design and develop a decentralized low-power mesh communication platform capable of operating without external infrastructure while maintaining scalability, energy efficiency, and accessibility for non-technical users.
-
-To achieve this objective, the project combines hardware design, firmware development, routing optimization, mobile application integration, and real-world validation into a unified communication ecosystem.
-
-The specific objectives of this work are summarized as follows:
+The overarching goal of this thesis is to design and validate a decentralized low-power mesh communication platform that remains usable by non-technical users. This goal decomposes into the following specific objectives:
 
 \begin{itemize}
-\item Design a portable hardware platform based on LoRa and \acro{ble} technologies capable of supporting infrastructure-free mesh communication.
+\item Design a portable hardware platform based on LoRa and \acro{ble} that supports multi-hop mesh communication.
 
-\item Develop a modular firmware architecture implementing packet forwarding, neighbor discovery, power management, and communication pipelines between LoRa and BLE interfaces.
+\item Develop a modular firmware architecture covering packet forwarding, neighbor discovery, power management, and the \acro{ble}--LoRa communication pipeline.
 
-\item Investigate the limitations of traditional flooding-based mesh propagation mechanisms and evaluate alternative routing approaches through simulation.
+\item Investigate the scalability limits of flooding-based mesh dissemination and evaluate alternative routing approaches through simulation.
 
-\item Design and implement a routing algorithm capable of dynamically adjusting forwarding behavior according to network conditions.
+\item Design and implement a routing algorithm that adjusts its forwarding behavior according to locally observed network conditions.
 
-\item Improve user accessibility by abstracting the underlying networking complexity and providing a user experience similar to conventional messaging applications.
+\item Provide a user experience comparable to conventional messaging applications by hiding all networking complexity behind a smartphone client.
 
-\item Design a compact enclosure and mechanical integration solution suitable for daily portable use alongside smartphones.
+\item Design a compact enclosure that integrates naturally with the user's existing smartphone.
 
-\item Validate the proposed system through simulation results, laboratory testing, and real-world communication experiments.
+\item Validate the platform through simulation, laboratory measurements, and real-world communication experiments.
 \end{itemize}
 
 \section{Scope and Limitations}
 
-The project includes the development of custom hardware, embedded firmware, a routing simulation environment, and a smartphone-oriented mobile application integrated into a complete end-to-end communication system.
+The work covers the complete end-to-end system, from the custom hardware and embedded firmware, through the routing simulator, to the Android application that acts as the user interface. Its scope therefore spans low-power wireless communication, mesh routing, embedded systems, mobile software, and mechanical integration.
 
-The scope of the work covers several engineering areas, including low-power wireless communication, mesh networking algorithms, embedded systems, mobile software development, and mechanical integration.
-
-The proposed platform allows smartphones to exchange messages through nearby mesh nodes using BLE connectivity combined with LoRa-based multi-hop communication.
-
-However, several limitations must also be considered. First, the system has been developed as a prototype-oriented research platform rather than as a commercial product. Consequently, aspects such as industrial certification, large-scale manufacturing optimization, and extensive environmental qualification are outside the scope of this thesis.
-
-Additionally, the mobile application has been developed exclusively for Android devices. Cross-platform compatibility and iOS support were not considered because the primary research focus was centered on mesh networking and embedded communication systems.
-
-The proposed platform also does not rely on Internet gateways, cloud synchronization, or existing communication infrastructure. While this decision improves independence and resilience, it also limits interoperability with traditional messaging services and prevents communication beyond the mesh network itself.
-
-Although the routing algorithm has been evaluated through simulation and validated through real-world testing, large-scale field deployments involving hundreds or thousands of physical nodes were not feasible within the scope of this project. Therefore, scalability conclusions are partially based on simulated environments and controlled experimental conditions.
-
-Finally, while the system incorporates encryption mechanisms and trust-based communication concepts, security-related features are designed to improve practical privacy and usability within the context of low-power decentralized communication systems.
+Several deliberate limitations frame the project. First, the platform is a research prototype: industrial certification, mass production, and environmental qualification lie outside its scope. Second, the mobile application targets Android only, since a cross-platform port would have displaced attention from the networking work at the core of the thesis. Third, the deliberate absence of Internet gateways, which is precisely what makes the system resilient, also excludes interoperability with conventional messaging services. Fourth, the scalability results reported in Chapter~\ref{ch:results} rest on simulation and on small-scale field deployments; validating them at the scale of hundreds of physical nodes was not feasible within a bachelor thesis. Finally, the cryptographic layer is designed to protect practical privacy in a low-power decentralized setting rather than to provide certified security guarantees.
 
 \section{Contributions}
 
-The main contributions of this thesis are listed below:
+The main contributions of this thesis are:
 
 \begin{itemize}
-\item The development of an adaptive smart gossip routing algorithm capable of dynamically adjusting packet forwarding behavior according to network conditions in order to improve scalability, reduce congestion, and minimize unnecessary retransmissions compared to traditional flooding-based approaches.
+\item \emph{Smart Gossip}, an adaptive forwarding algorithm that computes each node's relay probability from locally observable signals (\acro{rssi}, neighbor count, and duplicate copies overheard), together with an evolutionary tuning procedure~\cite{eiben_2003} that optimizes its parameters on a simulator built for this purpose.
 
-\item The creation of a custom network simulation environment specifically designed to evaluate mesh communication performance under different routing strategies, network densities, and propagation conditions.
+\item A custom LoRa mesh simulator, extending Meshtasticator with a pluggable routing interface and a batch evaluation harness that produces reproducible, statistically comparable results across routing strategies and network densities.
 
-\item The application of evolutionary optimization techniques \cite{eiben_2003} to automatically tune the forwarding parameters of the proposed smart gossip algorithm, enabling efficient exploration of the parameter space and improving overall network performance.
+\item A complete hardware and firmware platform: a compact ESP32-based board with a PCB antenna adapted from Texas Instruments Design Note DN024~\cite{ti_dn024}, and a layered firmware that implements the \acro{ble}--LoRa pipeline, neighbor discovery, adaptive power management, and end-to-end encryption.
 
-\item The implementation of a modular layered firmware architecture supporting LoRa communication, \acro{ble} integration, packet forwarding, neighbor discovery, power management, and bidirectional communication pipelines between mobile devices and the mesh network.
+\item An Android application that exposes the platform through an interface indistinguishable from a conventional messaging application, keeping the mesh entirely invisible to the end user.
 
-\item The development of an Android-based messaging platform designed to abstract the complexity of mesh networking and provide a user experience similar to conventional messaging applications, improving accessibility for non-technical users.
-
-\item The design of a compact portable hardware platform optimized for low-power operation and infrastructure-free communication scenarios.
-
-\item The integration of a PCB antenna design derived from Texas Instruments Design Note DN024 \cite{ti_dn024}, enabling compact RF integration while maintaining acceptable communication performance for portable deployments.
-
-\item The validation of the proposed system through simulation-based evaluation, laboratory measurements, and real-world communication experiments involving complete hardware and software integration.
+\item Experimental validation of the platform through simulation, laboratory measurements, and field tests.
 \end{itemize}
 
-Simulation-based evaluation against the Managed Flooding baseline shows that Smart Gossip reduces total air transmissions by 27--32\%, message propagation delay by 58--86\%, and packet collisions by 18--33\% across network sizes from 15 to 50 nodes, while maintaining packet delivery ratios within 4.5--12.4~pp of the baseline. A composite performance score confirms that Smart Gossip outperforms Managed Flooding in three out of four evaluated network configurations.
+Against a Managed Flooding baseline, Smart Gossip reduces air transmissions by~27--32\,\%, propagation delay by~58--86\,\%, and packet collisions by~18--33\,\% across networks of~15--50 nodes, at the cost of a delivery-ratio penalty of~4.5--12.4~percentage points. A composite performance score favors Smart Gossip in three out of four evaluated network sizes.
 
 \section{Thesis Structure}
 
-This thesis is organized into four main parts covering the theoretical background, system design, implementation, and evaluation of the proposed decentralized communication platform.
+The remainder of this document is organized as follows. Chapter~\ref{ch:introduction} introduces the motivation, objectives, scope, and main contributions of the project. Chapter~\ref{ch:background} then reviews the technological and theoretical background: mesh communication as an architectural concept, LoRa and the wider \acro{lpwan} family, Bluetooth Low Energy, and the existing off-grid mesh platforms and gossip-based routing protocols on which this work builds.
 
-Part~\ref{part:introduction} introduces the motivation behind the project, defines the problem addressed by the thesis, presents the main objectives, and outlines the scope and contributions of the proposed work.
+The core technical development of the thesis follows. Section~\ref{ch:sysarch} presents the overall system architecture and communication model. Section~\ref{ch:methodology} summarizes the engineering workflow and project management strategy adopted throughout the project. Section~\ref{ch:simulation} describes the development of the network simulator, the proposed Smart Gossip routing algorithm, and the evolutionary optimization process used for parameter tuning. Section~\ref{ch:hardware} details the custom low-power communication board, including its mechanical integration. Section~\ref{ch:firmware} explains the layered embedded architecture implementing mesh networking functionality, communication pipelines, and power management mechanisms. Section~\ref{ch:mobileapp} describes the Android-based user interface and smartphone integration approach. Finally, Section~\ref{ch:results} analyzes the performance of the proposed system through simulation and real-world testing.
 
-Part~\ref{part:state_of_the_art} reviews the technological and theoretical background related to decentralized mesh communication systems. This includes an overview of LoRa and \acro{ble} technologies, existing infrastructure-free communication platforms, and routing approaches.
+Chapter~\ref{ch:costs} presents the economic study of the project, breaking down engineering effort, materials cost, and total project cost. Chapter~\ref{ch:conclusions} summarizes the main conclusions obtained during the development of the project, discusses the achieved objectives and contributions, and Chapter~\ref{ch:future_work} proposes possible future improvements and research directions.
 
-Part~\ref{part:thesis_body} contains the core technical development of the thesis. It begins by presenting the overall system architecture and communication model. The following chapters describe the development of the network simulator and the proposed smart gossip routing algorithm, including the evolutionary optimization process used for parameter tuning. The hardware design chapter explains the development of the custom low-power communication board, while the firmware chapter details the layered embedded architecture implementing mesh networking functionality, communication pipelines, and power management mechanisms. The mobile application chapter describes the Android-based user interface and smartphone integration approach. Additionally, the mechanical integration chapter presents the enclosure and portability considerations, while the development methodology chapter summarizes the engineering workflow and project management strategy adopted throughout the project. Finally, the experimental evaluation chapter analyzes the performance of the proposed system through simulation and real-world testing.
-
-Part~\ref{part:conclusions} summarizes the main conclusions obtained during the development of the project, discusses the achieved objectives and contributions, and proposes possible future improvements and research directions.
-
-The document also includes several appendices containing complementary technical information such as AT command references, PCB schematics, and repository organization details.
+The document also includes several appendices containing complementary technical information: the complete AT-command reference (Appendix~\ref{ch:appendix_at}), the electrical schematic and copper layers of the printed circuit board (Appendix~\ref{ch:appendix_pcb}), the full bill of materials (Appendix~\ref{ch:appendix_bom}), and the source-code repository organization (Appendix~\ref{ch:appendix_repos}).
 
 
 % =============================================================================
@@ -161,42 +129,18 @@ The document also includes several appendices containing complementary technical
 \chapter{Background}
 \label{ch:background}
 
+This chapter provides the technical background required to place A3MESH within the wider landscape of decentralized communication systems. Section~\ref{sec:mesh} reviews mesh communication as an architectural concept and identifies the design tensions inherent to it. Section~\ref{sec:lora-lpwan} introduces LoRa and the \acro{lpwan} family, focusing on the modulation scheme, its configurable parameters, and the regulatory limits that constrain any real deployment. Section~\ref{sec:ble} covers Bluetooth Low Energy in the aspects relevant to its role as the smartphone-to-node link. Sections~\ref{sec:existing-solutions} and~\ref{sec:gossip} then survey the mesh platforms most closely related to this work---Meshtastic, MeshCore, and LocalMesh---and review the gossip-based routing protocols on which the Smart Gossip algorithm of Chapter~\ref{ch:simulation} is built.
+
 \section{Mesh Communication Systems}
+\label{sec:mesh}
 
-Mesh communication systems are decentralized network architectures in which devices, commonly referred to as \emph{nodes}, 
-cooperate to exchange information without relying on a fixed centralized infrastructure \cite{mesh_survey,ad_hoc_networks}. Unlike traditional communication 
-models based on access points, cellular towers, or centralized servers, mesh networks distribute communication responsibilities 
-among all participating nodes, allowing the network to operate autonomously even when part of the infrastructure is unavailable or damaged.
+In a mesh network, the participating devices---\emph{nodes}---cooperate as peers to exchange information without a fixed centralized infrastructure~\cite{mesh_survey,ad_hoc_networks}. Messages that cannot reach their destination in a single radio hop are relayed through intermediate nodes; new nodes can join at any time to extend coverage, and paths reconfigure themselves as the topology evolves. Figure~\ref{fig:mesh_vs_centralized} contrasts this arrangement with the star topology on which cellular and Wi-Fi networks rely, and with the degenerate point-to-point link at the opposite extreme.
 
-To do so, mesh networks utilize \emph{multi-hop communication}, where messages are forwarded from one node to another until they reach their destination. 
-This approach allows for extended coverage beyond the direct communication range \cite{ad_hoc_networks}.
+Depending on the routing discipline, packet relaying may rely on deterministic routing tables, probabilistic forwarding, flooding, or adaptive strategies. Each has its own trade-off, but the fundamental tension is the same throughout the mesh literature: increasing the number of nodes should improve connectivity, yet every additional relay competes for the same shared channel. Redundant retransmissions therefore inflate congestion, collisions, and energy consumption, and this effect is particularly pronounced in low-power wireless systems whose battery and bandwidth budgets are tight~\cite{ad_hoc_networks}. Additional difficulties include topology instability under mobility and the greater coordination overhead of decentralized systems.
 
-When a node receives a packet that is not intended for itself, it may retransmit the packet to neighboring nodes according to a predefined routing or forwarding strategy. Depending on the network architecture, these strategies 
-may rely on deterministic routing tables, probabilistic forwarding mechanisms, flooding approaches, or adaptive routing algorithms.
+Centralized architectures avoid these issues at the price of a single point of failure and a permanent dependency on operator infrastructure. Mesh networks trade some of that simplicity and global optimality for resilience and infrastructure independence, and this trade-off is precisely what motivates their use in disaster-recovery, remote-area, and temporary-deployment scenarios.
 
-New nodes can be added dynamically to increase network coverage without requiring significant infrastructure modifications. Additionally, mesh systems can often self-organize and self-heal by adapting communication paths according to network topology changes.
-
-On the one hand, this makes mesh networks particularly suitable for scenarios such as disaster recovery, remote areas, and temporary deployments where traditional 
-infrastructure may be unavailable or unreliable. 
-
-On the other hand, one of the most significant problems is routing efficiency. As the number of nodes increases, packet forwarding can generate excessive redundancy, 
-channel congestion, collisions, and increased energy consumption. This problem becomes particularly severe in low-power wireless systems where devices are 
-battery-powered and communication bandwidth is limited.
-
-Traditional flooding-based approaches represent a simple solution to guarantee high message delivery probability, since every node retransmits received packets.
-Nevertheless, this strategy scales poorly in dense networks due to the exponential growth of retransmissions. 
-Consequently, modern mesh systems often require more sophisticated routing or forwarding techniques capable of balancing reliability, scalability, and energy efficiency.
-
-Another important limitation is network latency and topology instability. Since communication depends on intermediate nodes, failures or mobility may affect 
-message propagation paths and reduce delivery reliability. Furthermore, distributed systems generally require more complex coordination mechanisms 
-compared to centralized architectures.
-
-Although centralized communication systems, such as cellular or cloud-based messaging platforms, provide several advantages including global connectivity, 
-optimized routing, centralized management, and simplified synchronization, they are fundamentally dependent on infrastructure availability and external service providers.
-
-In contrast, distributed mesh systems sacrifice part of this global connectivity and simplicity in exchange for increased autonomy, resilience, and infrastructure independence.
-
-\img{images/net_topology_vs.png}{Centralized star topology versus decentralized mesh topology versus point-to-point}{0.6}{mesh_vs_centralized}
+\img{images/net_topology_vs.png}{Centralized star topology, decentralized mesh topology, and point-to-point link.}{0.6}{mesh_vs_centralized}
 
 \section{LoRa and LPWAN Technologies}
 \label{sec:lora-lpwan}
@@ -401,26 +345,9 @@ milliamperes, combined with sleep currents of a few microamperes, yield average
 power consumptions that are orders of magnitude below those of Wi-Fi or classic
 Bluetooth for intermittent traffic~\cite{siekkinen2012energy}.
 
-\subsection{Suitability for Smartphone Integration}
-
-\acro{ble}'s native support in all major mobile operating systems---iOS, Android, and
-their derivatives---makes it the standard for peripheral-to-smartphone
-communication. The \acro{gatt} model abstracts hardware specifics behind a uniform
-service interface, so a single mobile application can interact with any
-compliant peripheral without platform-specific drivers. Combined with the
-sub-second connection times and the minimal radio overhead imposed on the
-handset, \acro{ble} provides the connectivity layer that enables the local
-configuration and monitoring interface examined in the remainder of this
-work.
-
 \subsection{BLE as the Smartphone Bridge}
 
-The decisive argument for \acro{ble} in this project is ubiquity: native \acro{ble} support is mandatory hardware in virtually all smartphones manufactured in the last
-decade, and both Android and iOS expose mature \acro{gatt} APIs to applications, with no need for pairing infrastructure, routers, or licensed
-spectrum~\cite{gomez2012overview}. In A3MESH, \acro{ble} therefore plays a role complementary to LoRa: while LoRa provides the long-range
-backbone between nodes, \acro{ble} provides the last metre between each node and its user. The node acts as a \acro{gatt} peripheral exposing message characteristics, and the smartphone application, acting as central, becomes the human interface of the mesh without requiring any
-custom radio hardware on the user's side. The combination of negligible energy cost, standardized application-layer semantics through \acro{gatt},
-and universal smartphone availability makes \acro{ble} the natural choice for this local link.
+The decisive argument for \acro{ble} in this project is ubiquity: native \acro{ble} support has been mandatory hardware in essentially every smartphone shipped in the last decade, and both Android and iOS expose mature \acro{gatt} APIs to applications without any need for pairing infrastructure, routers, or licensed spectrum~\cite{gomez2012overview}. Combined with sub-second connection times and negligible radio overhead on the handset, this makes \acro{ble} the natural short link between each node and its user: the node acts as a \acro{gatt} peripheral exposing message characteristics, while the smartphone application, acting as central, becomes the human interface of the mesh without requiring any custom radio hardware on the user's side.
 
 \section{Existing Solutions}
 \label{sec:existing-solutions}
@@ -466,12 +393,11 @@ Pure probabilistic forwarding has a known weakness: dissemination can die premat
 
 The protocols above still share a limitation: $p$ and its companion thresholds are fixed at design time, while the optimal operating point depends on local density, traffic load and link quality, all of which vary across the network and over time. \emph{Adaptive} gossip closes this loop by letting each node tune its forwarding probability from locally observable signals. Kyasanur et al.'s Smart Gossip, for instance, infers parent--child dependencies from overheard traffic and assigns each node a forwarding probability proportional to how much its neighbours actually depend on it, converging automatically to high probabilities in sparse regions and low ones in dense regions, with no manual configuration~\cite{kyasanur2006smartgossip}. Related adaptive schemes modulate $p$ using neighbour counts, overheard duplicate counters or received signal strength~\cite{williams2002comparison}.
 
-This body of work, however, was developed and evaluated almost exclusively for IEEE~802.11 ad-hoc networks and classical wireless sensor networks---radios with millisecond airtimes, effective carrier sensing and no duty-cycle constraints. Its translation to LoRa is far from mechanical: long airtimes magnify the cost of every redundant transmission, half-duplex operation means a forwarding node is deaf while it helps others, SNR is cheaply observable and unusually informative thanks to CSS, and the duty cycle imposes a hard budget. Meanwhile, the deployed LoRa mesh systems reviewed in Section~\ref{sec:existing-solutions} occupy the two extremes of the spectrum---managed flooding without probabilistic suppression (Meshtastic) and structured routing requiring planned infrastructure (MeshCore)---leaving the middle ground essentially unexplored. This is the research gap addressed by this thesis: A3MESH brings \emph{smart, adaptive gossip} to a fully decentralized LoRa mesh, using locally available information such as \acro{rssi} and overheard duplicates to modulate each node's forwarding probability, with the aim of approaching the channel efficiency of structured routing while preserving the zero-infrastructure, zero-configuration resilience of flooding.
+This body of work, however, was developed and evaluated almost exclusively for IEEE~802.11 ad-hoc networks and classical wireless sensor networks---radios with millisecond airtimes, effective carrier sensing and no duty-cycle constraints. Its translation to LoRa is far from mechanical: long airtimes magnify the cost of every redundant transmission, half-duplex operation means a forwarding node is deaf while it helps others, SNR is cheaply observable and unusually informative thanks to CSS, and the duty cycle imposes a hard budget. Meanwhile, the deployed LoRa mesh systems reviewed in Section~\ref{sec:existing-solutions} occupy the two extremes of the spectrum---managed flooding without probabilistic suppression (Meshtastic) and structured routing requiring planned infrastructure (MeshCore)---leaving the middle ground essentially unexplored. This is the research gap addressed by this thesis: A3MESH brings \emph{smart, adaptive gossip} to a fully decentralized LoRa mesh, using locally available information to modulate each node's forwarding probability, with the aim of approaching the channel efficiency of structured routing while preserving the zero-infrastructure, zero-configuration resilience of flooding.
 
 
 
 \chapter{Main Content}
-\label{part:thesis_body}
 
 \section{System Architecture}
 \label{ch:sysarch}
@@ -479,7 +405,9 @@ This body of work, however, was developed and evaluated almost exclusively for I
 \subsection{General Architecture}
 \label{sec:general_architecture}
 
-The architecture of the platform comprises four principal components: the mobile application, the \acro{ble} communication interface, the ESP32-based gateway node, and the LoRa mesh network.
+The architecture of the platform comprises four principal components: the mobile application, the \acro{ble} communication interface, the ESP32-based gateway node, and the LoRa mesh network as illustrated in Figure~\ref{fig:system_architecture}.
+
+\img{images/system_architecture_graphic.png}{High-level architecture of the A3MESH platform, showing the four main components and their interactions.}{0.85}{system_architecture}
  
 From the end user's perspective, the mobile application constitutes a user-friendly front end designed to mediate all interaction with the mesh network. Through it, users can send and receive messages, manage contacts, and configure network parameters as advanced settings. This component provides the accessibility and usability layer of the system, enabling users without any technical background to participate in the mesh network in a simple and intuitive manner.
  
@@ -541,8 +469,7 @@ A messaging system intended for emergency use must deliver messages with high pr
 \subsubsection{User Accessibility}
 \label{subsec:req_accessibility}
 
-Finally, the system must be operable by users with no technical background whatsoever. In the intended scenarios, the people who most need resilient communication are not radio amateurs or engineers, and any configuration step---flashing firmware, selecting spreading factors, managing identifiers---constitutes a barrier that excludes them. This requirement drives the upper layers of the architecture: the smartphone, a device users already own and understand, is the sole human interface; the \acro{ble} link and pairing process require no networking knowledge; the mesh is self-configuring, with discovery, forwarding, and adaptation occurring autonomously; and the application deliberately reproduces the interaction patterns of mainstream messaging applications. Accessibility also constrains the physical design, as reflected in the ergonomic and enclosure decisions of the mechanical integration chapter. In short, all technical complexity of the system is required to remain invisible below the application layer.
-
+Finally, the system must be operable by users with no technical background whatsoever. In the intended scenarios, the people who most need resilient communication are not radio amateurs or engineers, and any configuration step---flashing firmware, selecting spreading factors, managing identifiers---constitutes a barrier that excludes them. This requirement drives the upper layers of the architecture: the smartphone, a device users already own and understand, is the sole human interface; the \acro{ble} link and pairing process require no networking knowledge; the mesh is self-configuring, with discovery, forwarding, and adaptation occurring autonomously; and the application deliberately reproduces the interaction patterns of mainstream messaging applications. Accessibility also constrains the physical design, as reflected in the ergonomic and enclosure decisions of Section~\ref{sec:hw_mechanical}.
 
 % ---
 \section{Development Methodology and Project Management}
@@ -565,6 +492,10 @@ Each sprint's work items were recorded in a Jira project board maintained throug
 Tickets were grouped under six epics---\emph{Documentation}, \emph{Debugging and Testing}, \emph{FW Architecture}, \emph{HW Architecture}, \emph{System Architecture}, and \emph{Mobile SW}---one per major subsystem, allowing progress to be assessed at a subsystem granularity during planning meetings.
 
 This ticket-centric representation served two purposes beyond simple task tracking. First, it made the scope of each sprint explicit and negotiable at the planning meeting, preventing scope creep from being introduced informally between meetings. Second, and more importantly for day-to-day engineering, the ticket identifier was embedded directly in the version-control branch name, as described in the following section, creating a direct and auditable link between a Jira ticket and all the commits that contributed to resolving it.
+
+Figure~\ref{fig:jira_plan} shows a snapshot of the Jira timeline view, illustrating the distribution of hours spent in each epic over the course of the project.
+
+\img{images/jira_plan.png}{Jira timeline view of the project, showing the distribution of hours spent in each epic over the course of the project.}{1}{jira_plan}
 
 \subsection{Version Control with Git}
 
@@ -595,13 +526,8 @@ This monorepo organisation was chosen deliberately so that a complete snapshot o
 \label{ch:simulation}
 
 \subsection{Purpose of the Simulator}
-There are several reasons why a network simulator was necessary for this thesis.
 
-The first is the \emph{parameter exploration problem}. The adaptive forwarding function developed in this chapter is governed by five continuous parameters, where each evaluation of a single parameter combination requires observing the network for a statistically meaningful period. In other words, performing even a coarse exploration of this space on real hardware would require thousands of multi-hour field deployments, which is materially impossible within the scope of this work. In contrast, in simulation the same exploration is reduced to minutes of computation.
-
-The second obstacle is \emph{scale and controllability}. The phenomena of interest---broadcast storms, channel congestion, gossip die-out---only emerge at network sizes of tens of nodes spread over kilometres, far beyond the prototype fleet that can realistically be manufactured and deployed. Moreover, physical experiments cannot hold conditions constant: interference, weather, and node placement vary between runs, making it impossible to attribute performance differences to the routing algorithm rather than to the environment. 
-
-Finally, a discrete-event simulator provides perfectly repeatable conditions in which two algorithms can be compared on \emph{identical} topologies, traffic patterns, and channel realizations.
+A network simulator was necessary for three complementary reasons. First, the adaptive forwarding function developed here is governed by five continuous parameters, each evaluation of which requires observing the network for a statistically meaningful period; a coarse exploration on real hardware would take thousands of multi-hour field deployments, whereas the same exploration in simulation completes in minutes. Second, the phenomena of interest---broadcast storms, channel congestion, gossip die-out---only emerge at network sizes of tens of nodes spread over kilometres, far beyond the prototype fleet that can be manufactured and deployed within a bachelor thesis. Third, a discrete-event simulator provides perfectly repeatable conditions in which two algorithms can be compared on \emph{identical} topologies, traffic patterns, and channel realizations, something physical experiments---subject to interference, weather, and placement variability---cannot achieve.
 
 
 \subsection{Simulation Environment}
@@ -625,6 +551,8 @@ Every stochastic element of the simulation---node placement, traffic generation,
 \label{sec:sim_strategies}
 
 The design of the final algorithm proceeded incrementally: a sequence of forwarding strategies of increasing sophistication was implemented and evaluated, each addressing a weakness identified in its predecessor. This section describes the progression conceptually; quantitative results are deferred to Section~\ref{sec:sim_results}.
+
+In addition to this, in the \texttt{images/} folder of the repository, a set of several graphs is provided, which illustrate the performance of each routing strategy mentioned in this section compared among them in different combinations.
 
 \subsubsection{Pure Flooding}
 Pure flooding is the natural baseline: every node retransmits every packet it has not seen before, until the hop limit is exhausted. Its virtues are simplicity and maximal coverage---if any path exists within the hop horizon, flooding finds it. Its pathology, anticipated analytically in Section~\ref{sec:gossip}, was confirmed immediately in simulation: the number of transmissions grows linearly with node count regardless of traffic demand, and with LoRa airtimes of half a second per packet the channel saturates rapidly, manifesting as collisions, queueing delays, and duty-cycle exhaustion. Meshtastic's managed flood, which adds SNR-weighted contention windows and rebroadcast cancellation, mitigates the worst simultaneity but, as the results of Section~\ref{sec:sim_results} show, does not alter the fundamental scaling behavior. Managed flood, being the algorithm deployed in the most widely used comparable system, serves as the reference baseline throughout this chapter.
@@ -1011,7 +939,7 @@ subsystem} provides USB connectivity through a CH340C USB-to-UART bridge~\cite{c
 two tactile pushbuttons for manual boot selection and reset, and two indicator LEDs
 reflecting battery charging status.
 
-\img{images/pcb_subsystems_overlay.png}{Top-level hardware block diagram of the A3MESH node, showing the four functional subsystems and their principal electrical interfaces.}{0.5}{hw_block}
+\img{images/pcb_subsystems_overlay.png}{PCB subsystems overlay.}{0.5}{hw_block}
 
 \subsection{Power Subsystem}
 \label{sec:hw_power}
@@ -1308,6 +1236,8 @@ transients, while 10\,$\mu$F bulk capacitors distributed across the board buffer
 medium-frequency current demand. The 100\,$\mu$F output capacitor of the TPS63001
 provides low-frequency reservoir capacity.
 
+The complete electrical schematic and the front and back copper layers of the resulting board are provided in Appendix~\ref{ch:appendix_pcb} for reference.
+
 
 \subsection{Prototype Manufacturing}
 \label{sec:hw_manufacturing}
@@ -1318,14 +1248,14 @@ Furthermore, the BOM was compiled with LCSC part numbers so that JLCPCB could so
 
 % --
 \subsection{Mechanical Integration}
-\label{ch:mechanical}
+\label{sec:hw_mechanical}
+
+The mechanical layer closes the loop between the \acro{pcb} of Section~\ref{sec:hw_pcb} and the accessibility requirement of Section~\ref{subsec:req_accessibility}: without an enclosure the user perceives as a natural part of the smartphone, the hardware effort remains a bare board. The subsections that follow state the design objectives, the ergonomic and integration decisions taken to meet them, the 3D-modelling process, and the resulting enclosure geometry.
 
 \subsubsection{Design Objectives}
-\label{sec:design_objectives}
+\label{subsec:mech_objectives}
 
-The primary design objective was to create an accessory that the user would not need to consciously manage. Rather than requiring the user to remember to attach and detach the device, the goal was an "install once, forget it's there" experience: the board should become a permanent, unobtrusive extension of the phone rather than a separate object to keep track of.
-
-To achieve this, the \acro{pcba} was housed in a dedicated protective shell, conceptually similar to a small case of its own. This shell is then permanently bonded to the back of the phone's existing case using an adhesive layer, following the same attachment principle used by many "smart wallet" card holders available on the market. This approach removes the need for any manual connection or disconnection step, satisfying the core usability goal of the project.
+The primary objective was an accessory the user would not need to consciously manage: an ``install once, forget it's there'' experience, in which the board becomes a permanent extension of the phone rather than a separate object to keep track of. To achieve this, the \acro{pcba} is housed in a dedicated shell that is permanently bonded to the back of the phone's existing case with an adhesive layer, following the same attachment principle used by smart-wallet card holders. This removes any manual connection step and satisfies the core usability goal of the project.
 
 \subsubsection{Ergonomic Considerations}
 
@@ -1335,7 +1265,7 @@ Second, the enclosure was modelled to be 3D printed in a flexible, rubber-like p
 
 \subsubsection{Smartphone Integration}
 
-Several attachment strategies were evaluated before settling on the adhesive-mounted shell described in Section~\ref{sec:design_objectives}. One alternative considered was integrating a small dedicated pocket directly into the phone case, sized to hold the board internally. This approach would reduce the overall added thickness and improve comfort, but it was discarded because it is not scalable: a custom case would need to be designed and manufactured for every phone model, which is impractical for a general-purpose accessory.
+Several attachment strategies were evaluated before settling on the adhesive-mounted shell described in Section~\ref{subsec:mech_objectives}. One alternative considered was integrating a small dedicated pocket directly into the phone case, sized to hold the board internally. This approach would reduce the overall added thickness and improve comfort, but it was discarded because it is not scalable: a custom case would need to be designed and manufactured for every phone model, which is impractical for a general-purpose accessory.
 
 A second alternative considered was a MagSafe-style magnetic attachment. This option was ultimately rejected due to the risk of the magnets' electromagnetic field interfering with the radiofrequency signals handled by the board, which could compromise the device's wireless performance.
 
@@ -1355,7 +1285,15 @@ Figure~\ref{fig:enclosure_render} shows the final enclosure design housing the \
 
 Additionally, two small elements made of a transparent material can be observed. These act as light diffusers for the red and green charging status \acro{led}s mounted on the \acro{pcba}: since the \acro{led}s themselves are fully enclosed within the opaque shell, these transparent inserts channel and scatter their light to the outer surface, allowing the user to clearly see the charging status indicators from outside the enclosure.
 
-\img{images/a3mesh_case_enclosure.png}{Final enclosure design housing the \acro{pcba}.}{0.7}{enclosure_render}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\textwidth, height=0.55\textheight, keepaspectratio, trim=750 0 650 0, clip]%
+        {images/mesh_render.png}
+    \caption{Final enclosure design housing the \acro{pcba}.}
+    \label{fig:enclosure_render}
+\end{figure}
+
+% \img{images/mesh_render.png}{Final enclosure design housing the \acro{pcba}.}{0.7}{enclosure_render}
 
 % ---
 
@@ -1558,7 +1496,6 @@ The header carries a one-byte protocol version, a one-byte frame type
     \label{tab:fw_header_fields}
 \end{table}
 
-\newpage
 While the packet structure itself is declared \texttt{\_\_attribute\_\_((packed))} to match the
 on-wire layout exactly. Regarding to its fields are listed in Table~\ref{tab:fw_packet_fields}.
 
@@ -1864,7 +1801,6 @@ node-ID register and write their responses directly to \texttt{xBLETxQueue}.
 
 \img{images/at_sende2e_sequence_diagram_outline.png}{BLE-to-LoRa sequence diagram.}{0.75}{fw_ble2lora}
 
-\newpage
 \subsubsection{LoRa-to-BLE Pipeline}
 \label{sec:fw_lora2ble}
 
@@ -2023,23 +1959,9 @@ The foreground service ensures that BLE connectivity persists when the applicati
 
 \subsection{Development Strategy}
 
-\subsubsection{Rapid Development Using Claude Code}
+The mobile application is essential for validating the platform end-to-end but is not itself a research contribution of this thesis. To keep the effort proportionate to its role, the application was developed with the assistance of Claude Code~\cite{dakhel2023copilot}, using an open-source \acro{ble} starter project as a scaffold~\cite{punchthroughble2024}. The structural layers---the Room schema, \acro{mvvm} classes, Navigation graph, and RecyclerView adapters---were generated interactively, with my role limited to architecture and review. The cryptographic subsystem, by contrast, was specified at algorithm level and verified line by line against \acro{rfc}~5869 and \acro{nist} \acro{sp}~800-56A, because errors in key size, encoding, or error propagation are syntactically valid yet semantically incorrect and are not reliably flagged by any tool.
 
-The mobile application was developed with the assistance of Claude Code, an AI-based programming tool produced by Anthropic, which served as an interactive development partner throughout the implementation phase. AI programming assistants of this class, built on large language models trained on extensive code corpora, are capable of generating, refactoring, and debugging code at the function and module level in response to natural-language specifications, significantly compressing the iteration cycle for routine implementation tasks~\cite{dakhel2023copilot}.
-
-In practice, the architectural skeleton of the application---the Room database schema, the ViewModel layer, the Navigation Component graph, and the RecyclerView adapter infrastructure---was generated across a small number of interactive sessions, where my main role was to act as an architect and reviewer rather than as typist. The cryptographic subsystem required closer collaboration: the key exchange protocol was specified at the algorithmic level and the resulting code was cross-checked line by line against the specifications of RFC~5869 and NIST~SP~800-56A. AI-generated cryptographic code demands particularly careful human review, because errors in key size, encoding convention, or error propagation can be syntactically valid yet semantically incorrect; every generated function in the \texttt{crypto/} package was independently verified before integration.
-
-\subsubsection{Cost and Time Optimization}
-
-The decision to delegate a substantial fraction of application development to AI-assisted tooling was driven by a resource allocation argument. The mobile application, while essential for the platform's usability, is not the primary research contribution of this thesis. Developing a full-featured Android application involves a significant investment of time in areas---lifecycle management, adapter diffing, theme attribute hierarchies---that are well-understood engineering problems with no research content. Delegating this work to an AI assistant allowed the total time spent on the application to remain proportionate to its role, without sacrificing the functional completeness required for integration testing and real-world validation.
-
-\subsubsection{Engineering Trade-Offs}
-
-The use of AI-assisted development introduced specific trade-offs that should be acknowledged honestly. The initial code base was derived from an open-source BLE starter project~\cite{punchthroughble2024}, which was progressively transformed into the application described in this chapter. This layered approach occasionally produced architectural inconsistencies; a notable example is that \texttt{ChatActivity} initially used \texttt{by viewModels()} instead of \texttt{by activityViewModels()}, causing the connected-device LiveData to always appear null in that context. Such inconsistencies are characteristic of iterative AI-assisted development and were identified through systematic code review. They do not represent defects in the final delivered application, but they underscore that AI-generated code requires the same level of architectural scrutiny as any other code.
-
-\subsubsection{Focus Allocation Towards Core Research}
-
-The total development effort invested in the mobile application was approximately two weeks of part-time work, compared with the three months devoted to the simulation framework, the Smart Gossip algorithm, and the custom hardware design. This allocation reflects the primary objectives of the thesis. The application is sufficiently complete for its intended purpose: it enables real-world field testing of the full A3MESH platform, provides an accessible user interface that validates the accessibility requirement of Section~\ref{subsec:req_accessibility}, and demonstrates that the firmware AT interface is expressive enough to support a fully featured messaging application with end-to-end encryption. Future extensions, including iOS support, push notification integration, and message acknowledgement indicators, are deferred to future work.
+This approach compressed the total application effort to roughly two weeks of part-time work, against the two months invested in the simulator, the Smart Gossip algorithm, and the custom hardware. The result is functionally complete for the purposes of this thesis: it enables end-to-end field testing, satisfies the accessibility requirement of Section~\ref{subsec:req_accessibility}, and demonstrates that the firmware \acro{at} interface is expressive enough to support a fully featured messaging application. Extensions such as iOS support, push notifications, and delivery indicators are deferred to future work.
 
 \section{Experimental Results and Evaluation}
 \label{ch:results}
@@ -2057,7 +1979,7 @@ Packet delivery remained reliable at 100\,\% \acro{pdr} up to approximately 1\,0
 
 \img{images/max_range.png}{Range test on Avinguda de Madrid, Òdena. Node~A is positioned beside the parked lorry in the foreground; the elevation profile inset confirms a largely continuous line of sight along the test corridor despite moderate road undulation.}{0.95}{max_range}
 
-\newpage
+
 \subsection{Mesh Relay Demonstration}
 \label{sec:results_relay}
 
@@ -2094,22 +2016,126 @@ Battery lifetime was characterised under two usage profiles that bracket the exp
 \paragraph{Active profile.} A second node was placed within direct radio range and one message was sent every~~s throughout the test, with the remote node responding to each. This traffic pattern kept the \acro{cpu} continuously at~240~MHz, preventing the \texttt{PowerManager} from entering the idle state. The node exhausted its battery after~[X]~hours~[X]~minutes, yielding an average current draw of approximately~[X]~mA. The ratio between idle and active lifetimes---a factor of approximately~[X]---demonstrates the practical benefit of the adaptive frequency-scaling strategy: even a modest periodic traffic load sustains the~240~MHz clock and noticeably reduces autonomy relative to the quiescent case.
 
 
+\chapter{Economic Study}
+\label{ch:costs}
+
+This chapter presents the economic dimension of the project. It is divided in three sections: the labour cost associated with the engineering effort, the bill-of-materials cost of a single prototype unit, and the resulting total project cost. All figures are expressed in euros (EUR) and correspond to prices observed during 2025--2026 for hobbyist-quantity purchases through the distributors listed in Appendix~\ref{ch:appendix_bom}. Volume production economics and non-recurring engineering amortisation are deliberately excluded, as the platform is presented as a research prototype rather than as a commercial product.
+
+\section{Labour Cost}
+\label{sec:cost_labour}
+
+The engineering work carried out over the duration of this thesis has been valued at the medium to high rate for a junior engineer in Spain, taken as~17~EUR per hour. This rate is representative of a recent graduate performing embedded, hardware, and mobile-software development, and is used here to establish an order of magnitude for the human effort required to reproduce the project.
+
+Total effort was estimated from the Jira ticket record described in Section~\ref{ch:methodology} and aggregated by subsystem. Table~\ref{tab:cost_hours} summarises the distribution.
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{lrr}
+        \toprule
+        \textbf{Activity} & \textbf{Hours} & \textbf{Cost (EUR)} \\
+        \midrule
+        Background study and state-of-the-art review & 40 & 800 \\
+        Network simulator and Smart Gossip algorithm & 120 & 3\,200 \\
+        Hardware design (schematic, layout, manufacturing) & 160 & 2\,400 \\
+        Firmware architecture and implementation & 140 & 2\,800 \\
+        Android application development & 60 & 1\,200 \\
+        Mechanical design and 3D modelling & 20 & 400 \\
+        Experimental testing and validation & 20 & 400 \\
+        Thesis writing and documentation & 40 & 800 \\
+        \midrule
+        \textbf{Total} & \textbf{600} & \textbf{10\,200} \\
+        \bottomrule
+    \end{tabular}
+    \caption{Engineering effort distribution and derived labour cost at 17~EUR/hour.}
+    \label{tab:cost_hours}
+\end{table}
+
+The total engineering effort amounts to approximately 600~hours, consistent with the 24~\acro{ects} workload of a bachelor thesis at 25~hours per credit. The resulting labour cost is~10\,200~EUR.
+
+\section{Materials Cost per Unit}
+\label{sec:cost_materials}
+
+Table~\ref{tab:cost_bom} details the material cost of a single assembled A3MESH node, following the bill of materials given in Appendix~\ref{ch:appendix_bom}. Unit prices correspond to hobbyist-quantity orders through LCSC for the components sourced by JLCPCB, and to AliExpress or Amazon for the two items marked in Appendix~\ref{ch:appendix_bom} as separately procured.
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{lrrr}
+        \toprule
+        \textbf{Item} & \textbf{Qty} & \textbf{Unit (EUR)} & \textbf{Ext. (EUR)} \\
+        \midrule
+        ESP32-WROOM-32UE module              & 1 & 3.42 & 3.42 \\
+        RFM95W-868S2 LoRa module\textsuperscript{\dag} & 1 & 5.00 & 5.00 \\
+        CH340C USB-UART bridge               & 1 & 0.55 & 0.55 \\
+        TP4056 Li-ion charger                & 1 & 0.16 & 0.16 \\
+        TPS63001 buck-boost converter        & 1 & 1.28 & 1.28 \\
+        DW01A battery protection IC          & 1 & 0.04 & 0.04 \\
+        FS8205A dual N-MOSFET                & 1 & 0.06 & 0.06 \\
+        DMP1045UQ-7 P-MOSFET                 & 1 & 0.16 & 0.16 \\
+        SS34 Schottky diode                  & 1 & 0.03 & 0.03 \\
+        Polyfuse 500\,mA (1812)              & 1 & 0.09 & 0.09 \\
+        Power inductor 2.2\,\textmu H        & 1 & 0.03 & 0.03 \\
+        Status LEDs (red + green)            & 2 & $<$0.01 & 0.02 \\
+        SS8050 NPN LED driver                & 2 & $<$0.01 & 0.01 \\
+        Tactile pushbutton switch            & 2 & 0.06 & 0.13 \\
+        USB-C receptacle (GCT USB4105)       & 1 & 0.06 & 0.06 \\
+        JST-PH 2-pin battery connector\textsuperscript{\dag} & 1 & 0.10 & 0.10 \\
+        Ceramic capacitors (0402/0603/1206)  & 14 & $<$0.01 & 0.12 \\
+        Chip resistors (0402/0603)           & 16 & $<$0.01 & 0.02 \\
+        \midrule
+        \multicolumn{3}{l}{\emph{Subtotal, active and passive components}} & 11.28 \\
+        \midrule
+        PCB fabrication (2-layer, 74.5$\times$89.8~mm) & 1 & 2.00 & 2.00 \\
+        SMD assembly service (JLCPCB)              & 1 & 4.00 & 4.00 \\
+        Li-ion pouch cell (1\,200\,mAh, 3.7\,V)    & 1 & 5.00 & 5.00 \\
+        3D-printed \acro{tpu} enclosure            & 1 & 2.50 & 2.50 \\
+        \midrule
+        \textbf{Total per unit} & & & \textbf{24.78} \\
+        \bottomrule
+    \end{tabular}
+    \caption{Bill-of-materials cost of a single assembled node in hobbyist quantities.
+    Lines marked \textsuperscript{\dag} are sourced outside the JLCPCB order and priced as estimates.}
+    \label{tab:cost_bom}
+\end{table}
+
+The resulting per-unit cost is approximately~25~EUR. The dominant contributions are the RFM95W LoRa module, the JLCPCB assembly service, and the battery, which together account for over half of the total. Sourcing the LoRa module in volume, or replacing it with a bare SX1276 chip integrated on the same board, would reduce this figure meaningfully.
+
+\section{Total Project Cost}
+\label{sec:cost_total}
+
+Combining the labour cost of Section~\ref{sec:cost_labour} with the material cost of a small production run of five prototype units---the actual number of boards manufactured during this thesis for use in the experimental campaigns of Section~\ref{sec:results_relay}---the total project cost is summarised in Table~\ref{tab:cost_total}.
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{lr}
+        \toprule
+        \textbf{Concept} & \textbf{Cost (EUR)} \\
+        \midrule
+        Engineering labour (600~h at 17~EUR/h) & 10\,200.00 \\
+        Prototype units (5 nodes at 25.00~EUR each) & 125.00 \\
+        \midrule
+        \textbf{Total project cost} & \textbf{10\,325.00} \\
+        \bottomrule
+    \end{tabular}
+    \caption{Aggregate project cost, including engineering effort and prototype hardware.}
+    \label{tab:cost_total}
+\end{table}
+
+Engineering effort dominates the balance by two orders of magnitude, as is typical for research prototypes: the recurring cost of an additional unit is approximately~25~EUR, whereas the human cost of developing the platform in the first place is close to~10\,200~EUR. From a productisation standpoint, this ratio implies that the platform becomes economically interesting only if the engineering investment is amortised over a production volume in the low thousands of units.
+
 \chapter{Conclusions}
 \label{ch:conclusions}
 
 \section{Achieved Objectives}
 
-The seven specific objectives stated in Section~\ref{sec:objectives} have been addressed in full:
+Each of the objectives stated in Section~\ref{sec:objectives} has been addressed. A custom low-power hardware platform was designed and manufactured on a single 74.5$\times$89.8\,mm two-layer board integrating an ESP32-WROOM-32UE microcontroller, an RFM95W LoRa transceiver, a cascaded charging and buck-boost power subsystem, and a compact \acro{pcb} monopole antenna adapted from Texas Instruments Design Note DN024. On top of it, the layered firmware implements the LoRa and \acro{ble} communication pipelines, the Smart Gossip forwarding engine, neighbour discovery, AES-256-\acro{gcm} encryption with \acro{ecdh} key exchange, adaptive \acro{cpu} frequency scaling, and battery monitoring.
 
-Firstly, a custom low-power hardware platform was designed from the ground up, integrating an ESP32-WROOM-32UE microcontroller, a RFM95W LoRa transceiver, a cascaded charging and buck-boost power subsystem, and a compact PCB monopole antenna derived from TI Design Note DN024---all on a single 74.5$\times$89.8\,mm two-layer board manufactured from commodity components. Secondly, the layered firmware implements all required networking functions: LoRa and \acro{ble} communication pipelines, the Smart Gossip forwarding engine, neighbour discovery, AES-256-\acro{gcm} encryption with \acro{ecdh} key exchange, adaptive \acro{cpu} frequency scaling, and a battery monitoring subsystem.
-
-Thirdly, the central research question---whether adaptive gossip can replace flooding in a LoRa mesh---was addressed through a purpose-built discrete-event simulation environment, and the answer is affirmative with a clearly quantified trade-off. Fourthly, a dedicated Android application hides all networking complexity behind a messaging interface that requires no technical knowledge to operate. Fifthly, a 3D-printed flexible enclosure, bonded to the user's existing phone case, satisfies the portability objective without requiring any manual attachment step. Finally, real-world experiments confirmed mesh relay operation in two urban obstruction scenarios and established a single-hop range exceeding 1.2\,km under the SF12/BW125 configuration.
+The central research question---whether adaptive gossip can replace flooding on a LoRa mesh---was answered through a purpose-built discrete-event simulator, and the answer is affirmative with a clearly quantified trade-off. A dedicated Android application hides all networking complexity behind a conventional messaging interface, and a 3D-printed flexible enclosure bonded to the user's phone case satisfies the portability requirement without any manual attachment step. Finally, real-world experiments confirmed mesh relay operation in two urban obstruction scenarios and established a single-hop range exceeding~1.2\,km under the SF12/BW125 configuration.
 
 \section{Main Contributions}
 
-The primary contribution of this thesis is the \emph{Smart Gossip} adaptive forwarding algorithm, which computes, for each received packet, a relay probability that combines three locally observable signals---received signal strength, neighbour count, and duplicate copies overheard---into a single multiplicative expression bounded from below by a configurable floor. Moreover, the five parameters of the algorithm were tuned through Differential Evolution over a network simulator, an approach that reduced the exploration to minutes of computation, and produced a configuration that reduces per-node transmission air time by 27--32\%, end-to-end delay by 58--86\%, and collision rate by 18--37\% relative to managed flooding across networks of 15--50 nodes, while maintaining packet delivery ratios within 4.5--12.4 percentage points of the flooding baseline.
+The primary contribution of this thesis is the \emph{Smart Gossip} adaptive forwarding algorithm, which computes, for each received packet, a relay probability from three locally observable signals---received signal strength, neighbour count, and duplicate copies overheard---bounded from below by a configurable floor. Its five parameters were tuned through Differential Evolution on the simulator described in Chapter~\ref{ch:simulation}, producing a configuration that, relative to managed flooding across networks of 15--50 nodes, reduces per-node transmission air time by~27--32\,\%, end-to-end delay by~58--86\,\%, and collision rate by~18--37\,\%, at the cost of a delivery-ratio penalty of~4.5--12.4~percentage points.
 
-A further contribution is the simulation infrastructure itself. Because of the fact that the modified Meshtasticator environment, with its pluggable routing interface and batch evaluation harness, constitutes a reusable experimental platform for evaluating LoRa mesh forwarding policies under reproducible, statistically comparable conditions. Furthermore, the hardware platform, firmware architecture, and Android application are system contributions that collectively demonstrate the feasibility of the complete end-to-end vision: a user with no radio knowledge can exchange encrypted messages with another user over a multi-hop LoRa network by pairing their smartphones to inexpensive, pocket-sized nodes. In addition, the integration of an \acro{at}-command interface between the firmware and the application furthermore provides a well-defined contract that allows either subsystem to evolve independently.
+A secondary contribution is the simulator itself: the modified Meshtasticator environment, with a pluggable routing interface and a batch evaluation harness, constitutes a reusable platform for evaluating LoRa mesh forwarding policies under reproducible conditions. Finally, the hardware, firmware, and Android application together demonstrate that a user with no radio knowledge can exchange encrypted messages over a multi-hop LoRa network by pairing an ordinary smartphone with an inexpensive, pocket-sized node, and the \acro{at}-command interface between firmware and application defines a stable contract that allows either subsystem to evolve independently.
 
 \section{Lessons Learned}
 
@@ -2120,6 +2146,7 @@ The simulation-first methodology proved indispensable. The five-parameter space 
 \acro{ai}-assisted development demonstrated clear but bounded value. The Android application's structural scaffolding---\acro{room} schema, \acro{mvvm} layer, Navigation graph, adapter infrastructure---was produced rapidly and correctly. Cryptographic code, however, required line-by-line human review: subtle errors in key size, nonce construction, or error propagation are syntactically valid yet semantically incorrect, and no tool reliably flags them. The lesson is that AI assistance is most effective as a force multiplier for well-understood engineering tasks, not as a substitute for domain expertise on security-critical code.
 
 \chapter{Future Work}
+\label{ch:future_work}
 
 Several directions for future work present themselves naturally from the limitations identified throughout this thesis.
 
@@ -2919,10 +2946,7 @@ file embedding all bodies, components, and manufacturing history.
 }
 }
 
-\noindent The \texttt{.f3z} file can be imported directly into Fusion~360 via
-\emph{File $\to$ Open $\to$ Open from my computer}. STL exports for 3D
-printing can be generated from within Fusion~360 by right-clicking each body
-and selecting \emph{Save as Mesh}.
+\noindent The \texttt{.f3z} file can be imported directly into Fusion~360.
 
 
 % =============================================================================
