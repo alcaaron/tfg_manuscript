@@ -40,7 +40,7 @@ namespace lib::power
         std::atomic<uint32_t> _last_activity_ms;
         std::atomic<bool>     _is_idle;
 
-        static void power_task(void *pvParameters);
+        static void vPowerTask(void *pvParameters);
     };
 
 } // namespace lib::power

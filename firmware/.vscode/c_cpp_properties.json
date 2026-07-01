@@ -10,6 +10,7 @@
             "includePath": [
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/src",
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/crypto",
+                "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/power",
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/mesh",
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/lora",
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/ble",
@@ -214,7 +215,6 @@
                 "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/dio_qspi/include",
                 "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/cores/esp32",
                 "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/variants/doitESP32devkitV1",
-                "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/power",
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/telemetry",
                 "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/utils",
                 "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",
@@ -255,6 +255,7 @@
                 "path": [
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/src",
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/crypto",
+                    "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/power",
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/mesh",
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/lora",
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/ble",
@@ -459,7 +460,6 @@
                     "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/dio_qspi/include",
                     "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/cores/esp32",
                     "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/variants/doitESP32devkitV1",
-                    "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/power",
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/telemetry",
                     "/home/alcaaron/Documentos/tfg/tfg_manuscript/tfg_firmware/firmware/lib/utils",
                     "/home/alcaaron/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",

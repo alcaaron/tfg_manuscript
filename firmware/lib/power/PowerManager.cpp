@@ -24,10 +24,10 @@ namespace lib::power
     {
         _last_activity_ms.store(millis(), std::memory_order_relaxed);
         return xTaskCreatePinnedToCore(
-            power_task, "PowerTask", 2048, this, 1, NULL, 1) == pdPASS;
+            vPowerTask, "PowerTask", 2048, this, 1, NULL, 1) == pdPASS;
     }
 
-    void PowerManager::power_task(void *pvParameters)
+    void PowerManager::vPowerTask(void *pvParameters)
     {
         auto *self = static_cast<PowerManager *>(pvParameters);
 

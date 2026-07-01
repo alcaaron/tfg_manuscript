@@ -42,11 +42,10 @@ namespace lib::lora
     }
 
     // LoRa SX127x time-on-air formula (Semtech AN1200.13 rev2, §4).
-    // Uses config.h constants: A3MESH_SF, BANDWIDTH_125_KHZ, A3MESH_PREAMBLE_LENGTH, A3MESH_CR.
-    // CRC=1, explicit header (IH=0), low-data-rate opt off (DE=0, valid for SF≤10 @125 kHz).
+    // CRC=1, explicit header (IH=0), LDRO off (T_sym=8.19ms @ SF11/250kHz < 16ms threshold).
     uint32_t LoRaDriver::compute_airtime_ms(size_t pkt_len)
     {
-        constexpr uint32_t bw_hz    = 125000UL;
+        constexpr uint32_t bw_hz    = static_cast<uint32_t>(BANDWIDTH_250_KHZ);
         constexpr uint8_t  sf       = A3MESH_SF;
         constexpr uint8_t  preamble = A3MESH_PREAMBLE_LENGTH;
         constexpr uint8_t  cr       = A3MESH_CR;  // 1 → 4/5

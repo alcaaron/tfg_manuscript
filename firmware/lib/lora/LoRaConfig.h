@@ -25,8 +25,8 @@ namespace lib::lora
         /*!< RF centre frequency in Hz (e.g. 868000000 for EU868). */
         long frequency = EU868_FREQUENCY;
 
-        /*!< Signal bandwidth in Hz (e.g. 125E3 for 125 kHz). */
-        float bandwidth = BANDWIDTH_125_KHZ;
+        /*!< Signal bandwidth in Hz (e.g. 250E3 for 250 kHz). */
+        float bandwidth = BANDWIDTH_250_KHZ;
 
         /*!< LoRa spreading factor [6–12]. Higher values increase range at the
          *   cost of lower data rate and longer time-on-air. */
