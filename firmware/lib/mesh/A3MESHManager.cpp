@@ -11,12 +11,12 @@ namespace lib::mesh
         _mutex = xSemaphoreCreateMutex();
         if (!_mutex)
         {
-            Serial.println("[A3MESH] Mutex creation failed!");
+            MESH_LOG("[A3MESH] Mutex creation failed!\n");
             while (1)
                 ;
         }
         _node_id = generate_node_id();
-        Serial.printf("Node ID: %u\n", _node_id);
+        MESH_LOG("[A3MESH] Node ID: %u\n", _node_id);
     }
 
     uint32_t A3MESHManager::get_node_id()
@@ -84,7 +84,7 @@ namespace lib::mesh
 
         if (neighbor_count < MAX_NEIGHBORS)
         {
-            Serial.printf("[NEIGHBOR] Adding node %hx; Total=%d\n", neighbor.node_id, neighbor_count+1);
+            MESH_LOG("[NEIGHBOR] Adding node %hx; Total=%d\n", neighbor.node_id, neighbor_count+1);
             neighbors[neighbor_count++] = neighbor;
         }
 

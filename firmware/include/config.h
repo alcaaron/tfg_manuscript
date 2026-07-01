@@ -163,7 +163,7 @@
 // === DEBUG CONFIGURATION ===
 // ==============================
 
-#define A3MESH_DEBUG 1
+#define A3MESH_DEBUG 0
 
 #if A3MESH_DEBUG
   #define MESH_LOG(fmt, ...) Serial.printf(fmt, ##__VA_ARGS__)

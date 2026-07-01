@@ -5,7 +5,7 @@ namespace lib::ble
 {
     void ServerCallbacks::onConnect(BLEServer *pServer)
     {
-        Serial.println("[BLE] Device Connected!");
+        MESH_LOG("[BLE] Device Connected!\n");
         driver->_deviceConnected = true;
     }
 
@@ -26,7 +26,7 @@ namespace lib::ble
 
             if (xBLERxQueue != nullptr)
             {
-                Serial.printf("[BLE] RX: %s", buffer);
+                MESH_LOG("[BLE] RX: %s", buffer);
                 xQueueSend(xBLERxQueue, buffer, 0);
             }
         }

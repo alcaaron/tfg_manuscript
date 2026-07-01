@@ -27,8 +27,8 @@ lib::power::PowerManager power_mgr;
 // CR uses arduino-LoRa denominator convention: 5=4/5, 6=4/6, 7=4/7, 8=4/8.
 // A3MESH_CR (config.h) = 1 is clamped to 5 by the library, so we start at 5.
 static uint8_t  g_lora_sf = A3MESH_SF;
-static uint16_t g_lora_bw = 125;
-static uint8_t  g_lora_cr = 5;
+static uint16_t g_lora_bw = BANDWIDTH_250_KHZ / 1000;
+static uint8_t  g_lora_cr = A3MESH_CR + 4;
 
 // Parse a lowercase/uppercase hex string of exactly (out_len*2) chars into bytes.
 static bool parse_hex_bytes(const char *hex, uint8_t *out, size_t out_len)
@@ -164,26 +164,9 @@ MeshRxState handleValidate(a3mesh_rx_ctx_t &ctx)
       ctx.pkt);
 
   if (ok < 0){
-    Serial.printf("[A3MESH] Failed to deserialize packet, e: %d\r\n", ok);
+    MESH_LOG("[A3MESH] Failed to deserialize packet, e: %d\r\n", ok);
     return MeshRxState::k_rx_drop;
   }
-
-  // Serial.print("[A3MESH] ReceivedHeader:");
-  // Serial.printf("[A3MESH] version: %u, type: %u, packet_length: %u\r\n",
-  //     ctx.header.version,
-  //     ctx.header.type,
-  //     ctx.header.packet_length);
-
-  // Serial.print("[A3MESH] Received packet:");
-  // Serial.printf("[A3MESH] pkt_id: %u, src: %hx, node_id: %hx, dst: %hx, ttl: %u, type: %u, flags: %u, payload_len: %u\r\n",
-  //     ctx.pkt.pkt_id,
-  //     ctx.pkt.src,
-  //     ctx.pkt.node_id,
-  //     ctx.pkt.dst,
-  //     ctx.pkt.ttl,
-  //     ctx.pkt.type,
-  //     ctx.pkt.flags,
-  //     ctx.pkt.payload_len);
 
   if (ctx.pkt.src == a3mesh.get_node_id())
     return MeshRxState::k_rx_drop;

@@ -11,7 +11,7 @@ void vBLETxTask(void *pvParameters)
         if (xQueueReceive(xBLETxQueue, &tx_buffer, portMAX_DELAY) == pdTRUE)
         {
             ble.send(tx_buffer);
-            Serial.printf("[BLE] TX: %s", tx_buffer);
+            MESH_LOG("[BLE] TX: %s", tx_buffer);
         }
     }
 }
