@@ -7,7 +7,7 @@
 \addbibresource{tfe.bib}
 
 
-\title{A3MESH: Design of a Mesh Communication System Between Mobile Phones for Catastrophic Situations}
+\title{Design of a Mesh Communication System Between Mobile Phones for Catastrophic Situations}
 %\subtitle{}
 
 \author[m]{Aarón Alcalá Alcaina}
@@ -49,18 +49,8 @@ The project integrates a compact, low-power PCB (ESP32, SX1276 LoRa transceiver,
 
 % =============================================================================
 
-\part{Introduction}
-\label{part:introduction}
-
-% -----------------------------------------------------------------------------
-% TARGET: 4-5 pages
-% Purpose:
-% Introduce the problem, motivation, objectives and contributions.
-% Reader should understand:
-%   - Why this project matters
-%   - What problem it solves
-%   - Why existing systems are insufficient
-% -----------------------------------------------------------------------------
+\part{Thesis Body}
+\label{part:thesis_body}
 
 \chapter{Introduction}
 \label{ch:introduction}
@@ -168,10 +158,8 @@ The document also includes several appendices containing complementary technical
 
 % =============================================================================
 
-\part{State of the Art}
-\label{part:state_of_the_art}
-
-\chapter{Background and Related Work}
+\chapter{Background}
+\label{ch:background}
 
 \section{Mesh Communication Systems}
 
@@ -253,7 +241,7 @@ At the physical layer, a LoRa symbol is not conveyed by selecting a sinusoidal t
 
 At the receiver, demodulation is performed by correlating the incoming waveform with a locally generated reference chirp, a process commonly referred to as \emph{dechirping}. This operation converts the cyclic shift of the received chirp into a tone whose frequency is proportional to the transmitted symbol index. The subsequent \acro{fft} stage then identifies the spectral bin associated with that tone, allowing the receiver to recover the symbol value efficiently. This is one of the key reasons why LoRa achieves high sensitivity and robust reception under low signal-to-noise ratios~\cite{wirelesspi_lora}.
 
-\subsubsection*{Implications of the Configurable Parameters}
+\subsection*{Implications of the Configurable Parameters}
 The LoRa PHY therefore exposes a small but highly influential set of parameters that directly shape the link budget, throughput, and robustness of the system. Figure~\ref{fig:lora_modulation} illustrates the effect of the main LoRa parameters on a time-frequency waterfall plot.
 
 \img{images/lora_modulation.png}{LoRa Chirp Spread Spectrum illustration~\cite{wirelesspi_lora}.}{1}{lora_modulation}
@@ -352,9 +340,7 @@ over the advertising channels, and point-to-point connections in which the
 central device polls the peripheral at a negotiated \emph{connection interval},
 allowing the radio to remain dormant between events.
 
-\subsubsection{Advertising and Scanning}
-
-To establish a connection, one device must advertise while a second device
+\paragraph{Advertising and Scanning.} To establish a connection, one device must advertise while a second device
 scans. The advertiser periodically transmits advertising packets on the three
 dedicated channels; the scanner listens and raises a scan-report event each
 time such a packet is received~\cite{silabs_ble_flowcharts}. Two scanning
@@ -367,9 +353,7 @@ parameters---advertising interval, scanning interval, and scanning
 window---whose interaction determines discovery latency and energy
 consumption~\cite{bluetooth2023core}.
 
-\subsubsection{Connection Establishment}
-
-Once the scanner has collected sufficient information from the advertiser, it
+\paragraph{Connection Establishment.} Once the scanner has collected sufficient information from the advertiser, it
 may open a connection, at which point it becomes the \emph{central} device and
 the former advertiser becomes the \emph{peripheral}~\cite{silabs_ble_flowcharts}.
 A connection-initiation failure can occur in two ways: the central explicitly
@@ -379,9 +363,7 @@ hard limit of six consecutive connection intervals during which either host may
 remain silent; if this threshold is exceeded, the link layer drops the
 connection~\cite{bluetooth2023core,silabs_ble_flowcharts}.
 
-\subsubsection{Connection Parameter Negotiation}
-
-After a connection has been established, both hosts may request adjustments to
+\paragraph{Connection Parameter Negotiation.} After a connection has been established, both hosts may request adjustments to
 the link parameters. The connection-parameter-update procedure can be triggered
 either by the central, the peripheral, or autonomously by the link layer during
 connection initiation. In all cases the central retains the final authority over
@@ -488,13 +470,13 @@ This body of work, however, was developed and evaluated almost exclusively for I
 
 
 
-\part{Thesis Body}
+\chapter{Main Content}
 \label{part:thesis_body}
 
-\chapter{System Architecture}
+\section{System Architecture}
 \label{ch:sysarch}
 
-\section{General Architecture}
+\subsection{General Architecture}
 \label{sec:general_architecture}
 
 The architecture of the platform comprises four principal components: the mobile application, the \acro{ble} communication interface, the ESP32-based gateway node, and the LoRa mesh network.
@@ -507,7 +489,7 @@ To structure this communication, an \acro{at}-command-based interface has been i
 
 Finally, the outermost layer of the architecture is the LoRa mesh network, which provides long-range wireless communication between nodes. This network constitutes the backbone of the system, allowing nodes to communicate with one another.
 
-\section{Node Interaction Model}
+\subsection{Node Interaction Model}
 \label{sec:node_interaction_model}
 
 The mesh layer is built on a deliberately egalitarian premise: all nodes are functionally identical peers. There are no coordinators, no dedicated repeaters, and no infrastructure roles of any kind; every node is simultaneously an endpoint for its own user and a potential relay for the traffic of others. This design choice follows directly from the resilience objectives of the system and stands in explicit contrast to the role-based architecture of MeshCore discussed in Section~\ref{subsec:localmesh}.
@@ -519,7 +501,7 @@ The mesh layer is built on a deliberately egalitarian premise: all nodes are fun
 \paragraph{Forwarding decision.} The defining characteristic of A3MESH's interaction model is that this relaying decision is \emph{probabilistic and adaptive} rather than deterministic. Instead of rebroadcasting every new packet unconditionally---the flooding approach whose pathologies were analyzed in Section~\ref{sec:gossip}---each node forwards with a probability modulated by locally observable signals, such as the quality of the link over which the packet arrived and the level of redundancy it observes in its vicinity. Nodes in dense regions, where many candidate relays exist, suppress most of their retransmissions, whereas nodes in sparse regions, where they may constitute the only bridge between network segments, forward with near certainty. As a result, the network as a whole self-regulates its channel occupancy without any global coordination. The design of this forwarding policy, its mathematical formulation, and its optimization constitute the central contribution of this thesis and are developed in Chapter~\ref{ch:simulation}, together with its realization in Chapter~\ref{ch:firmware}.
 
 
-\section{Communication Flow}
+\subsection{Communication Flow}
 \label{sec:communication_flow}
 
 This section traces the complete lifecycle of a user message through the system, from the sender's smartphone to the recipient's, tying together the four architectural components introduced in Section~\ref{sec:general_architecture}. Figure~\ref{fig:sequence_message} presents the corresponding sequence diagram.
@@ -537,29 +519,71 @@ This section traces the complete lifecycle of a user message through the system,
 It must be emphasized that this description captures the system-level journey of a message; the internal mechanics of each stage---the queueing and task structure of the \acro{ble}-to-LoRa pipelines, the channel-access procedure, and the encryption scheme---are implementation concerns addressed in Chapter~\ref{ch:firmware}.
 
 
-\section{Design Requirements}
+\subsection{Design Requirements}
 \label{sec:design_requirements}
 The architecture described above is shaped by four system-level requirements. They are stated here together with their rationale and target figures; the subsequent chapters derive from them the concrete engineering requirements of each subsystem (Chapter~\ref{ch:hardware} for the hardware platform, Chapter~\ref{ch:firmware} for the firmware, and Chapter~\ref{ch:mobileapp} for the mobile application), and Chapter~\ref{ch:results} evaluates the extent to which they are met.
 
-\subsection{Low Power Consumption}
+\subsubsection{Low Power Consumption}
 \label{subsec:req_power}
 
 A3MESH nodes are battery-powered devices intended for scenarios---emergencies, remote deployments, prolonged infrastructure outages---in which recharging opportunities cannot be assumed. Energy is therefore the most binding resource of the entire design, and the requirement is twofold. At the device level, a node must sustain multiple days of autonomous operation on a single battery charge, which demands aggressive duty cycling of both radios, exploitation of the ESP32 sleep modes, and a power subsystem with high conversion efficiency. At the network level, the forwarding protocol itself must be energy-aware: every retransmission suppressed by the gossip policy is energy saved not by one node but by the network as a whole. This dual perspective---energy as a hardware constraint and as a protocol design criterion---recurs throughout this work.
 
-\subsection{Scalability}
+\subsubsection{Scalability}
 \label{subsec:req_scalability}
 
 The system must remain functional as node density grows, precisely the regime in which flood-based LoRa meshes degrade. The requirement is therefore formulated in terms of \emph{graceful degradation}: channel load must grow with offered traffic rather than with the number of deployed nodes, and the addition of nodes to a region should improve, not erode, its connectivity. This requirement is the principal motivation for abandoning deterministic flooding in favor of the adaptive gossip policy, and it is evaluated quantitatively through the congestion metrics of Chapter~\ref{ch:simulation}.
 
-\subsection{Reliability}
+\subsubsection{Reliability}
 \label{subsec:req_reliability}
 
 A messaging system intended for emergency use must deliver messages with high probability under adverse conditions: lossy links, node failures, mobility, and network partitions. Probabilistic forwarding introduces an inherent tension here, since every suppressed retransmission is also a lost redundancy opportunity. The requirement is therefore expressed as a target operating point: the forwarding policy must achieve a packet delivery ratio statistically indistinguishable from that of pure flooding---in particular in sparse topologies, where premature gossip die-out is the dominant failure mode---while consuming a substantially smaller airtime budget. Reliability is thus not pursued through end-to-end acknowledgements and retransmissions, which would multiply airtime consumption, but through the controlled redundancy that the gossip mechanism itself provides. The delivery-ratio metric defined in Chapter~\ref{ch:simulation} quantifies compliance with this requirement.
 
-\subsection{User Accessibility}
+\subsubsection{User Accessibility}
 \label{subsec:req_accessibility}
 
 Finally, the system must be operable by users with no technical background whatsoever. In the intended scenarios, the people who most need resilient communication are not radio amateurs or engineers, and any configuration step---flashing firmware, selecting spreading factors, managing identifiers---constitutes a barrier that excludes them. This requirement drives the upper layers of the architecture: the smartphone, a device users already own and understand, is the sole human interface; the \acro{ble} link and pairing process require no networking knowledge; the mesh is self-configuring, with discovery, forwarding, and adaptation occurring autonomously; and the application deliberately reproduces the interaction patterns of mainstream messaging applications. Accessibility also constrains the physical design, as reflected in the ergonomic and enclosure decisions of the mechanical integration chapter. In short, all technical complexity of the system is required to remain invisible below the application layer.
+
+
+% ---
+\section{Development Methodology and Project Management}
+\label{ch:methodology}
+
+\subsection{Development Workflow}
+
+Development was structured around three interlocking tools: Scrum sprints for iteration cadence and supervisor alignment, Jira for task tracking and sprint planning, and Git for version control with branch names tied directly to Jira ticket identifiers.
+
+\subsection{Agile Methodology}
+
+A lightweight variant of the Scrum framework~\cite{schwaber2020scrum} was adopted for the duration of the project. Sprints of two weeks each provided the iteration unit. At the opening of each sprint, a planning meeting with the project supervisor was held to review the work completed in the preceding iteration, identify any deviations from the original plan, and select the tasks to be addressed in the forthcoming two weeks.
+
+The two-week cadence balanced feedback frequency against iteration overhead: shorter cycles would have imposed disproportionate planning cost given tasks such as \acro{pcb} fabrication, while longer cycles risked accumulating divergence from the supervisor's expectations before a correction could be applied. When a sprint's scope proved larger than anticipated, the subsequent sprint was adjusted to compensate rather than deferring indefinitely.
+
+\subsection{Sprint Planning with Jira}
+
+Each sprint's work items were recorded in a Jira project board maintained throughout the development period. Every discrete deliverable---a subsystem design, a firmware module, a simulation experiment, and a thesis chapter---was represented as a Jira issue assigned a unique ticket identifier of the form \texttt{TFG-\textit{N}}, where $N$ is a monotonically increasing integer.
+
+Tickets were grouped under six epics---\emph{Documentation}, \emph{Debugging and Testing}, \emph{FW Architecture}, \emph{HW Architecture}, \emph{System Architecture}, and \emph{Mobile SW}---one per major subsystem, allowing progress to be assessed at a subsystem granularity during planning meetings.
+
+This ticket-centric representation served two purposes beyond simple task tracking. First, it made the scope of each sprint explicit and negotiable at the planning meeting, preventing scope creep from being introduced informally between meetings. Second, and more importantly for day-to-day engineering, the ticket identifier was embedded directly in the version-control branch name, as described in the following section, creating a direct and auditable link between a Jira ticket and all the commits that contributed to resolving it.
+
+\subsection{Version Control with Git}
+
+The project used Git~\cite{chacon2014progit} for version control throughout its entire duration. The repository's branching strategy was designed around a single invariant: the \texttt{main} branch must always represent a compilable, functional state of the project. No commit was ever made directly to \texttt{main}; all development work was carried out on dedicated feature branches.
+
+Feature branches follow the naming convention \texttt{feature\_TFG-\textit{N}\_\textit{summary}}, where \textit{N} is the Jira ticket number and \textit{summary} is a concise, PascalCase description of the task. For example, the branch on which this chapter was drafted is \texttt{feature\_TFG-52\_Methodology}, and the branch that produced the hardware chapter was \texttt{feature\_TFG-48\_Hardware}. Moreover, the inclusion of the Jira ticket number in the branch name means that any line of the repository's \texttt{git log} can be traced back to the originating task without consulting external documentation.
+
+The integration workflow follows a deliberate sequence. When starting a new task, a feature branch is created from the current tip of \texttt{main}. All development commits are placed on that branch. Before integrating the completed work, the latest state of \texttt{main} is pulled into the feature branch to incorporate any changes that may have been merged by other branches during the development period, resolving any conflicts at this stage so that \texttt{main} itself is never the site of a conflict resolution.
+
+Figure~\ref{fig:git_workflow} illustrates this sequence as a branch diagram, showing the moment at which \texttt{main} is pulled into the feature branch before the final merge, thereby ensuring compatibility with any concurrent work that has already been integrated.
+
+\img{images/git_workflow.png}{Git branching workflow.}{0.8}{git_workflow}
+
+\subsection{Repository Organisation}
+
+The entire project is maintained within a single repository whose directory structure enforces the orthogonality of its constituent subsystems. The root of the repository contains the LaTeX source of this thesis alongside five subdirectories, each of which corresponds to one self-contained technical component, check out Appendix~\ref{ch:appendix_repos} for details.
+
+This monorepo organisation was chosen deliberately so that a complete snapshot of the project at any point in history---including the thesis text, the firmware, the hardware design, and the simulation code---is recoverable from a single commit hash. The orthogonality of the subdirectories ensures that changes to one subsystem do not generate noise in the diffs of another: a firmware commit touches only files under \texttt{tfg\_firmware/}, a thesis chapter commit touches only \texttt{tfe.tex} and \texttt{tfe.bib}, and the two are never conflated. This discipline also makes it straightforward to understand the scope of any given feature branch from its commit history alone.
+% ---
 
 % =============================================================================
 % SIMULATOR
@@ -567,10 +591,10 @@ Finally, the system must be operable by users with no technical background whats
 
 % TARGET: 10-14 pages
 
-\chapter{Network Simulation and Routing Algorithm Design}
+\section{Network Simulation and Routing Algorithm Design}
 \label{ch:simulation}
 
-\section{Purpose of the Simulator}
+\subsection{Purpose of the Simulator}
 There are several reasons why a network simulator was necessary for this thesis.
 
 The first is the \emph{parameter exploration problem}. The adaptive forwarding function developed in this chapter is governed by five continuous parameters, where each evaluation of a single parameter combination requires observing the network for a statistically meaningful period. In other words, performing even a coarse exploration of this space on real hardware would require thousands of multi-hour field deployments, which is materially impossible within the scope of this work. In contrast, in simulation the same exploration is reduced to minutes of computation.
@@ -580,42 +604,42 @@ The second obstacle is \emph{scale and controllability}. The phenomena of intere
 Finally, a discrete-event simulator provides perfectly repeatable conditions in which two algorithms can be compared on \emph{identical} topologies, traffic patterns, and channel realizations.
 
 
-\section{Simulation Environment}
+\subsection{Simulation Environment}
 
-\subsection{Simulator Architecture}
+\subsubsection{Simulator Architecture}
 The experimental platform is built upon \emph{Meshtasticator}, the open-source discrete-event simulator of the Meshtastic project~\cite{meshtasticator2024}. Meshtasticator models a LoRa mesh as a set of node processes coordinated by the SimPy discrete-event engine~\cite{simpy2024}: nodes exchange packets through a broadcast pipe that emulates the shared radio medium, and every transmission is propagated to all other nodes, where it may be received, lost due to insufficient signal strength, or destroyed by collision. The simulator implements the relevant \acro{phy} and \acro{mac} behavior of real Meshtastic devices as well as LoRa time-on-air computation, capture-effect collision modeling, listen-before-talk channel access with random back-off, and the official \emph{managed flood} routing algorithm of the Meshtastic firmware, which provides a faithful baseline for comparison.
 
 On top of that, the simulator was extended for this thesis in two main directions. First, the routing layer was refactored to support pluggable forwarding policies, and the candidate strategies described in Section~\ref{sec:sim_strategies} were implemented as selectable router types, culminating in the Smart Gossip router. Second, the configuration system was instrumented so that the parameters of the Smart Gossip decision function are exposed as runtime variables, a prerequisite for the automated optimization process of Section~\ref{sec:sim_optimization}. Finally, a batch-execution harness and an optimization driver were developed on top of the simulator to run large experiment campaigns and collect the metrics defined in Section~\ref{sec:sim_metrics}.
 
-\subsection{Node, Packet and Channel Models}
+\subsubsection{Node, Packet and Channel Models}
 Each simulated node generates application messages, maintains a duplicate cache, executes the configured forwarding policy, and respects the half-duplex constraint of the radio. Nodes are placed uniformly at random over a 15$\times$15~km area, subject to a minimum-separation constraint, and approximately 30\% of the nodes are mobile, exercising the protocols under topological change.
 
 Apart from this, the radio configuration corresponds to the \texttt{LONG\_FAST} preset on the EU~868 band: SF11, 250~kHz bandwidth and coding rate 4/5, yielding a time-on-air of approximately 550~ms per packet; transmit power is 27~dBm and receiver sensitivity $-131.5$~dBm. Path loss follows the 3GPP Suburban Macro model (Model~5), which produces realistic link ranges of roughly 1.8~km in this configuration. Two refinements increase realism: log-normal shadowing and per-link asymmetric gain offsets (normally distributed, $\sigma = 3$~dB), so that link quality differs between directions, as observed in real LoRa deployments~\cite{cattani2017reliability}. The hop limit is fixed at 3, matching the Meshtastic default.
 
 
-\subsection{Randomness and Reproducibility}
+\subsubsection{Randomness and Reproducibility}
  
 Every stochastic element of the simulation---node placement, traffic generation, link asymmetries, mobility, and the gossip coin flips themselves---derives from explicitly seeded pseudo-random generators. Each repetition of a scenario uses a distinct, documented seed (0--29), and node positions are pre-generated and cached per seed, so that all routing algorithms are evaluated on \emph{exactly} the same sequence of topologies. What is more, this pairing eliminates topology variance from inter-algorithm comparisons and makes every result in this chapter exactly reproducible from the configuration files listed in Appendix~\ref{ch:appendix_repos}.
 
-\section{Evaluated Routing Strategies}
+\subsection{Evaluated Routing Strategies}
 \label{sec:sim_strategies}
 
 The design of the final algorithm proceeded incrementally: a sequence of forwarding strategies of increasing sophistication was implemented and evaluated, each addressing a weakness identified in its predecessor. This section describes the progression conceptually; quantitative results are deferred to Section~\ref{sec:sim_results}.
 
-\subsection{Pure Flooding}
+\subsubsection{Pure Flooding}
 Pure flooding is the natural baseline: every node retransmits every packet it has not seen before, until the hop limit is exhausted. Its virtues are simplicity and maximal coverage---if any path exists within the hop horizon, flooding finds it. Its pathology, anticipated analytically in Section~\ref{sec:gossip}, was confirmed immediately in simulation: the number of transmissions grows linearly with node count regardless of traffic demand, and with LoRa airtimes of half a second per packet the channel saturates rapidly, manifesting as collisions, queueing delays, and duty-cycle exhaustion. Meshtastic's managed flood, which adds SNR-weighted contention windows and rebroadcast cancellation, mitigates the worst simultaneity but, as the results of Section~\ref{sec:sim_results} show, does not alter the fundamental scaling behavior. Managed flood, being the algorithm deployed in the most widely used comparable system, serves as the reference baseline throughout this chapter.
 
-\subsection{Probabilistic Gossip}
+\subsubsection{Probabilistic Gossip}
 The first refinement replaces the deterministic rebroadcast with a Bernoulli trial: each node forwards a new packet with fixed probability $p$ and stays silent otherwise, following the classical gossip scheme of Haas et al.~\cite{haas2006gossip}. After simulation, several values of $p$ were tested, and the scheme's weakness is equally clear: no single value of $p$ suits all regions of a heterogeneous network. Therefore, a probability low enough to relieve congestion in dense clusters causes premature die-out in sparse areas, where a silent node may be the only bridge between partitions; a probability high enough to protect sparse areas forfeits most of the savings in dense ones. Consequently, the optimal $p$ is, in short, a \emph{local} quantity---which motivates making the decision adaptive.
 
 This routing logic is defined as \emph{GOSSIP0N} in the simulator, where N value is represented between 2 and 8, related to the values of $p$ tested.
-\subsection{RSSI-Aware Gossip}
+\subsubsection{RSSI-Aware Gossip}
 The second refinement modulates the forwarding probability with the received signal strength of the incoming packet. The intuition exploits a geometric fact of broadcast propagation: a packet received weakly arrives from far away, meaning the receiver lies near the edge of the transmitter's coverage area and is precisely the kind of node that extends the packet's reach furthest if it relays; conversely, a packet received strongly comes from a nearby transmitter whose coverage area largely overlaps the receiver's, making a relay largely redundant. \acro{rssi} thus acts as a zero-cost proxy for geographic progress, an idea well established in \acro{wsn} and \acro{lpwan} routing~\cite{senel2011relay,cattani2017reliability}. This strategy concentrates retransmissions at the periphery of each broadcast wave, improving the usefulness of each transmission, but it remains blind to how many \emph{other} candidates surround the receiver.
 
 This routing logic is defined as \emph{RSSI\_BASED} in the simulator.
 
 
-\subsection{Density-Aware Gossip}
+\subsubsection{Density-Aware Gossip}
 The third refinement addresses exactly that blindness: the forwarding probability is made inversely dependent on the number of neighbors a node currently observes, following the neighbor-knowledge principle of Tseng et al.~\cite{tseng2002broadcast}. A node surrounded by many peers can afford to stay silent, since the expected number of other relays is high; a node with few neighbors must forward, since it may be an articulation point of the topology. This mechanism attacks the broadcast storm at its root---it decouples the aggregate retransmission count from node density---and proved in simulation to be the single most effective congestion-mitigation ingredient. In isolation, however, it ignores both link quality and the redundancy already observed on the channel.
 
 Each of the three signals---link quality, local density, observed redundancy---thus captures a complementary aspect of the forwarding decision. The natural conclusion is to combine them, which leads to the algorithm at the core of this thesis.
@@ -623,10 +647,10 @@ Each of the three signals---link quality, local density, observed redundancy---t
 This routing logic is defined as \emph{ADAPTIVE\_GOSSIP} in the simulator.
 
 
-\section{Smart Gossip Algorithm}
+\subsection{Smart Gossip Algorithm}
 \label{sec:sim_smartgossip}
 
-\subsection{Decision Function}
+\subsubsection{Decision Function}
  
 Smart Gossip computes, for every newly received packet, a retransmission probability that combines the three signals above as independent multiplicative factors, bounded from below by a survival floor:
  
@@ -657,7 +681,7 @@ Smart Gossip computes, for every newly received packet, a retransmission probabi
  
 The node then draws a uniform random number and retransmits if it falls below $p$, after the randomized back-off described in Section~\ref{sec:communication_flow}. All inputs to Equation~\eqref{eq:smartgossip} are locally observable at zero communication cost: \acro{rssi} is reported by the transceiver with every reception, the neighbor count is maintained by passive overhearing, and the copy counter is a by-product of the duplicate cache. The algorithm therefore adds no control traffic whatsoever.
  
-\subsection{Rationale of Each Factor}
+\subsubsection{Rationale of Each Factor}
  
 \paragraph{The \acro{rssi} factor.} Equation~\eqref{eq:frssi} encodes the edge-of-coverage heuristic introduced above: it approaches 1 as the \acro{rssi} approaches the sensitivity limit ($-131.5$~dBm), where the receiver is likely one of very few nodes to have heard the packet, and approaches 0 for strong signals from nearby transmitters whose coverage the receiver cannot meaningfully extend. A sigmoid is preferred over a hard threshold because \acro{rssi} in a shadowed channel is a noisy quantity; a continuous transition prevents abrupt behavioral changes from decibel-level fluctuations, and its shape is consistent with the coverage probability induced by log-normal fading~\cite{senel2011relay,cattani2017reliability}. The parameter $\alpha$ controls the steepness of the transition and $\mathrm{RSSI}_{\text{ref}}$ its center.
  
@@ -667,7 +691,7 @@ The node then draws a uniform random number and retransmits if it falls below $p
  
 \paragraph{The probability floor.} Finally, $p_{\text{floor}}$ guarantees that no combination of inputs ever silences a node completely. It is the safeguard against gossip die-out identified in Section~\ref{sec:gossip}: in pathological cases---a sparse bridge node that happens to receive a strong signal, for instance---the multiplicative factors could otherwise drive $p$ arbitrarily close to zero and sever the network. The floor also provides a single, intuitive operational knob: raising $p_{\text{floor}}$ toward 1 continuously morphs Smart Gossip back into flooding, a property exploited in Section~\ref{sec:sim_final_params}.
  
-\subsection{Behavior in Representative Scenarios}
+\subsubsection{Behavior in Representative Scenarios}
  
 Table~\ref{tab:sg_examples} evaluates Equation~\eqref{eq:smartgossip} with the optimized parameters of Section~\ref{sec:sim_optimization} in five representative situations, illustrating how the factors interact. A node at the coverage edge with few neighbors forwards with high probability (0.70); an average node halves that; observed duplicates suppress it further; and well-connected nodes near the transmitter fall to the floor, retransmitting only 11\% of the time.
 
@@ -689,14 +713,14 @@ Table~\ref{tab:sg_examples} evaluates Equation~\eqref{eq:smartgossip} with the o
     \end{tabular}
 \end{table}
  
-\section{Evolutionary Optimization Process}
+\subsection{Evolutionary Optimization Process}
 \label{sec:sim_optimization}
 
-\subsection{Why Manual Tuning Is Insufficient}
+\subsubsection{Why Manual Tuning Is Insufficient}
  
 Equation~\eqref{eq:smartgossip} introduces five free parameters: $\theta = (\alpha, \mathrm{RSSI}_{\text{ref}}, \beta, \gamma, p_{\text{floor}})$. Because their effects are strongly coupled---a steeper sigmoid changes the operating point at which the density factor matters, the duplicate penalty interacts with the floor---tuning them one at a time is methodologically unsound. Also, exhaustive search fares no better: a modest grid of ten values per dimension yields $10^5$ combinations, each requiring multiple full network simulations to average out stochastic noise. Finally, the objective surface is non-convex and \emph{noisy}, since every evaluation is itself a random experiment, which rules out gradient-based methods. The problem calls for a derivative-free global optimizer that is sample-efficient in moderate dimensions.
  
-\subsection{Differential Evolution}
+\subsubsection{Differential Evolution}
  
 Differential evolution (\acro{de})~\cite{storn1997de,price2005de} satisfies these requirements and was adopted through its \texttt{scipy.optimize} implementation~\cite{virtanen2020scipy}. DE maintains a population of candidate parameter vectors and evolves it through three operators. \emph{Mutation} creates, for each individual $\mathbf{x}_i$, a mutant vector from three distinct randomly chosen members of the population,
 \begin{equation}
@@ -705,7 +729,7 @@ Differential evolution (\acro{de})~\cite{storn1997de,price2005de} satisfies thes
 \end{equation}
 where the differential weight $F$ was dithered in $[0.5, 1.0]$ to balance exploration and convergence~\cite{price2005de}. \emph{Crossover} then mixes $\mathbf{v}_i$ with $\mathbf{x}_i$ coordinate-wise with recombination probability 0.7, producing a trial vector. \emph{Selection} is greedy: the trial replaces $\mathbf{x}_i$ in the next generation only if it achieves a better fitness. Because mutation step sizes derive from the population's own spread, DE self-adapts its search scale, behaving exploratively while the population is dispersed and refining once it concentrates around an optimum---a property well suited to noisy, non-convex landscapes~\cite{das2011de}.
  
-\subsection{Fitness Function and Configuration}
+\subsubsection{Fitness Function and Configuration}
  
 Each candidate $\theta$ is evaluated by running full network simulations at sizes of 15 and 30 nodes---the regime where the routing decision matters most---over multiple seeded repetitions, and aggregating four metrics into the scalar fitness
 \begin{equation}
@@ -715,33 +739,33 @@ Each candidate $\theta$ is evaluated by running full network simulations at size
 where $\overline{\text{reach}}$ is the mean reachability, $\overline{\text{useful}}$ the mean usefulness, $\overline{\text{col}}$ the mean collision rate (all in \%) and $\overline{\text{tx}}$ the mean per-node transmission airtime normalised to a comparable scale. The weights encode the design intent: coverage and channel efficiency are rewarded equally and dominantly, while collisions and raw airtime act as soft penalties. The search ranges of the five parameters (Table~\ref{tab:sg_params}) were chosen generously around physically meaningful values. The optimization converged after approximately 160 fitness evaluations, completing in under ten minutes of computation---itself a demonstration of why the exploration had to be conducted in simulation.
 
 
-\subsection{Limitations of the Optimization}
+\subsubsection{Limitations of the Optimization}
  
 Three limitations of this process must be acknowledged. First, to keep the campaign tractable, each fitness evaluation averaged over a small number of repetitions, so the optimum is estimated under residual noise; a larger budget would yield a more robust optimum. Second, fitness was evaluated only at 15 and 30 nodes; including the extremes (5 and 50) might have shifted the optimum toward higher coverage in small networks. Third, Equation~\eqref{eq:fitness} does not impose a hard reachability constraint, which explains the coverage deficit observed in the smallest networks in Section~\ref{sec:sim_results}. These limitations delimit the validity of the chosen parameters and directly motivate the future-work directions of Chapter~\ref{ch:conclusions}.
 
 
-\section{Performance Metrics}
+\subsection{Performance Metrics}
 \label{sec:sim_metrics}
  
 Four metrics, computed identically for every algorithm and scenario, quantify the quality of a forwarding policy. Together they capture the two sides of the fundamental trade-off---how much of the network is reached, and at what cost in channel resources.
  
-\subsection{Reachability}
+\subsubsection{Reachability}
  
 Reachability is the fraction of origin--destination pairs for which a generated message was correctly delivered, expressed as the number of useful receptions over $M\,(N-1)$, where $M$ is the number of generated messages and $N$ the network size. It is the primary effectiveness metric: it answers whether the network performs its function. Absolute values must be interpreted against the topology; in the sparse 15$\times$15~km scenarios simulated here, some node pairs lack physical connectivity altogether, bounding reachability below 100\% for \emph{any} algorithm.
  
-\subsection{Average Delay}
+\subsubsection{Average Delay}
  
 Delay is measured per delivered message as the time elapsed between generation at the source application and reception at the destination, and averaged over all deliveries. Beyond user experience, delay is a sensitive \emph{congestion indicator}: in a listen-before-talk MAC, channel saturation manifests as packets waiting tens of seconds for clear air, so a diverging delay curve reveals a collapsing channel even when delivery eventually succeeds. Note that the metric is conditioned on delivery; messages never delivered do not contribute.
  
-\subsection{Transmission Air Utilization}
+\subsubsection{Transmission Air Utilization}
  
 Air utilization is the total time each node's radio spends transmitting over the simulation, averaged per node. It is the direct cost metric of a forwarding policy and carries a double physical meaning: it is proportional to the radio's energy expenditure---linking the protocol to the power requirement of Section~\ref{subsec:req_power}---and it measures consumption of the regulatory duty-cycle budget of the EU~868 band, the hard ceiling identified in Section~\ref{subsec:req_scalability}.
  
-\subsection{Usefulness}
+\subsubsection{Usefulness}
  
 Usefulness is the fraction of received packets that carried new information to their receiver, i.e.\ that were not duplicates already present in its cache. It is the \emph{efficiency} metric of the channel: a low value means the medium is being filled with copies nobody needs. Usefulness isolates precisely the redundancy that gossip is designed to remove, making it the most discriminating single indicator of forwarding intelligence. The collision rate---the fraction of sensed packets destroyed by concurrent transmissions---is additionally reported as a secondary congestion indicator.
 
-\section{Simulation Results and Analysis}
+\subsection{Simulation Results and Analysis}
 \label{sec:sim_results}
 
 The final evaluation campaign compared Smart Gossip, with the optimized parameters of Table~\ref{tab:sg_params}, against Meshtastic's managed flood across four network sizes (5, 15, 30 and 50 nodes), with 30 seeded repetitions per algorithm and size---240 simulations of 30 minutes each. Both algorithms faced identical topologies, traffic, and channel realizations in every repetition. Tables~\ref{tab:res_reach}--\ref{tab:res_delay} report means and standard deviations; Figures~\ref{fig:plot_reachability}--\ref{fig:plot_delay} present the same data graphically.
@@ -862,21 +886,21 @@ The final evaluation campaign compared Smart Gossip, with the optimized paramete
   \label{fig:plot_delay}
 \end{figure}
 
-\subsection{Channel Efficiency}
+\subsubsection{Channel Efficiency}
  
 The most robust result of the campaign is the reduction in air utilization: for networks of 15 nodes and above, Smart Gossip occupies 27--32\% less channel time per node than managed flood, with small variance across 30 repetitions. The practical significance is twofold. In energy terms, transmission is the dominant consumer in a LoRa node, so this reduction translates directly into battery lifetime. In regulatory terms, with the \texttt{LONG\_FAST} airtime of ${\sim}550$~ms per packet, managed flood at 15 nodes already consumes 5.4\% of duty cycle over the 30-minute window against Smart Gossip's 3.8\%; under heavier traffic or larger networks, flooding approaches the regulatory ceiling first, at which point nodes are legally forced to silence. The usefulness metric explains where the savings come from: under managed flood, fewer than half of all received packets carry new information, whereas Smart Gossip raises usefulness by a consistent ${\sim}10\%$ relative for all networks of 15 nodes and above---the same information is disseminated with substantially fewer transmissions.
  
-\subsection{Congestion Collapse under Flooding}
+\subsubsection{Congestion Collapse under Flooding}
  
 The delay results expose the broadcast storm in its most dramatic form. At 30 nodes, managed flood exhibits a mean delay of 78.6~s---and 160~s at 50 nodes---against 11.4~s and 27.1~s for Smart Gossip, reductions of 85\% and 83\% respectively. The mechanism is the one anticipated in Section~\ref{sec:gossip}: when every node contends to retransmit, the listen-before-talk MAC forces packets to queue for tens of seconds awaiting clear channel, and collisions force further retries. Smart Gossip removes the bulk of this contention at the source by silencing redundant relays, so the packets that are forwarded traverse a comparatively idle channel. The collision-rate results corroborate the picture at 5--30 nodes (reductions of 18--37\%); only at 50 nodes does managed flood show marginally fewer collisions ($+1.5$~pp for Smart Gossip), an artifact of its channel being so saturated that its contention windows serialize transmissions---at the cost of the 160-second delays just described.
  
-\subsection{The Coverage Trade-off and Failure Scenarios}
+\subsubsection{The Coverage Trade-off and Failure Scenarios}
  
 The cost of these gains is a reachability deficit of 4.5--12.4 percentage points, largest at intermediate sizes. This is the inherent gossip trade-off anticipated theoretically~\cite{haas2006gossip}: every suppressed retransmission is also a suppressed redundancy opportunity, and in a sparse topology some of those opportunities were load-bearing. Three observations contextualize the deficit. First, absolute reachability is bounded by physical connectivity in these sparse scenarios---both algorithms range from ${\sim}30$ to ${\sim}77\%$---so part of the gap reflects marginal links that only brute-force redundancy can cross. Second, the deficit \emph{shrinks} in the largest network ($-4.5$~pp at 50 nodes) while the efficiency advantages persist, indicating that the trade-off improves exactly where it matters. Third, the deficit is largest precisely in the configurations excluded from the optimization fitness, suggesting it is partly an artifact of the tuning procedure rather than of the algorithm itself.
  
 The clear failure scenario for Smart Gossip is the small, sparse network. At 5 nodes, congestion is a non-problem---there is nothing to optimize away---while every retransmission matters for coverage; managed flood is the better algorithm there, also winning the composite comparison below and incurring lower delay ($+28.7\%$ for Smart Gossip). Conversely, the failure scenario for managed flood is density: its delay and airtime diverge with network size, which is incompatible with the scalability requirement of Section~\ref{subsec:req_scalability}.
  
-\subsection{Composite Comparison}
+\subsubsection{Composite Comparison}
  
 To aggregate the four metrics into a single comparative figure, a composite score was defined weighing effectiveness and efficiency equally and penalizing channel costs:
 \begin{equation}
@@ -903,7 +927,7 @@ The weighting differs slightly from the optimization fitness of Equation~\eqref{
  
 In summary, the simulations demonstrate that Smart Gossip delivers comparable information dissemination at a 27--32\% lower channel and energy cost, while avoiding the congestion collapse that renders flooding-based forwarding unusable---delays beyond a minute---at the network sizes the system is designed to scale to.
  
-\section{Final Parameter Selection}
+\subsection{Final Parameter Selection}
 \label{sec:sim_final_params}
 
 Table~\ref{tab:sg_params} lists the parameter values produced by the optimization, which are adopted as the firmware defaults of Chapter~\ref{ch:firmware}.
@@ -929,10 +953,10 @@ Each value admits a coherent physical reading, which lends confidence that the o
  
 Two real-world implications follow. First, because all inputs to the decision are already available in the firmware (transceiver \acro{rssi}, neighbor table, duplicate cache), the algorithm's implementation cost is a handful of floating-point operations per received packet---negligible on the ESP32---and its parameters are stored as configuration constants that can be updated without protocol changes. Second, $p_{\text{floor}}$ doubles as an application-level policy knob: deployments prioritizing delivery certainty over efficiency (for instance, emergency alert dissemination) can raise the floor toward 1, continuously trading channel efficiency back for the redundancy of full flooding without any other modification. The validation of these parameters on real hardware is presented in Chapter~\ref{ch:results}.
 
-\chapter{Hardware Design}
+\section{Hardware Design}
 \label{ch:hardware}
 
-\section{Hardware Requirements}
+\subsection{Hardware Requirements}
 \label{sec:hw_requirements}
 
 The system-level requirements established in Section~\ref{sec:design_requirements}
@@ -969,7 +993,7 @@ The complete bill of materials contains fewer than thirty distinct line
 items, all available in standard SMD packages ranging from 0402 to SOIC-16, check out appendix~\ref{ch:appendix_bom}.
 
 
-\section{System Block Diagram}
+\subsection{System Block Diagram}
 \label{sec:hw_block}
 
 The hardware platform is organised around four functional subsystems that interact
@@ -989,7 +1013,7 @@ reflecting battery charging status.
 
 \img{images/pcb_subsystems_overlay.png}{Top-level hardware block diagram of the A3MESH node, showing the four functional subsystems and their principal electrical interfaces.}{0.5}{hw_block}
 
-\section{Power Subsystem}
+\subsection{Power Subsystem}
 \label{sec:hw_power}
 
 The power subsystem is the most topologically complex portion of the design. Its
@@ -1001,7 +1025,7 @@ to three dedicated stages arranged in series.
 
 \img{images/power_subsystem.png}{Schematic of the power subsystem, showing the three cascaded stages that handle charging, protection, and voltage regulation.}{0.8}{hw_power}
 
-\subsection{Battery Selection}
+\subsubsection{Battery Selection}
 \label{subsec:hw_battery}
 
 A single-cell lithium polymer cell was selected as the energy source. Lithium polymer
@@ -1015,7 +1039,7 @@ series cell-balancing circuits. The cell is connected through a two-pin JST-comp
 header (J1, mounted on the board underside) so that different cell capacities can
 be fitted to the same platform without hardware changes.
 
-\subsection{Charging Circuit}
+\subsubsection{Charging Circuit}
 \label{subsec:hw_charger}
 
 Charging is handled by the TP4056-42 (U4), a fully integrated constant-current
@@ -1043,7 +1067,7 @@ prevent reverse conduction from the battery back into the USB supply when the la
 is absent or at a lower potential than the battery, ensuring that the system can
 be powered from either source without contention between the two rails.
 
-\subsection{Voltage Regulation}
+\subsubsection{Voltage Regulation}
 \label{subsec:hw_regulator}
 
 The regulated 3.3\,V rail is generated by the Texas Instruments TPS63001 (U8), a
@@ -1066,7 +1090,7 @@ C13, 2.2\,$\mu$F, 1206) are placed, complemented by
 distributed 100\,nF and 10\,$\mu$F decoupling capacitors close to the supply pins of
 all active devices.
 
-\subsection{Power Monitoring}
+\subsubsection{Power Monitoring}
 \label{subsec:hw_batmon}
 
 In order to monitor the state of charge of the LiPo cell, the firmware measures its terminal
@@ -1082,12 +1106,12 @@ monitoring path dissipates less than 6\,$\mu$W at full charge, with a negligible
 impact on the overall energy budget.
 
 
-\section{Processing Subsystem}
+\subsection{Processing Subsystem}
 \label{sec:hw_processing}
 
 \img{images/processing_subsystem.png}{Schematic of the processing subsystem, showing the ESP32-WROOM-32UE module.}{0.7}{hw_processing}
 
-\subsection{ESP32 Architecture}
+\subsubsection{ESP32 Architecture}
 \label{subsec:hw_esp32}
 
 The central processing element is the Espressif ESP32-WROOM-32UE (U6), a
@@ -1125,7 +1149,7 @@ avoid the additional propagation delay of the GPIO matrix~\cite{espressif2023esp
     \end{tabular}
 \end{table}
 
-\subsection{BLE Integration}
+\subsubsection{BLE Integration}
 \label{subsec:hw_ble}
 
 The ESP32's integrated 2.4\,GHz radio supports Bluetooth 4.2, including the BLE
@@ -1135,7 +1159,7 @@ server and maintaining a single connection to the paired smartphone. No external
 required for the BLE link: the module's internal antenna provides sufficient gain for
 the short-range smartphone pairing scenario.
 
-\subsection{Memory Considerations}
+\subsubsection{Memory Considerations}
 \label{subsec:hw_memory}
 
 The 4\,MB flash within the module is partitioned into a bootloader region, the
@@ -1147,12 +1171,12 @@ firmware development, peak heap occupancy remained below 200\,KB, leaving a marg
 sufficient for future protocol extensions without requiring external SRAM.
 
 
-\section{RF Subsystem}
+\subsection{RF Subsystem}
 \label{sec:hw_rf}
 
 \img{images/rf_subsystem.png}{Schematic of the RF subsystem, showing the RFM95W LoRa module.}{0.6}{hw_rf}
 
-\subsection{LoRa Transceiver Selection}
+\subsubsection{LoRa Transceiver Selection}
 \label{subsec:hw_lora}
 
 The LoRa radio is implemented by the HopeRF RFM95W-868S2 (U2), a compact SMD module
@@ -1172,7 +1196,7 @@ interrupt outputs, and an RF port that connects directly
 to the integrated PCB antenna, forgoing an external coaxial connector and its
 associated insertion loss.
 
-\subsection{Antenna Design Considerations}
+\subsubsection{Antenna Design Considerations}
 \label{subsec:hw_antenna}
 
 The RF radiator (AE1) is an integrated PCB monopole antenna implemented according
@@ -1193,7 +1217,7 @@ The antenna's single feed pad connects directly to the RFM95W RF output pad, whi
 includes the on-module matching network that presents a 50\,$\Omega$ interface to the
 antenna feed point.
 
-\subsection{RF Matching and Layout}
+\subsubsection{RF Matching and Layout}
 \label{subsec:hw_rf_layout}
 
 A keep-out zone of 38\,mm\,$\times$\,24\,mm is enforced on both copper layers beneath
@@ -1205,7 +1229,7 @@ to minimise series resistance and stray capacitance at the 10\,MHz SPI clock
 frequency. All power supply traces to the RFM95W and ESP32 are supplemented with
 local 100\,nF decoupling capacitors placed within 0.5\,mm of each supply pin.
 
-\subsection{Regulatory Constraints}
+\subsubsection{Regulatory Constraints}
 \label{subsec:hw_regulatory}
 
 Operation in the EU\,868\,MHz band is subject to ETSI EN\,300\,220, which
@@ -1224,7 +1248,7 @@ one-hour window and prevents the node from transmitting beyond the applicable
 regulatory budget, irrespective of the configured RF power level.
 
 
-\section{USB Programming Interface}
+\subsection{USB Programming Interface}
 \label{sec:hw_usb}
 
 \img{images/prog_subsystem.png}{Schematic of the USB programming and user interface subsystem, showing the CH340C USB-to-UART bridge and auto-reset circuit.}{0.7}{hw_usb}
@@ -1255,7 +1279,7 @@ CC2 lines, which is the USB Type-C specification's mechanism for a device to sig
 its power sink requirements to a compliant charger or host port.
 
 
-\section{PCB Design}
+\subsection{PCB Design}
 \label{sec:hw_pcb}
 
 The board was designed in KiCad\,9.0 and manufactured on a standard two-layer FR4
@@ -1285,16 +1309,57 @@ medium-frequency current demand. The 100\,$\mu$F output capacitor of the TPS6300
 provides low-frequency reservoir capacity.
 
 
-\section{Prototype Manufacturing}
+\subsection{Prototype Manufacturing}
 \label{sec:hw_manufacturing}
 
 The KiCad layout was exported to Gerber files in RS-274-X format together with NC drill files, which were then submitted to JLCPCB for fabrication of a two-layer PCB. All SMD passives use 0402 or 0603 packages, except for bulk capacitors, which require the larger 1206 package to accommodate their voltage ratings. Integrated circuits range from SOT-23-6 to SOIC-16, while the USB-C receptacle and battery header are semi-through-hole parts, chosen for the mechanical robustness they provide against repeated connector cycles.
 
 Furthermore, the BOM was compiled with LCSC part numbers so that JLCPCB could source every component from a single distributor, streamlining assembly. Finally, seven test-point pads were distributed across the board to facilitate in-circuit measurement of the key power rails (VBUS, 3.3\,V, BAT+) and programming signals during bringup.
 
-% =============================================================================
-% FIRMWARE
-\chapter{Firmware Architecture and Implementation}
+% --
+\subsection{Mechanical Integration}
+\label{ch:mechanical}
+
+\subsubsection{Design Objectives}
+\label{sec:design_objectives}
+
+The primary design objective was to create an accessory that the user would not need to consciously manage. Rather than requiring the user to remember to attach and detach the device, the goal was an "install once, forget it's there" experience: the board should become a permanent, unobtrusive extension of the phone rather than a separate object to keep track of.
+
+To achieve this, the \acro{pcba} was housed in a dedicated protective shell, conceptually similar to a small case of its own. This shell is then permanently bonded to the back of the phone's existing case using an adhesive layer, following the same attachment principle used by many "smart wallet" card holders available on the market. This approach removes the need for any manual connection or disconnection step, satisfying the core usability goal of the project.
+
+\subsubsection{Ergonomic Considerations}
+
+Building on the goal of making the accessory feel like a natural part of the phone, two main ergonomic decisions were made. First, all external edges of the enclosure were rounded, eliminating sharp corners and edges so that the device sits comfortably in the hand during normal phone use, in the same way that commercial phone cases avoid hard edges.
+
+Second, the enclosure was modelled to be 3D printed in a flexible, rubber-like plastic, matching the material commonly used in standard phone cases. This material choice provides a soft tactile feel consistent with the rest of the phone accessory, while also adding a degree of shock absorption to protect the \acro{pcba} inside.
+
+\subsubsection{Smartphone Integration}
+
+Several attachment strategies were evaluated before settling on the adhesive-mounted shell described in Section~\ref{sec:design_objectives}. One alternative considered was integrating a small dedicated pocket directly into the phone case, sized to hold the board internally. This approach would reduce the overall added thickness and improve comfort, but it was discarded because it is not scalable: a custom case would need to be designed and manufactured for every phone model, which is impractical for a general-purpose accessory.
+
+A second alternative considered was a MagSafe-style magnetic attachment. This option was ultimately rejected due to the risk of the magnets' electromagnetic field interfering with the radiofrequency signals handled by the board, which could compromise the device's wireless performance.
+
+Given these constraints, the adhesive-backed shell was selected as the final solution, as it offers a reasonable compromise between universality, ease of installation, and signal integrity.
+
+
+\subsubsection{3D Modelling Process}
+
+The enclosure was designed using Autodesk Fusion 360 as the primary \acro{cad} tool. To ensure the design would integrate correctly with a real device, a 3D model of a phone similar to the target unit was sourced online and used as a reference geometry throughout the modelling process, allowing the enclosure's dimensions and curvature to closely match the actual phone form factor.
+
+In parallel, the 3D model of the PCBA was exported directly from KiCad. This ensured that the internal cavity of the enclosure was dimensioned to match the real board geometry as closely as possible, avoiding the tolerance issues that can arise when modelling component placement from datasheets alone.
+
+
+\subsubsection{Enclosure Design}
+
+Figure~\ref{fig:enclosure_render} shows the final enclosure design housing the \acro{pcba}. The rounded edges, the rubber-like surface finish, and the discreet ventilation slots can be appreciated in the render, along with the engraved logo on the rear face. The bottom edge integrates the connector cutout required for charging and data access, keeping the silhouette as close as possible to that of a standard phone case.
+
+Additionally, two small elements made of a transparent material can be observed. These act as light diffusers for the red and green charging status \acro{led}s mounted on the \acro{pcba}: since the \acro{led}s themselves are fully enclosed within the opaque shell, these transparent inserts channel and scatter their light to the outer surface, allowing the user to clearly see the charging status indicators from outside the enclosure.
+
+\img{images/a3mesh_case_enclosure.png}{Final enclosure design housing the \acro{pcba}.}{0.7}{enclosure_render}
+
+% ---
+
+\section{Firmware Architecture and Implementation}
 \label{ch:firmware}
 
 This chapter describes the design philosophy, the layered decomposition, and the concrete implementation of each
@@ -1302,7 +1367,7 @@ subsystem, drawing directly from the \texttt{tfg\_firmware/firmware} PlatformIO
 project.
 
 
-\section{Firmware Design Philosophy}
+\subsection{Firmware Design Philosophy}
 \label{sec:fw_philosophy}
 
 Three principles govern the design of the A3MESH firmware: strict layer separation,
@@ -1331,7 +1396,7 @@ single word. As a result, no dynamic allocation occurs on any path between frame
 forwarding decision.
 
 
-\section{Layered Architecture}
+\subsection{Layered Architecture}
 \label{sec:fw_layers}
 
 The firmware is decomposed into four horizontal layers. Firstly, the
@@ -1386,10 +1451,10 @@ All queues have a depth of ten items and are statically allocated at initialisat
 
 
 
-\section{Physical Communication Layer}
+\subsection{Physical Communication Layer}
 \label{sec:fw_physical}
 
-\subsection{LoRa Driver}
+\subsubsection{LoRa Driver}
 \label{sec:fw_lora_driver}
 
 The LoRa driver wraps the Arduino-LoRa SPI library with an interrupt-deferred
@@ -1442,7 +1507,7 @@ blocked silently. By design, this sliding window avoids the compliance gaps that
 fixed-period counter would otherwise introduce around midnight or after a device
 restart.
 
-\subsection{BLE Driver}
+\subsubsection{BLE Driver}
 \label{sec:fw_ble_driver}
 
 The BLE driver implements a Nordic UART Service (NUS)-compatible GATT server using
@@ -1470,7 +1535,7 @@ notification to the connected peer. By decoupling BLE transmission into a
 dedicated task, long notify round trips are prevented from stalling time-sensitive
 state-machine transitions.
 
-\subsection{Packet Encoding}
+\subsubsection{Packet Encoding}
 \label{sec:fw_packet}
 
 Every frame transmitted over the LoRa channel consists of a fixed four-byte
@@ -1545,10 +1610,10 @@ used in \texttt{src} and \texttt{node\_id}, in turn, is derived from the factory
 Bluetooth MAC address as described in Section~\ref{sec:fw_identity}.
 
 
-\section{Mesh Logic Layer}
+\subsection{Mesh Logic Layer}
 \label{sec:fw_mesh}
 
-\subsection{Reception State Machine}
+\subsubsection{Reception State Machine}
 \label{sec:fw_statemachine}
 
 All received frames are processed by a ten-state explicit finite state machine
@@ -1613,7 +1678,7 @@ distance-aware relay selection studied in~\cite{senel2011relay}:
     d_{\mathrm{jitter}} = \mathrm{map}(\mathrm{RSSI},\; -120,\; -40,\; 20,\; 200)\;\;\mathrm{[ms]}
 \]
 
-\subsection{Neighbour Discovery}
+\subsubsection{Neighbour Discovery}
 \label{sec:fw_discovery}
 
 The mesh layer maintains a neighbour table of up to \texttt{MAX\_NEIGHBORS}~$= 10$
@@ -1637,7 +1702,7 @@ $\texttt{NODE\_TIMEOUT} / 10$\,ms. Its eviction function \texttt{rm\_tout\_neigb
 applies swap-last deletion---overwriting the expired slot with the last table
 entry---completing in O(1) time without shifting the array.
 
-\subsection{Smart Gossip Integration}
+\subsubsection{Smart Gossip Integration}
 \label{sec:fw_smartgossip}
 
 The forwarding probability is computed by \texttt{gossip\_forward\_probability()},
@@ -1654,7 +1719,7 @@ continuously seeded from RF thermal noise when the BLE radio is
 active~\cite{espressif2023esp32trm}, providing statistically independent draws
 without the sequential correlations of a software PRNG.
 
-\subsection{Duplicate Detection and Passive ACK Suppression}
+\subsubsection{Duplicate Detection and Passive ACK Suppression}
 \label{sec:fw_passive_ack}
 
 \paragraph{Duplicate detection.}
@@ -1683,7 +1748,7 @@ with no explicit coordination between nodes as illustrated in Figure~\ref{fig:fw
 
 \img{images/passive_ack_sequence_diagram.png}{Passive ACK suppression sequence-diagram.}{0.85}{fw_passive_ack}
 
-\subsection{TTL and Loop Prevention}
+\subsubsection{TTL and Loop Prevention}
 \label{sec:fw_ttl}
 
 Network loops are controlled by two independent mechanisms. At the packet level,
@@ -1700,10 +1765,10 @@ the two limits bound the worst-case replication factor of any message to at most
 $3 \times 5 = 15$ on-air copies within its 30-second cache lifetime.
 
 
-\section{System Services Layer}
+\subsection{System Services Layer}
 \label{sec:fw_services}
 
-\subsection{Power Management and Battery Monitoring}
+\subsubsection{Power Management and Battery Monitoring}
 \label{sec:fw_power}
 
 \paragraph{Sleep modes and their unsuitability.}
@@ -1753,7 +1818,7 @@ reported to the companion application via the \texttt{AT+INFO?} command. As a
 hardware safeguard independent of firmware state, the DW01A\,+\,FS8205A protection
 stage provides a hard cut-off near 2.4\,V to prevent deep discharge.
 
-\subsection{Node Identity}
+\subsubsection{Node Identity}
 \label{sec:fw_identity}
 
 Each node derives its 32-bit identifier deterministically from the factory-programmed
@@ -1771,10 +1836,10 @@ stays invariant across firmware updates and power cycles, peer devices and the
 duplicate cache can maintain consistent state without manual reconfiguration.
 
 
-\section{Application and Interface Layer}
+\subsection{Application and Interface Layer}
 \label{sec:fw_application}
 
-\subsection{AT Command Interface}
+\subsubsection{AT Command Interface}
 \label{sec:fw_at}
 
 The companion application communicates with each node through a Hayes-style AT command
@@ -1785,7 +1850,7 @@ executed successfully, while \texttt{+ERR=n} indicates failure, with the integer
 \texttt{n} identifying the specific error condition. Appendix~\ref{ch:appendix_at} lists the complete command set.
 
 
-\subsection{BLE-to-LoRa Pipeline}
+\subsubsection{BLE-to-LoRa Pipeline}
 \label{sec:fw_ble2lora}
 
 On the upstream path, \texttt{BLE2LoRaTask} on Core~1 blocks on \texttt{xBLERxQueue} and,
@@ -1800,7 +1865,7 @@ node-ID register and write their responses directly to \texttt{xBLETxQueue}.
 \img{images/at_sende2e_sequence_diagram_outline.png}{BLE-to-LoRa sequence diagram.}{0.75}{fw_ble2lora}
 
 \newpage
-\subsection{LoRa-to-BLE Pipeline}
+\subsubsection{LoRa-to-BLE Pipeline}
 \label{sec:fw_lora2ble}
 
 The downstream pipeline carries received mesh traffic to the smartphone
@@ -1821,10 +1886,10 @@ forwarded copy in the same pass through the state machine.
 
 \img{images/lora2ble_sequence_diagram_outline_v3.png}{LoRa-to-BLE sequence diagram.}{0.75}{fw_lora2ble}
 
-\section{Security Architecture}
+\subsection{Security Architecture}
 \label{sec:fw_security}
 
-\subsection{Encryption Model}
+\subsubsection{Encryption Model}
 \label{sec:fw_crypto}
 
 All encrypted payloads use AES-256-GCM as specified in NIST SP~800-38D~\cite{nist2007gcm}
@@ -1847,7 +1912,7 @@ mesh-wide shared key as a baseline confidentiality layer against passive
 radio observers. Unencrypted messaging (\texttt{k\_data\_plain}) is preserved to
 ensure interoperability when key provisioning has not been completed.
 
-\subsection{Nonce Construction and Replay Protection}
+\subsubsection{Nonce Construction and Replay Protection}
 \label{sec:fw_nonce}
 
 Nonce uniqueness is guaranteed by the \texttt{NonceManager} class. Each 96-bit nonce
@@ -1871,7 +1936,7 @@ greater than the recorded maximum, or falls within a backward window of 64 posit
 to accommodate legitimate out-of-order delivery. Counters falling below the window
 floor are unconditionally rejected as replays.
 
-\subsection{Key Management}
+\subsubsection{Key Management}
 \label{sec:fw_keymgmt}
 
 Key material is provisioned through two complementary mechanisms. The AT command
@@ -1886,14 +1951,14 @@ confirms the key via \texttt{AT+SETPEERKEY=}. All keys reside in volatile memory
 \texttt{AT+CLRKEYS} and any power cycle erase the entire key store, requiring
 re-provisioning on the next boot.
 
-\chapter{Mobile Application Development}
+\section{Mobile Application Development}
 \label{ch:mobileapp}
 
-\section{Application Objectives}
+\subsection{Application Objectives}
 
 Four principal objectives shaped the design of the application. First, it must establish and maintain a reliable BLE connection with the paired A3MESH node, transparently recovering from transient disconnections. Second, it must translate user actions---composing a message, opening a conversation, and managing contacts---into the AT commands defined by the firmware interface described in Section~\ref{sec:fw_at}, and dispatch incoming AT notifications to the relevant conversation. Third, it must manage the session cryptographic material required for end-to-end encryption, performing ECDH key exchange and daily network key derivation on behalf of the user without requiring any manual intervention. Fourth, it must persist all conversations and contact entries locally in a structured database so that message history remains accessible regardless of BLE connectivity status.
 
-\section{User Experience Design}
+\subsection{User Experience Design}
 
 The interaction model adopted for A3MESH deliberately mirrors the conventions of mainstream instant messaging applications, a design decision that flows directly from the accessibility requirement discussed in Section~\ref{subsec:req_accessibility}. Hence, users are presented with a conversation list on launch, from which they can open individual chat threads or initiate a new exchange. Within a thread, messages are rendered as asymmetric chat bubbles---outgoing messages aligned to the right with a filled blue background, and incoming messages aligned to the left with a neutral surface colour---a layout that reproduces the visual grammar established by widely adopted messaging platforms and is immediately recognisable without instruction.
 
@@ -1901,7 +1966,7 @@ The visual framework follows the Material Design~3 specification~\cite{google202
 
 The four-tab architecture maps cleanly to the user's mental model: the Chats tab addresses communication, the Contacts tab manages the address book, the Device tab surfaces connectivity status, and the Settings tab exposes the small subset of radio parameters and other aesthetic features that a user might legitimately wish to adjust.
 
-\section{Android Communication Architecture}
+\subsection{Android Communication Architecture}
 \label{sec:app_architecture}
 
 The application follows the Model--View--ViewModel (\acro{mvvm}) architectural pattern recommended by Google's Android Architecture Guidelines~\cite{google2024architecture}, in which UI components observe reactive data streams rather than pulling state imperatively. This choice was motivated by two properties of the BLE communication domain: incoming events arrive asynchronously on hardware callback threads, not on the Android main thread; and multiple UI components must react to the same events without being coupled to one another.
@@ -1928,7 +1993,7 @@ The third class is \emph{group keys}, 32-byte secrets generated by a group creat
 
 All keys are persisted in hexadecimal form through the \texttt{A3MeshKeyStore} class, which wraps \texttt{SharedPreferences}, and the full key set is re-provisioned to the firmware on every reconnection to survive firmware resets.
 
-\section{BLE Integration}
+\subsection{BLE Integration}
 
 The BLE communication layer is encapsulated in the \texttt{ConnectionManager} singleton, which owns the GATT connection lifecycle and serialises all operations through a \texttt{ConcurrentLinkedQueue}. This serialization is necessary because the Android BLE stack is not reentrant: issuing a second GATT operation before the callback for the previous one has fired results in silent failure. The queue ensures that only one operation---connect, read, write, MTU negotiation, or notification subscription---is in flight at any given time, and that the next operation is dequeued only after \texttt{signalEndOfOperation()} is called from the relevant GATT callback. Consumers register \texttt{ConnectionEventListener} instances, stored via \texttt{WeakReference} to avoid leaking Activity contexts, and receive callbacks for connection completion, disconnection, and characteristic changes.
 
@@ -1936,7 +2001,7 @@ Upon successful GATT connection, \texttt{MainActivity} requests a maximum transm
 
 Incoming notifications are dispatched in \texttt{MainActivity}'s \texttt{onCharacteristic\-Changed} callback according to a set of unsolicited response codes defined by the firmware AT interface. Each code triggers the corresponding handler in \texttt{BleViewModel}, which updates the Room database, posts the appropriate \texttt{LiveData} event, or initiates a key exchange, depending on the type of notification.
 
-\section{Messaging Interface}
+\subsection{Messaging Interface}
 
 The messaging interface is organised around two principal screens. \texttt{ChatsFragment} presents the conversation list as a \texttt{RecyclerView} powered by \texttt{ChatsAdapter}, which uses \texttt{DiffUtil} to compute item differences and animate insertions without redrawing the entire list. Each row displays the contact name or hexadecimal node address, the timestamp of the most recent message, and an unread message badge. A pinned entry at the top of the list represents the public broadcast channel, which is permanently visible. New conversations are initiated through a speed-dial floating action button that expands into three options: direct message to a specific node address, create a new group, and join an existing group.
 
@@ -1944,124 +2009,45 @@ The messaging interface is organised around two principal screens. \texttt{Chats
 
 Group management relies on QR-code-based key distribution implemented with the ZXing library~\cite{zxing2024}. When a user creates a group, the application generates a random 32-byte AES-256 group key, encodes it together with the 32-bit group identifier and group name into a compact string of the form \texttt{a3g:<groupId>:<keyHex>:<name>}, and renders this string as a QR code for distribution. Members wishing to join scan the code using ZXing's \texttt{ScanContract} Activity Result API, whereupon the application extracts the group key, provisions it to the firmware via \texttt{AT+SETGRPKEY}, and opens the corresponding group chat.
 
-\section{Contact and Node Management}
+\subsection{Contact and Node Management}
 
 The Contacts subsystem bridges two abstractions: the 32-bit integer LoRa node addresses used by the firmware and the human-readable names with which users identify their peers. \texttt{ContactsFragment} allows the user to assign a name to any node address, modify existing entries, and delete contacts. Contacts are resolved against message records at display time; if no contact entry exists for a given address, the application falls back to the raw hexadecimal representation (e.g., \texttt{0xAABBCCDD}).
 
 \texttt{DeviceFragment} provides visibility into the paired node's operational state. On connection, the application queries the node by issuing \texttt{AT+INFO?}, and the response is parsed and displayed. A separate \texttt{AT+NEIGHBORS?} query retrieves the current neighbour table, listing the identifiers, received signal strength, and last-heard timestamps of all nodes within direct radio range of the paired hardware. This list is also used proactively: on connection establishment and on each \texttt{+DISC=} notification, the application automatically initiates ECDH key exchange with newly discovered peers, so that end-to-end encrypted communication is available as soon as a neighbour enters range, without any user action.
 
-\section{Offline Interaction Model}
+\subsection{Offline Interaction Model}
 
 A deliberate consequence of the architectural choices described above is that the application remains functional in a meaningful sense even when no A3MESH node is paired. The Room database retains the full conversation history and contact book, which are accessible and browsable at all times. Attempting to send a message with no BLE device connected is detected at the \texttt{ConnectionManager} level and results in a Material alert dialog prompting the user to establish a connection before proceeding. This clear feedback, rather than silent failure, is consistent with the accessible design philosophy that underpins the platform.
 
 The foreground service ensures that BLE connectivity persists when the application moves to the background---a practical requirement in emergency scenarios where the device may be pocketed while the user is engaged in another activity. Should the BLE link be interrupted, the application displays an alert dialog on next resumption and the foreground service terminates itself cleanly.
 
-\section{Development Strategy}
+\subsection{Development Strategy}
 
-\subsection{Rapid Development Using Claude Code}
+\subsubsection{Rapid Development Using Claude Code}
 
 The mobile application was developed with the assistance of Claude Code, an AI-based programming tool produced by Anthropic, which served as an interactive development partner throughout the implementation phase. AI programming assistants of this class, built on large language models trained on extensive code corpora, are capable of generating, refactoring, and debugging code at the function and module level in response to natural-language specifications, significantly compressing the iteration cycle for routine implementation tasks~\cite{dakhel2023copilot}.
 
 In practice, the architectural skeleton of the application---the Room database schema, the ViewModel layer, the Navigation Component graph, and the RecyclerView adapter infrastructure---was generated across a small number of interactive sessions, where my main role was to act as an architect and reviewer rather than as typist. The cryptographic subsystem required closer collaboration: the key exchange protocol was specified at the algorithmic level and the resulting code was cross-checked line by line against the specifications of RFC~5869 and NIST~SP~800-56A. AI-generated cryptographic code demands particularly careful human review, because errors in key size, encoding convention, or error propagation can be syntactically valid yet semantically incorrect; every generated function in the \texttt{crypto/} package was independently verified before integration.
 
-\subsection{Cost and Time Optimization}
+\subsubsection{Cost and Time Optimization}
 
 The decision to delegate a substantial fraction of application development to AI-assisted tooling was driven by a resource allocation argument. The mobile application, while essential for the platform's usability, is not the primary research contribution of this thesis. Developing a full-featured Android application involves a significant investment of time in areas---lifecycle management, adapter diffing, theme attribute hierarchies---that are well-understood engineering problems with no research content. Delegating this work to an AI assistant allowed the total time spent on the application to remain proportionate to its role, without sacrificing the functional completeness required for integration testing and real-world validation.
 
-\subsection{Engineering Trade-Offs}
+\subsubsection{Engineering Trade-Offs}
 
 The use of AI-assisted development introduced specific trade-offs that should be acknowledged honestly. The initial code base was derived from an open-source BLE starter project~\cite{punchthroughble2024}, which was progressively transformed into the application described in this chapter. This layered approach occasionally produced architectural inconsistencies; a notable example is that \texttt{ChatActivity} initially used \texttt{by viewModels()} instead of \texttt{by activityViewModels()}, causing the connected-device LiveData to always appear null in that context. Such inconsistencies are characteristic of iterative AI-assisted development and were identified through systematic code review. They do not represent defects in the final delivered application, but they underscore that AI-generated code requires the same level of architectural scrutiny as any other code.
 
-\subsection{Focus Allocation Towards Core Research}
+\subsubsection{Focus Allocation Towards Core Research}
 
 The total development effort invested in the mobile application was approximately two weeks of part-time work, compared with the three months devoted to the simulation framework, the Smart Gossip algorithm, and the custom hardware design. This allocation reflects the primary objectives of the thesis. The application is sufficiently complete for its intended purpose: it enables real-world field testing of the full A3MESH platform, provides an accessible user interface that validates the accessibility requirement of Section~\ref{subsec:req_accessibility}, and demonstrates that the firmware AT interface is expressive enough to support a fully featured messaging application with end-to-end encryption. Future extensions, including iOS support, push notification integration, and message acknowledgement indicators, are deferred to future work.
 
-\chapter{Mechanical Integration}
-\label{ch:mechanical}
-
-\section{Design Objectives}
-\label{sec:design_objectives}
-
-The primary design objective was to create an accessory that the user would not need to consciously manage. Rather than requiring the user to remember to attach and detach the device, the goal was an "install once, forget it's there" experience: the board should become a permanent, unobtrusive extension of the phone rather than a separate object to keep track of.
-
-To achieve this, the \acro{pcba} was housed in a dedicated protective shell, conceptually similar to a small case of its own. This shell is then permanently bonded to the back of the phone's existing case using an adhesive layer, following the same attachment principle used by many "smart wallet" card holders available on the market. This approach removes the need for any manual connection or disconnection step, satisfying the core usability goal of the project.
-
-\section{Ergonomic Considerations}
-
-Building on the goal of making the accessory feel like a natural part of the phone, two main ergonomic decisions were made. First, all external edges of the enclosure were rounded, eliminating sharp corners and edges so that the device sits comfortably in the hand during normal phone use, in the same way that commercial phone cases avoid hard edges.
-
-Second, the enclosure was modelled to be 3D printed in a flexible, rubber-like plastic, matching the material commonly used in standard phone cases. This material choice provides a soft tactile feel consistent with the rest of the phone accessory, while also adding a degree of shock absorption to protect the \acro{pcba} inside.
-
-\section{Smartphone Integration}
-
-Several attachment strategies were evaluated before settling on the adhesive-mounted shell described in Section~\ref{sec:design_objectives}. One alternative considered was integrating a small dedicated pocket directly into the phone case, sized to hold the board internally. This approach would reduce the overall added thickness and improve comfort, but it was discarded because it is not scalable: a custom case would need to be designed and manufactured for every phone model, which is impractical for a general-purpose accessory.
-
-A second alternative considered was a MagSafe-style magnetic attachment. This option was ultimately rejected due to the risk of the magnets' electromagnetic field interfering with the radiofrequency signals handled by the board, which could compromise the device's wireless performance.
-
-Given these constraints, the adhesive-backed shell was selected as the final solution, as it offers a reasonable compromise between universality, ease of installation, and signal integrity.
-
-
-\section{3D Modelling Process}
-
-The enclosure was designed using Autodesk Fusion 360 as the primary \acro{cad} tool. To ensure the design would integrate correctly with a real device, a 3D model of a phone similar to the target unit was sourced online and used as a reference geometry throughout the modelling process, allowing the enclosure's dimensions and curvature to closely match the actual phone form factor.
-
-In parallel, the 3D model of the PCBA was exported directly from KiCad. This ensured that the internal cavity of the enclosure was dimensioned to match the real board geometry as closely as possible, avoiding the tolerance issues that can arise when modelling component placement from datasheets alone.
-
-
-\section{Enclosure Design}
-
-Figure~\ref{fig:enclosure_render} shows the final enclosure design housing the \acro{pcba}. The rounded edges, the rubber-like surface finish, and the discreet ventilation slots can be appreciated in the render, along with the engraved logo on the rear face. The bottom edge integrates the connector cutout required for charging and data access, keeping the silhouette as close as possible to that of a standard phone case.
-
-Additionally, two small elements made of a transparent material can be observed. These act as light diffusers for the red and green charging status \acro{led}s mounted on the \acro{pcba}: since the \acro{led}s themselves are fully enclosed within the opaque shell, these transparent inserts channel and scatter their light to the outer surface, allowing the user to clearly see the charging status indicators from outside the enclosure.
-
-\img{images/a3mesh_case_enclosure.png}{Final enclosure design housing the \acro{pcba}.}{0.7}{enclosure_render}
-
-\chapter{Development Methodology and Project Management}
-\label{ch:methodology}
-
-\section{Development Workflow}
-
-Development was structured around three interlocking tools: Scrum sprints for iteration cadence and supervisor alignment, Jira for task tracking and sprint planning, and Git for version control with branch names tied directly to Jira ticket identifiers.
-
-\section{Agile Methodology}
-
-A lightweight variant of the Scrum framework~\cite{schwaber2020scrum} was adopted for the duration of the project. Sprints of two weeks each provided the iteration unit. At the opening of each sprint, a planning meeting with the project supervisor was held to review the work completed in the preceding iteration, identify any deviations from the original plan, and select the tasks to be addressed in the forthcoming two weeks.
-
-The two-week cadence balanced feedback frequency against iteration overhead: shorter cycles would have imposed disproportionate planning cost given tasks such as \acro{pcb} fabrication, while longer cycles risked accumulating divergence from the supervisor's expectations before a correction could be applied. When a sprint's scope proved larger than anticipated, the subsequent sprint was adjusted to compensate rather than deferring indefinitely.
-
-\section{Sprint Planning with Jira}
-
-Each sprint's work items were recorded in a Jira project board maintained throughout the development period. Every discrete deliverable---a subsystem design, a firmware module, a simulation experiment, and a thesis chapter---was represented as a Jira issue assigned a unique ticket identifier of the form \texttt{TFG-\textit{N}}, where $N$ is a monotonically increasing integer.
-
-Tickets were grouped under six epics---\emph{Documentation}, \emph{Debugging and Testing}, \emph{FW Architecture}, \emph{HW Architecture}, \emph{System Architecture}, and \emph{Mobile SW}---one per major subsystem, allowing progress to be assessed at a subsystem granularity during planning meetings.
-
-This ticket-centric representation served two purposes beyond simple task tracking. First, it made the scope of each sprint explicit and negotiable at the planning meeting, preventing scope creep from being introduced informally between meetings. Second, and more importantly for day-to-day engineering, the ticket identifier was embedded directly in the version-control branch name, as described in the following section, creating a direct and auditable link between a Jira ticket and all the commits that contributed to resolving it.
-
-\section{Version Control with Git}
-
-The project used Git~\cite{chacon2014progit} for version control throughout its entire duration. The repository's branching strategy was designed around a single invariant: the \texttt{main} branch must always represent a compilable, functional state of the project. No commit was ever made directly to \texttt{main}; all development work was carried out on dedicated feature branches.
-
-Feature branches follow the naming convention \texttt{feature\_TFG-\textit{N}\_\textit{summary}}, where \textit{N} is the Jira ticket number and \textit{summary} is a concise, PascalCase description of the task. For example, the branch on which this chapter was drafted is \texttt{feature\_TFG-52\_Methodology}, and the branch that produced the hardware chapter was \texttt{feature\_TFG-48\_Hardware}. Moreover, the inclusion of the Jira ticket number in the branch name means that any line of the repository's \texttt{git log} can be traced back to the originating task without consulting external documentation.
-
-The integration workflow follows a deliberate sequence. When starting a new task, a feature branch is created from the current tip of \texttt{main}. All development commits are placed on that branch. Before integrating the completed work, the latest state of \texttt{main} is pulled into the feature branch to incorporate any changes that may have been merged by other branches during the development period, resolving any conflicts at this stage so that \texttt{main} itself is never the site of a conflict resolution.
-
-Figure~\ref{fig:git_workflow} illustrates this sequence as a branch diagram, showing the moment at which \texttt{main} is pulled into the feature branch before the final merge, thereby ensuring compatibility with any concurrent work that has already been integrated.
-
-\img{images/git_workflow.png}{Git branching workflow.}{0.8}{git_workflow}
-
-\section{Repository Organisation}
-
-The entire project is maintained within a single repository whose directory structure enforces the orthogonality of its constituent subsystems. The root of the repository contains the LaTeX source of this thesis alongside five subdirectories, each of which corresponds to one self-contained technical component, check out Appendix~\ref{ch:appendix_repos} for details.
-
-This monorepo organisation was chosen deliberately so that a complete snapshot of the project at any point in history---including the thesis text, the firmware, the hardware design, and the simulation code---is recoverable from a single commit hash. The orthogonality of the subdirectories ensures that changes to one subsystem do not generate noise in the diffs of another: a firmware commit touches only files under \texttt{tfg\_firmware/}, a thesis chapter commit touches only \texttt{tfe.tex} and \texttt{tfe.bib}, and the two are never conflated. This discipline also makes it straightforward to understand the scope of any given feature branch from its commit history alone.
-
-\chapter{Experimental Results and Evaluation}
+\section{Experimental Results and Evaluation}
 \label{ch:results}
 
-\section{Test Methodology}
+\subsection{Test Methodology}
 
 The experimental evaluation was structured around three independent test campaigns, each targeting a distinct performance dimension of the platform. The first campaign measured the maximum single-hop radio range under near-ideal propagation conditions. The second validated the mesh relay capability in an urban environment, confirming that multi-hop forwarding compensates for obstructions that sever direct links. The third characterised the operational battery lifetime of a fully assembled node under two contrasting usage profiles.
-\section{Range Evaluation}
+\subsection{Range Evaluation}
 
 The range test was conducted along Avinguda de Madrid in Òdena (Igualada, Barcelona), a quasi-linear road in the Pla de les Gavarreres area that provides an extended, largely unobstructed corridor suited to single-hop range characterisation. To approach the theoretical ceiling of the SX1276 transceiver, the radio was configured with spreading factor~12 and bandwidth~125~kHz (\acro{sf}12/\acro{bw}125), the most link-budget-efficient combination available, achieving a receiver sensitivity of~$-$148~dBm at the cost of reduced data rate.
 
@@ -2072,12 +2058,12 @@ Packet delivery remained reliable at 100\,\% \acro{pdr} up to approximately 1\,0
 \img{images/max_range.png}{Range test on Avinguda de Madrid, Òdena. Node~A is positioned beside the parked lorry in the foreground; the elevation profile inset confirms a largely continuous line of sight along the test corridor despite moderate road undulation.}{0.95}{max_range}
 
 \newpage
-\section{Mesh Relay Demonstration}
+\subsection{Mesh Relay Demonstration}
 \label{sec:results_relay}
 
 The mesh relay capability was validated through two urban deployment scenarios conducted in Vilanova del Camí. In each scenario, three nodes---referred to as Node~A, Node~B, and Node~C---were placed such that a direct radio link between Node~A and Node~C was obstructed, while Node~B maintained adequate signal margins to both endpoints.
 
-\subsection{Unobstructed-Street Scenario}
+\subsubsection{Unobstructed-Street Scenario}
 
 In the first scenario, the three nodes were placed at intervals of approximately~100~m along a straight street. Figure~\ref{fig:relay_clear} illustrates the placement.
 
@@ -2088,7 +2074,7 @@ In the first scenario, the three nodes were placed at intervals of approximately
 In order to make the result more evident, the \acro{sf} was reduced to its minimum value \acro{sf7} and the bandwidth was set to 250~kHz.
 Additionally, it was then verified through the application that the only neighboring node displayed for both Nodes~A and C was Node~B, confirming that communication between the two nodes was successfully established through the intermediate relay node.
 
-\subsection{Building-Obstruction Scenario}
+\subsubsection{Building-Obstruction Scenario}
 
 In the second scenario, each node was positioned on a different side of a different building block, such that no two nodes shared a direct line of sight, Figure~\ref{fig:obstructed_scenario} shows the arrangement.
 
@@ -2098,7 +2084,7 @@ In the second scenario, each node was positioned on a different side of a differ
 Despite the more challenging propagation geometry, the mesh successfully relayed messages but with a worse link quality than in the unobstructed-street scenario as expected.
 
 
-\section{Power Consumption Analysis}
+\subsection{Power Consumption Analysis}
 \label{sec:results_power}
 
 Battery lifetime was characterised under two usage profiles that bracket the expected operational range of the platform. In both tests, the node was fully charged to~4.20~V prior to the experiment and left to operate autonomously until the DW01A\,+\,FS8205A hardware protection circuit disconnected the cell at approximately~2.4~V. Battery state was sampled periodically via \texttt{AT+INFO?} to track the discharge curve reported by the firmware's look-up-table estimator.
@@ -2108,10 +2094,7 @@ Battery lifetime was characterised under two usage profiles that bracket the exp
 \paragraph{Active profile.} A second node was placed within direct radio range and one message was sent every~~s throughout the test, with the remote node responding to each. This traffic pattern kept the \acro{cpu} continuously at~240~MHz, preventing the \texttt{PowerManager} from entering the idle state. The node exhausted its battery after~[X]~hours~[X]~minutes, yielding an average current draw of approximately~[X]~mA. The ratio between idle and active lifetimes---a factor of approximately~[X]---demonstrates the practical benefit of the adaptive frequency-scaling strategy: even a modest periodic traffic load sustains the~240~MHz clock and noticeably reduces autonomy relative to the quiescent case.
 
 
-\part{Conclusions}
-\label{part:conclusions}
-
-\chapter{Conclusions and Future Work}
+\chapter{Conclusions}
 \label{ch:conclusions}
 
 \section{Achieved Objectives}
@@ -2136,7 +2119,7 @@ The simulation-first methodology proved indispensable. The five-parameter space 
 
 \acro{ai}-assisted development demonstrated clear but bounded value. The Android application's structural scaffolding---\acro{room} schema, \acro{mvvm} layer, Navigation graph, adapter infrastructure---was produced rapidly and correctly. Cryptographic code, however, required line-by-line human review: subtle errors in key size, nonce construction, or error propagation are syntactically valid yet semantically incorrect, and no tool reliably flags them. The lesson is that AI assistance is most effective as a force multiplier for well-understood engineering tasks, not as a substitute for domain expertise on security-critical code.
 
-\section{Future Improvements}
+\chapter{Future Work}
 
 Several directions for future work present themselves naturally from the limitations identified throughout this thesis.
 
@@ -2185,8 +2168,6 @@ hexadecimal characters (e.g.\ \texttt{0ab1c2d3}). Cryptographic keys are 32-byte
 
 \begin{table}[htbp]
     \centering
-    \caption{AT-command error codes.}
-    \label{tab:at_appendix_errors}
     \begin{tabular}{ll}
         \toprule
         \textbf{Code} & \textbf{Meaning} \\
@@ -2199,6 +2180,8 @@ hexadecimal characters (e.g.\ \texttt{0ab1c2d3}). Cryptographic keys are 32-byte
         \texttt{+ERR=6} & Key storage table full; no slot available for the new key. \\
         \bottomrule
     \end{tabular}
+    \caption{AT-command error codes.}
+    \label{tab:at_appendix_errors}
 \end{table}
 
 
@@ -2577,8 +2560,6 @@ the packet header. All notifications are terminated with
 
 \begin{table}[htbp]
     \centering
-    \caption{Unsolicited notifications issued by the firmware.}
-    \label{tab:at_notifications}
     \begin{tabular}{p{0.50\linewidth}p{0.44\linewidth}}
         \toprule
         \textbf{Notification format} & \textbf{Triggering event} \\
@@ -2595,6 +2576,8 @@ the packet header. All notifications are terminated with
         New neighbour discovered via a received discovery beacon. \\
         \bottomrule
     \end{tabular}
+    \caption{Unsolicited notifications issued by the firmware.}
+    \label{tab:at_notifications}
 \end{table}
 
 \chapter{PCB Schematics}
