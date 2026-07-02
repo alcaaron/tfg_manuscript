@@ -1547,6 +1547,7 @@ used in \texttt{src} and \texttt{node\_id}, in turn, is derived from the factory
 Bluetooth MAC address as described in Section~\ref{sec:fw_identity}.
 
 
+\newpage
 \subsection{Mesh Logic Layer}
 \label{sec:fw_mesh}
 
@@ -1797,6 +1798,8 @@ Transmission commands construct and serialise an \texttt{A3MESH\_packet\_t} (del
 encryption to \texttt{CryptoManager} when required) before posting it to
 \texttt{xLoRaTxQueue}; query commands read from the mesh manager, battery driver, or
 node-ID register and write their responses directly to \texttt{xBLETxQueue}.
+
+Figure~\ref{fig:fw_ble2lora} illustrates the sequence of events described above.
 
 
 \img{images/at_sende2e_sequence_diagram_outline.png}{BLE-to-LoRa sequence diagram.}{0.75}{fw_ble2lora}
@@ -2157,6 +2160,8 @@ A second line of improvement concerns the physical form factor. The current node
 On the software side, the companion application currently targets Android exclusively. Extending it to iOS would substantially broaden the platform's reach, particularly in emergency response communities in regions where iOS market share is high. The firmware \acro{at} interface is already platform-agnostic; the principal effort would be the reimplementation of the \acro{ble} communication layer and the cryptographic subsystem using the iOS Core Bluetooth and CommonCrypto frameworks, which offer comparable capabilities to their Android counterparts. A shared cross-platform logic layer implemented in Kotlin Multiplatform or similar technology could reduce the duplication of business logic between the two applications.
 
 Finally, the Smart Gossip parameters are currently fixed constants compiled into the firmware. A natural evolution would be an online adaptation mechanism that adjusts $\beta$ and $p_{\text{floor}}$ at runtime in response to observed network conditions---raising the density weight when the neighbour count grows and relaxing the floor when the duplicate rate indicates good coverage. Such closed-loop adaptation would remove the need for pre-optimised parameters altogether and make the algorithm self-tuning across the full range of network densities, including the small-network regime where the current static parameterisation underperforms managed flooding.
+
+A further extension of considerable practical value would be the introduction of an internet gateway role for nodes that happen to have connectivity---through Wi-Fi, Ethernet, or mobile data---at a given moment. In the current design every node is equal; a gateway-capable node would act as a transparent bridge between the LoRa mesh and the wider internet, relaying outbound messages to an \acro{mqtt} broker, a \acro{rest} \acro{api}, or a cloud service, and injecting inbound messages from those services back into the mesh. This bidirectional bridge opens several immediately practical scenarios: \acro{ntp}-based time synchronisation distributed across the mesh without each node requiring its own internet link; distribution of firmware configuration updates or new group encryption keys without physical access to individual units; and outbound emergency notifications---triggered by an \acro{sos} event, a low-battery alert, or an attached sensor threshold---delivered as push notifications or e-mail to registered contacts even when the originating node has no direct connectivity. When nodes carry environmental sensors, the gateway could additionally forward periodic telemetry---temperature, humidity, air quality, or network statistics such as \acro{rssi}, \acro{snr}, and \acro{pdr}---to platforms such as Grafana or Home Assistant, enabling remote monitoring and long-term performance analysis of geographically dispersed deployments. The gateway role could be implemented as a compile-time configuration option that activates an additional FreeRTOS task alongside the existing LoRa and \acro{ble} tasks, requiring no changes to the core firmware architecture and leaving unmodified nodes fully interoperable with gateway-enabled ones.
 
 \printbibliography
 
