@@ -12,9 +12,6 @@
 *.toc
 *.xmpi
 
-# PDF generado (no versionar durante desarrollo)
-*.pdf
-
 # Editor / SO
 *.swp
 *.swo
