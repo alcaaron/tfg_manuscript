@@ -1,15 +1,20 @@
 [submodule "MeshtasticatorMeshAlgoComp"]
 	path = MeshtasticatorMeshAlgoComp
 	url = https://github.com/alcaaron/MeshtasticatorMeshAlgoComp.git
+	branch = routing_exp
 [submodule "tfg_firmware"]
 	path = tfg_firmware
 	url = https://github.com/alcaaron/tfg_firmware.git
+	branch = main
 [submodule "tfg_hardware"]
 	path = tfg_hardware
 	url = https://github.com/alcaaron/tfg_hardware.git
+	branch = main
 [submodule "tfg_software"]
 	path = tfg_software
 	url = https://github.com/alcaaron/tfg_software.git
+	branch = main
 [submodule "tfg_3d"]
 	path = tfg_3d
 	url = https://github.com/alcaaron/tfg_3d.git
+	branch = main
