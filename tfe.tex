@@ -138,10 +138,11 @@ In a mesh network, the participating devices---\emph{nodes}---cooperate as peers
 
 Depending on the routing discipline, packet relaying may rely on deterministic routing tables, probabilistic forwarding, flooding, or adaptive strategies. Each has its own trade-off, but the fundamental tension is the same throughout the mesh literature: increasing the number of nodes should improve connectivity, yet every additional relay competes for the same shared channel. Redundant retransmissions therefore inflate congestion, collisions, and energy consumption, and this effect is particularly pronounced in low-power wireless systems whose battery and bandwidth budgets are tight~\cite{ad_hoc_networks}. Additional difficulties include topology instability under mobility and the greater coordination overhead of decentralized systems.
 
-Centralized architectures avoid these issues at the price of a single point of failure and a permanent dependency on operator infrastructure. Mesh networks trade some of that simplicity and global optimality for resilience and infrastructure independence, and this trade-off is precisely what motivates their use in disaster-recovery, remote-area, and temporary-deployment scenarios.
+Centralized architectures avoid these issues at the price of a single point of failure and a permanent dependency on operator infrastructure. Mesh networks trade some of that simplicity and global optimality for resilience and infrastructure independence.
 
-\img{images/net_topology_vs.png}{Centralized star topology, decentralized mesh topology, and point-to-point link.}{0.6}{mesh_vs_centralized}
+\img{images/net_topology_vs.png}{Centralized star topology, decentralized mesh topology, and point-to-point link.}{0.5}{mesh_vs_centralized}
 
+\newpage
 \section{LoRa and LPWAN Technologies}
 \label{sec:lora-lpwan}
 
@@ -238,6 +239,8 @@ the following chapters.
 
 \begin{table}
   \centering
+  \caption{Comparison of wireless technologies for \acro{iot} and off-grid deployments. LoRa uniquely combines kilometre-scale range, low power, and operator-independent operation~\cite{mekki2019comparative,raza2017lpwan}.}
+  \label{tab:lpwan_comparison}
   \begin{tabular}{lllll}
     \toprule
     \emph{Technology} & \emph{Range} & \emph{Data rate} & \emph{Power} & \emph{Infrastructure} \\
@@ -250,8 +253,6 @@ the following chapters.
     \acro{ble} & $<$100~m    & 1--2~Mbps      & Very low & None \\
     \bottomrule
   \end{tabular}
-  \caption{Comparison of wireless technologies for \acro{iot} and off-grid deployments. LoRa uniquely combines kilometre-scale range, low power, and operator-independent operation~\cite{mekki2019comparative,raza2017lpwan}.}
-  \label{tab:lpwan_comparison}
 \end{table}
 
 \section{Bluetooth Low Energy}
@@ -499,11 +500,7 @@ Figure~\ref{fig:jira_plan} shows a snapshot of the Jira timeline view, illustrat
 
 \subsection{Version Control with Git}
 
-The project used Git~\cite{chacon2014progit} for version control throughout its entire duration. The repository's branching strategy was designed around a single invariant: the \texttt{main} branch must always represent a compilable, functional state of the project. No commit was ever made directly to \texttt{main}; all development work was carried out on dedicated feature branches.
-
-Feature branches follow the naming convention \texttt{feature\_TFG-\textit{N}\_\textit{summary}}, where \textit{N} is the Jira ticket number and \textit{summary} is a concise, PascalCase description of the task. For example, the branch on which this chapter was drafted is \texttt{feature\_TFG-52\_Methodology}, and the branch that produced the hardware chapter was \texttt{feature\_TFG-48\_Hardware}. Moreover, the inclusion of the Jira ticket number in the branch name means that any line of the repository's \texttt{git log} can be traced back to the originating task without consulting external documentation.
-
-The integration workflow follows a deliberate sequence. When starting a new task, a feature branch is created from the current tip of \texttt{main}. All development commits are placed on that branch. Before integrating the completed work, the latest state of \texttt{main} is pulled into the feature branch to incorporate any changes that may have been merged by other branches during the development period, resolving any conflicts at this stage so that \texttt{main} itself is never the site of a conflict resolution.
+Git~\cite{chacon2014progit} was used as the version control system, structured around a central invariant: the \texttt{main} branch must always represent a compilable, functional state of the project. To preserve this, no commits were made directly to \texttt{main}; instead, all development was carried out on dedicated feature branches, named following the convention \texttt{feature\_TFG-\textit{N}\_\textit{summary}}, where \textit{N} is the Jira ticket number and \textit{summary} is a concise, PascalCase description of the task. Including the ticket number in the branch name allows any line of the \texttt{git log} to be traced back to its originating task without consulting external documentation. The integration workflow follows a deliberate sequence: a feature branch is created from the current tip of \texttt{main}, all development commits are made on that branch, and before integrating the work, the latest state of \texttt{main} is pulled into the feature branch so that any conflicts are resolved there, ensuring \texttt{main} itself is never the site of conflict resolution.
 
 Figure~\ref{fig:git_workflow} illustrates this sequence as a branch diagram, showing the moment at which \texttt{main} is pulled into the feature branch before the final merge, thereby ensuring compatibility with any concurrent work that has already been integrated.
 
@@ -511,9 +508,9 @@ Figure~\ref{fig:git_workflow} illustrates this sequence as a branch diagram, sho
 
 \subsection{Repository Organisation}
 
-The entire project is maintained within a single repository whose directory structure enforces the orthogonality of its constituent subsystems. The root of the repository contains the LaTeX source of this thesis alongside five subdirectories, each of which corresponds to one self-contained technical component, check out Appendix~\ref{ch:appendix_repos} for details.
+The entire project is maintained within a single repository whose directory structure enforces the orthogonality of its constituent subsystems. The root of the repository contains the LaTeX source of this thesis alongside five subdirectories, each of which corresponds to one self-contained technical component, as detailed in Appendix~\ref{ch:appendix_repos}.
 
-This monorepo organisation was chosen deliberately so that a complete snapshot of the project at any point in history---including the thesis text, the firmware, the hardware design, and the simulation code---is recoverable from a single commit hash. The orthogonality of the subdirectories ensures that changes to one subsystem do not generate noise in the diffs of another: a firmware commit touches only files under \texttt{tfg\_firmware/}, a thesis chapter commit touches only \texttt{tfe.tex} and \texttt{tfe.bib}, and the two are never conflated. This discipline also makes it straightforward to understand the scope of any given feature branch from its commit history alone.
+This monorepo organisation was chosen deliberately so that a complete snapshot of the project at any point in history---including the thesis text, the firmware, the hardware design, and the simulation code---is recoverable from a single commit hash. The orthogonality of the subdirectories ensures that changes to one subsystem do not generate noise in the diffs of another.
 % ---
 
 % =============================================================================
@@ -700,6 +697,8 @@ The final evaluation campaign compared Smart Gossip, with the optimized paramete
  
 \begin{table}[htbp]
     \centering
+    \caption{Reachability (\%), mean $\pm$ standard deviation over 30 repetitions.}
+    \label{tab:res_reach}
     \begin{tabular}{rcccc}
         \toprule
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
@@ -710,13 +709,12 @@ The final evaluation campaign compared Smart Gossip, with the optimized paramete
         50 & $29.3 \pm 4.1$  & $33.8 \pm 3.0$  & $-4.5$ pp  & $-13.4\%$ \\
         \bottomrule
     \end{tabular}
-    \caption{Reachability (\%), mean $\pm$ standard deviation over 30 repetitions.}
-    \label{tab:res_reach}
 \end{table}
  
 \begin{table}[htbp]
     \centering
-
+    \caption{Collision rate (\%), mean $\pm$ standard deviation over 30 repetitions.}
+    \label{tab:res_col}
     \begin{tabular}{rcccc}
         \toprule
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
@@ -727,12 +725,12 @@ The final evaluation campaign compared Smart Gossip, with the optimized paramete
         50 & $20.6 \pm 2.4$ & $19.1 \pm 2.3$ & $+1.5$ pp & $+7.9\%$ \\
         \bottomrule
     \end{tabular}
-    \caption{Collision rate (\%), mean $\pm$ standard deviation over 30 repetitions.}
-    \label{tab:res_col}
 \end{table}
  
 \begin{table}[htbp]
     \centering
+    \caption{Usefulness (\%), mean $\pm$ standard deviation over 30 repetitions.}
+    \label{tab:res_useful}
     \begin{tabular}{rcccc}
         \toprule
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
@@ -743,12 +741,12 @@ The final evaluation campaign compared Smart Gossip, with the optimized paramete
         50 & $49.9 \pm 2.3$ & $45.2 \pm 2.4$ & $+4.8$ pp & $+10.6\%$ \\
         \bottomrule
     \end{tabular}
-    \caption{Usefulness (\%), mean $\pm$ standard deviation over 30 repetitions.}
-    \label{tab:res_useful}
 \end{table}
  
 \begin{table}[htbp]
     \centering
+    \caption{Per-node transmission air utilization (ms), mean $\pm$ standard deviation over 30 repetitions.}
+    \label{tab:res_txair}
     \begin{tabular}{rcccc}
         \toprule
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
@@ -759,12 +757,12 @@ The final evaluation campaign compared Smart Gossip, with the optimized paramete
         50 & $79\,802 \pm 2\,479$ & $109\,958 \pm 7\,701$ & $-30\,156$ & $-27.4\%$ \\
         \bottomrule
     \end{tabular}
-    \caption{Per-node transmission air utilization (ms), mean $\pm$ standard deviation over 30 repetitions.}
-    \label{tab:res_txair}
 \end{table}
  
 \begin{table}[htbp]
     \centering
+    \caption{Average end-to-end delay (ms), mean $\pm$ standard deviation over 30 repetitions.}
+    \label{tab:res_delay}
     \begin{tabular}{rcccc}
         \toprule
         Nodes & Smart Gossip & Managed Flood & $\Delta$ abs. & $\Delta$ rel. \\
@@ -775,8 +773,6 @@ The final evaluation campaign compared Smart Gossip, with the optimized paramete
         50 & $27\,112 \pm 16\,709$ & $160\,440 \pm 50\,484$  & $-133\,328$  & $-83.1\%$ \\
         \bottomrule
     \end{tabular}
-    \caption{Average end-to-end delay (ms), mean $\pm$ standard deviation over 30 repetitions.}
-    \label{tab:res_delay}
 \end{table}
 
 \begin{figure}[htbp]
@@ -839,6 +835,8 @@ The weighting differs slightly from the optimization fitness of Equation~\eqref{
  
 \begin{table}[htbp]
     \centering
+    \caption{Composite score (Equation~\eqref{eq:composite}) per network size.}
+    \label{tab:res_score}
     \begin{tabular}{rcccc}
         \toprule
         Nodes & Smart Gossip & Managed Flood & Winner & Margin \\
@@ -849,8 +847,6 @@ The weighting differs slightly from the optimization fitness of Equation~\eqref{
         50 & \textbf{12.65} & 8.28  & SG & $+4.38$ \\
         \bottomrule
     \end{tabular}
-    \caption{Composite score (Equation~\eqref{eq:composite}) per network size.}
-    \label{tab:res_score}
 \end{table}
  
 In summary, the simulations demonstrate that Smart Gossip delivers comparable information dissemination at a 27--32\% lower channel and energy cost, while avoiding the congestion collapse that renders flooding-based forwarding unusable---delays beyond a minute---at the network sizes the system is designed to scale to.
@@ -862,6 +858,8 @@ Table~\ref{tab:sg_params} lists the parameter values produced by the optimizatio
  
 \begin{table}[htbp]
     \centering
+    \caption{Optimized Smart Gossip parameters, search ranges, and physical interpretation.}
+    \label{tab:sg_params}
     \begin{tabular}{llccl}
         \toprule
         Parameter & Symbol & Value & Search range & Interpretation \\
@@ -873,8 +871,6 @@ Table~\ref{tab:sg_params} lists the parameter values produced by the optimizatio
         Probability floor      & $p_{\text{floor}}$ & $0.111$ & $[0.10,\,0.40]$ & guaranteed minimum relay probability \\
         \bottomrule
     \end{tabular}
-    \caption{Optimized Smart Gossip parameters, search ranges, and physical interpretation.}
-    \label{tab:sg_params}
 \end{table}
  
 Each value admits a coherent physical reading, which lends confidence that the optimizer converged to a meaningful operating point rather than a noise artifact. The inflection point of $-103.8$~dBm places the center of the \acro{rssi} transition at roughly 600--800~m under the simulated propagation model---comfortably inside coverage, so that only genuinely close receivers are suppressed. The steepness $\alpha = 0.145$ spreads the transition over approximately 28~dB, wide enough to absorb shadowing fluctuations. The density weight $\beta = 0.146$ halves the forwarding probability at around 7 neighbors, bounding the expected relay count per neighborhood near $1/\beta \approx 7$ for very dense regions. The duplicate penalty $\gamma = 0.311$ attenuates each additional overheard copy by roughly 27\%, and the floor of $p_{\text{floor}} = 0.111$ guarantees that even maximally suppressed nodes relay about one packet in nine. Notably, the optimizer drove both $\beta$ toward the top of its search range and $p_{\text{floor}}$ toward the bottom, confirming that in the evaluated regime the dominant lever is aggressive density-based suppression.
@@ -1355,6 +1351,8 @@ processing, and power management (Table~\ref{tab:fw_tasks}).
 
 \begin{table}[htbp]
     \centering
+    \caption{FreeRTOS task inventory.}
+    \label{tab:fw_tasks}
     \begin{tabular}{llll}
         \toprule
         \textbf{Task} & \textbf{Core} & \textbf{Prio} & \textbf{Role} \\
@@ -1369,8 +1367,6 @@ processing, and power management (Table~\ref{tab:fw_tasks}).
         \texttt{vPowerTask}          & 1 & 1 & Adaptive CPU frequency scaling \\
         \bottomrule
     \end{tabular}
-    \caption{FreeRTOS task inventory.}
-    \label{tab:fw_tasks}
 \end{table}
 
 Four queues provide all inter-layer communication:
@@ -1483,6 +1479,8 @@ The header carries a one-byte protocol version, a one-byte frame type
 
 \begin{table}[htbp]
     \centering
+    \caption{Fields of the \texttt{A3MESH\_header\_t} wire structure.}
+    \label{tab:fw_header_fields}
     \begin{tabular}{llp{7cm}}
         \toprule
         \textbf{Field} & \textbf{Size} & \textbf{Description} \\
@@ -1492,8 +1490,6 @@ The header carries a one-byte protocol version, a one-byte frame type
         \texttt{packet\_length} & 2\,B & Length in bytes of the following \texttt{A3MESH\_packet\_t}. \\
         \bottomrule
     \end{tabular}
-    \caption{Fields of the \texttt{A3MESH\_header\_t} wire structure.}
-    \label{tab:fw_header_fields}
 \end{table}
 
 While the packet structure itself is declared \texttt{\_\_attribute\_\_((packed))} to match the
@@ -1501,6 +1497,8 @@ on-wire layout exactly. Regarding to its fields are listed in Table~\ref{tab:fw_
 
 \begin{table}[htbp]
     \centering
+    \caption{Fields of the \texttt{A3MESH\_packet\_t} wire structure.}
+    \label{tab:fw_packet_fields}
     \begin{tabular}{llp{7cm}}
         \toprule
         \textbf{Field} & \textbf{Size} & \textbf{Description} \\
@@ -1517,8 +1515,6 @@ on-wire layout exactly. Regarding to its fields are listed in Table~\ref{tab:fw_
         \texttt{payload}      & N\,B & Application data or ciphertext, up to \texttt{A3MESH\_MAX\_PAYLOAD} bytes. \\
         \bottomrule
     \end{tabular}
-    \caption{Fields of the \texttt{A3MESH\_packet\_t} wire structure.}
-    \label{tab:fw_packet_fields}
 \end{table}
 
 The four frame types defined by \texttt{a3mesh\_msg\_type\_t} are:
@@ -1547,7 +1543,6 @@ used in \texttt{src} and \texttt{node\_id}, in turn, is derived from the factory
 Bluetooth MAC address as described in Section~\ref{sec:fw_identity}.
 
 
-\newpage
 \subsection{Mesh Logic Layer}
 \label{sec:fw_mesh}
 
@@ -1562,6 +1557,8 @@ The states are summarised in Table~\ref{tab:fw_states}.
 
 \begin{table}[htbp]
     \centering
+    \caption{\texttt{MeshRxState} states and their actions.}
+    \label{tab:fw_states}
     \begin{tabular}{lp{9.5cm}}
         \toprule
         \textbf{State} & \textbf{Action} \\
@@ -1578,8 +1575,6 @@ The states are summarised in Table~\ref{tab:fw_states}.
         \texttt{k\_rx\_done}              & Release pool slot; return to \texttt{k\_rx\_idle}. \\
         \bottomrule
     \end{tabular}
-    \caption{\texttt{MeshRxState} states and their actions.}
-    \label{tab:fw_states}
 \end{table}
 
 \img{images/mesh_rx_state_machine.png}{Reception state machine diagram.}{1}{fw_rx_sm}
@@ -1971,10 +1966,10 @@ This approach compressed the total application effort to roughly two weeks of pa
 
 \subsection{Test Methodology}
 
-The experimental evaluation was structured around three independent test campaigns, each targeting a distinct performance dimension of the platform. The first campaign measured the maximum single-hop radio range under near-ideal propagation conditions. The second validated the mesh relay capability in an urban environment, confirming that multi-hop forwarding compensates for obstructions that sever direct links. The third characterised the operational battery lifetime of a fully assembled node under two contrasting usage profiles.
+The experimental evaluation was structured around three independent test campaigns, each targeting a distinct performance dimension of the platform. The first campaign measured the maximum single-hop radio range under near-ideal propagation conditions. The second validated the mesh relay capability in an urban environment, confirming that multi-hop forwarding compensates for obstructions that sever direct links. The third characterised the operational battery lifetime of a fully assembled node.
 \subsection{Range Evaluation}
 
-The range test was conducted along Avinguda de Madrid in Òdena (Igualada, Barcelona), a quasi-linear road in the Pla de les Gavarreres area that provides an extended, largely unobstructed corridor suited to single-hop range characterisation. To approach the theoretical ceiling of the SX1276 transceiver, the radio was configured with spreading factor~12 and bandwidth~125~kHz (\acro{sf}12/\acro{bw}125), the most link-budget-efficient combination available, achieving a receiver sensitivity of~$-$148~dBm at the cost of reduced data rate.
+The range test was conducted along Avinguda de Madrid in Òdena (Igualada, Barcelona), a quasi-linear road in the Pla de les Gavarreres area that provides an extended, largely unobstructed corridor suited to single-hop range characterisation. To approach the theoretical ceiling of the SX1276 transceiver, the radio was configured with spreading factor~12 and bandwidth~125~kHz (\acro{sf}12/\acro{bw}125), the most link-budget-efficient combination available, achieving a receiver sensitivity of~$-$138~dBm at the cost of reduced data rate.
 
 Node~A was stationed at a fixed reference point beside a parked lorry, as shown in Figure~\ref{fig:max_range}. Node~B was then carried progressively further along the road while receiving periodic packets from Node~A. Despite a moderate undulation along the corridor---visible in the elevation profile inset of Figure~\ref{fig:max_range}---a continuous line of sight was maintained throughout the test, making the experiment representative of open-terrain propagation conditions.
 
@@ -2008,21 +2003,17 @@ In the second scenario, each node was positioned on a different side of a differ
 
 Despite the more challenging propagation geometry, the mesh successfully relayed messages but with a worse link quality than in the unobstructed-street scenario as expected.
 
-
+\newpage
 \subsection{Power Consumption Analysis}
 \label{sec:results_power}
 
-Battery lifetime was characterised under two usage profiles that bracket the expected operational range of the platform. In both tests, the node was fully charged to~4.20~V prior to the experiment and left to operate autonomously until the DW01A\,+\,FS8205A hardware protection circuit disconnected the cell at approximately~2.4~V. Battery state was sampled periodically via \texttt{AT+INFO?} to track the discharge curve reported by the firmware's look-up-table estimator.
+The node was fully charged to~4.20~V prior to the experiment and left to operate autonomously until the DW01A\,+\,FS8205A hardware protection circuit disconnected the cell at approximately~2.4~V. Battery state was sampled periodically via \texttt{AT+INFO?} to track the discharge curve reported by the firmware's look-up-table estimator. It is relevant to mention that the battery used for this experiment was not a new cell, but rather a recycled one, thus the final amount of hours of operation would increase with a new cell. 
 
-\paragraph{Idle profile.} The node remained powered on with the \acro{ble} interface active and paired to the companion application, but no messages were sent and no user interaction took place. The node continued to transmit the neighbour-discovery beacon every~30~s as described in Chapter~\ref{ch:firmware}. The \texttt{PowerManager} task reduced the \acro{cpu} clock from~240~MHz to~80~MHz after the configured 10-minute inactivity timeout, as confirmed by the absence of \texttt{notify\_activity()} calls during the quiescent period. The node remained operational for~[X]~hours~[X]~minutes.
-
-\paragraph{Active profile.} A second node was placed within direct radio range and one message was sent every~~s throughout the test, with the remote node responding to each. This traffic pattern kept the \acro{cpu} continuously at~240~MHz, preventing the \texttt{PowerManager} from entering the idle state. The node exhausted its battery after~[X]~hours~[X]~minutes, yielding an average current draw of approximately~[X]~mA. The ratio between idle and active lifetimes---a factor of approximately~[X]---demonstrates the practical benefit of the adaptive frequency-scaling strategy: even a modest periodic traffic load sustains the~240~MHz clock and noticeably reduces autonomy relative to the quiescent case.
-
-
+The node remained powered on with the \acro{ble} interface active and paired to the companion application, but no messages were sent and no user interaction took place. The node continued to transmit the neighbour-discovery beacon every~30~s as described in Chapter~\ref{ch:firmware}. The \texttt{PowerManager} task reduced the \acro{cpu} clock from~240~MHz to~80~MHz after the configured 10-minute inactivity timeout, as confirmed by the absence of \texttt{notify\_activity()} calls during the quiescent period. The node remained operational for~\emph{15~hours}.
 \chapter{Economic Study}
 \label{ch:costs}
 
-This chapter presents the economic dimension of the project. It is divided in three sections: the labour cost associated with the engineering effort, the bill-of-materials cost of a single prototype unit, and the resulting total project cost. All figures are expressed in euros (EUR) and correspond to prices observed during 2025--2026 for hobbyist-quantity purchases through the distributors listed in Appendix~\ref{ch:appendix_bom}. Volume production economics and non-recurring engineering amortisation are deliberately excluded, as the platform is presented as a research prototype rather than as a commercial product.
+This chapter presents the economic dimension of the project. It is divided in three sections: the labour cost associated with the engineering effort, the bill-of-materials cost of a single prototype unit, and the resulting total project cost. All figures are expressed in euros (EUR) and correspond to prices observed during 2025--2026 through the distributors listed in Appendix~\ref{ch:appendix_bom}. Volume production economics and non-recurring engineering amortisation are deliberately excluded, as the platform is presented as a research prototype rather than as a commercial product.
 
 \section{Labour Cost}
 \label{sec:cost_labour}
@@ -2033,6 +2024,8 @@ Total effort was estimated from the Jira ticket record described in Section~\ref
 
 \begin{table}[htbp]
     \centering
+    \caption{Engineering effort distribution and derived labour cost at 17~EUR/hour.}
+    \label{tab:cost_hours}
     \begin{tabular}{lrr}
         \toprule
         \textbf{Activity} & \textbf{Hours} & \textbf{Cost (EUR)} \\
@@ -2049,8 +2042,6 @@ Total effort was estimated from the Jira ticket record described in Section~\ref
         \textbf{Total} & \textbf{600} & \textbf{10\,200} \\
         \bottomrule
     \end{tabular}
-    \caption{Engineering effort distribution and derived labour cost at 17~EUR/hour.}
-    \label{tab:cost_hours}
 \end{table}
 
 The total engineering effort amounts to approximately 600~hours, consistent with the 24~\acro{ects} workload of a bachelor thesis at 25~hours per credit. The resulting labour cost is~10\,200~EUR.
@@ -2058,10 +2049,13 @@ The total engineering effort amounts to approximately 600~hours, consistent with
 \section{Materials Cost per Unit}
 \label{sec:cost_materials}
 
-Table~\ref{tab:cost_bom} details the material cost of a single assembled A3MESH node, following the bill of materials given in Appendix~\ref{ch:appendix_bom}. Unit prices correspond to hobbyist-quantity orders through LCSC for the components sourced by JLCPCB, and to AliExpress or Amazon for the two items marked in Appendix~\ref{ch:appendix_bom} as separately procured.
+Table~\ref{tab:cost_bom} details the material cost of a single assembled A3MESH node, following the bill of materials given in Appendix~\ref{ch:appendix_bom}. Unit prices correspond to small orders through LCSC for the components sourced by JLCPCB, and to AliExpress or Amazon for the two items marked in Appendix~\ref{ch:appendix_bom} as separately procured.
 
 \begin{table}[htbp]
     \centering
+    \caption{Bill-of-materials cost of a single assembled node in hobbyist quantities.
+    Lines marked \textsuperscript{\dag} are sourced outside the JLCPCB order and priced as estimates.}
+    \label{tab:cost_bom}
     \begin{tabular}{lrrr}
         \toprule
         \textbf{Item} & \textbf{Qty} & \textbf{Unit (EUR)} & \textbf{Ext. (EUR)} \\
@@ -2095,9 +2089,6 @@ Table~\ref{tab:cost_bom} details the material cost of a single assembled A3MESH 
         \textbf{Total per unit} & & & \textbf{24.78} \\
         \bottomrule
     \end{tabular}
-    \caption{Bill-of-materials cost of a single assembled node in hobbyist quantities.
-    Lines marked \textsuperscript{\dag} are sourced outside the JLCPCB order and priced as estimates.}
-    \label{tab:cost_bom}
 \end{table}
 
 The resulting per-unit cost is approximately~25~EUR. The dominant contributions are the RFM95W LoRa module, the JLCPCB assembly service, and the battery, which together account for over half of the total. Sourcing the LoRa module in volume, or replacing it with a bare SX1276 chip integrated on the same board, would reduce this figure meaningfully.
@@ -2109,6 +2100,8 @@ Combining the labour cost of Section~\ref{sec:cost_labour} with the material cos
 
 \begin{table}[htbp]
     \centering
+    \caption{Aggregate project cost, including engineering effort and prototype hardware.}
+    \label{tab:cost_total}
     \begin{tabular}{lr}
         \toprule
         \textbf{Concept} & \textbf{Cost (EUR)} \\
@@ -2119,8 +2112,6 @@ Combining the labour cost of Section~\ref{sec:cost_labour} with the material cos
         \textbf{Total project cost} & \textbf{10\,325.00} \\
         \bottomrule
     \end{tabular}
-    \caption{Aggregate project cost, including engineering effort and prototype hardware.}
-    \label{tab:cost_total}
 \end{table}
 
 Engineering effort dominates the balance by two orders of magnitude, as is typical for research prototypes: the recurring cost of an additional unit is approximately~25~EUR, whereas the human cost of developing the platform in the first place is close to~10\,200~EUR. From a productisation standpoint, this ratio implies that the platform becomes economically interesting only if the engineering investment is amortised over a production volume in the low thousands of units.
@@ -2159,9 +2150,9 @@ A second line of improvement concerns the physical form factor. The current node
 
 On the software side, the companion application currently targets Android exclusively. Extending it to iOS would substantially broaden the platform's reach, particularly in emergency response communities in regions where iOS market share is high. The firmware \acro{at} interface is already platform-agnostic; the principal effort would be the reimplementation of the \acro{ble} communication layer and the cryptographic subsystem using the iOS Core Bluetooth and CommonCrypto frameworks, which offer comparable capabilities to their Android counterparts. A shared cross-platform logic layer implemented in Kotlin Multiplatform or similar technology could reduce the duplication of business logic between the two applications.
 
-Finally, the Smart Gossip parameters are currently fixed constants compiled into the firmware. A natural evolution would be an online adaptation mechanism that adjusts $\beta$ and $p_{\text{floor}}$ at runtime in response to observed network conditions---raising the density weight when the neighbour count grows and relaxing the floor when the duplicate rate indicates good coverage. Such closed-loop adaptation would remove the need for pre-optimised parameters altogether and make the algorithm self-tuning across the full range of network densities, including the small-network regime where the current static parameterisation underperforms managed flooding.
+Furthermore, the Smart Gossip parameters are currently fixed constants compiled into the firmware. A natural evolution would be an online adaptation mechanism that adjusts $\beta$ and $p_{\text{floor}}$ at runtime in response to observed network conditions---raising the density weight when the neighbour count grows and relaxing the floor when the duplicate rate indicates good coverage. Such closed-loop adaptation would remove the need for pre-optimised parameters altogether and make the algorithm self-tuning across the full range of network densities, including the small-network regime where the current static parameterisation underperforms managed flooding.
 
-A further extension of considerable practical value would be the introduction of an internet gateway role for nodes that happen to have connectivity---through Wi-Fi, Ethernet, or mobile data---at a given moment. In the current design every node is equal; a gateway-capable node would act as a transparent bridge between the LoRa mesh and the wider internet, relaying outbound messages to an \acro{mqtt} broker, a \acro{rest} \acro{api}, or a cloud service, and injecting inbound messages from those services back into the mesh. This bidirectional bridge opens several immediately practical scenarios: \acro{ntp}-based time synchronisation distributed across the mesh without each node requiring its own internet link; distribution of firmware configuration updates or new group encryption keys without physical access to individual units; and outbound emergency notifications---triggered by an \acro{sos} event, a low-battery alert, or an attached sensor threshold---delivered as push notifications or e-mail to registered contacts even when the originating node has no direct connectivity. When nodes carry environmental sensors, the gateway could additionally forward periodic telemetry---temperature, humidity, air quality, or network statistics such as \acro{rssi}, \acro{snr}, and \acro{pdr}---to platforms such as Grafana or Home Assistant, enabling remote monitoring and long-term performance analysis of geographically dispersed deployments. The gateway role could be implemented as a compile-time configuration option that activates an additional FreeRTOS task alongside the existing LoRa and \acro{ble} tasks, requiring no changes to the core firmware architecture and leaving unmodified nodes fully interoperable with gateway-enabled ones.
+Finally, a further extension of considerable practical value would be the introduction of an internet gateway role for nodes that happen to have connectivity---through Wi-Fi, Ethernet, or mobile data---at a given moment. In the current design every node is equal; a gateway-capable node would act as a transparent bridge between the LoRa mesh and the wider internet, relaying outbound messages to an \acro{mqtt} broker, a \acro{rest} \acro{api}, or a cloud service, and injecting inbound messages from those services back into the mesh. This bidirectional bridge opens several immediately practical scenarios: \acro{ntp}-based time synchronisation distributed across the mesh without each node requiring its own internet link; distribution of firmware configuration updates or new group encryption keys without physical access to individual units; and outbound emergency notifications---triggered by an \acro{sos} event, a low-battery alert, or an attached sensor threshold---delivered as push notifications or e-mail to registered contacts even when the originating node has no direct connectivity. When nodes carry environmental sensors, the gateway could additionally forward periodic telemetry---temperature, humidity, air quality, or network statistics such as \acro{rssi}, \acro{snr}, and \acro{pdr}---to platforms such as Grafana or Home Assistant, enabling remote monitoring and long-term performance analysis of geographically dispersed deployments. The gateway role could be implemented as a compile-time configuration option that activates an additional FreeRTOS task alongside the existing LoRa and \acro{ble} tasks, requiring no changes to the core firmware architecture and leaving unmodified nodes fully interoperable with gateway-enabled ones.
 
 \printbibliography
 
@@ -2200,6 +2191,8 @@ hexadecimal characters (e.g.\ \texttt{0ab1c2d3}). Cryptographic keys are 32-byte
 
 \begin{table}[htbp]
     \centering
+    \caption{AT-command error codes.}
+    \label{tab:at_appendix_errors}
     \begin{tabular}{ll}
         \toprule
         \textbf{Code} & \textbf{Meaning} \\
@@ -2212,8 +2205,6 @@ hexadecimal characters (e.g.\ \texttt{0ab1c2d3}). Cryptographic keys are 32-byte
         \texttt{+ERR=6} & Key storage table full; no slot available for the new key. \\
         \bottomrule
     \end{tabular}
-    \caption{AT-command error codes.}
-    \label{tab:at_appendix_errors}
 \end{table}
 
 
@@ -2592,6 +2583,8 @@ the packet header. All notifications are terminated with
 
 \begin{table}[htbp]
     \centering
+    \caption{Unsolicited notifications issued by the firmware.}
+    \label{tab:at_notifications}
     \begin{tabular}{p{0.50\linewidth}p{0.44\linewidth}}
         \toprule
         \textbf{Notification format} & \textbf{Triggering event} \\
@@ -2608,8 +2601,6 @@ the packet header. All notifications are terminated with
         New neighbour discovered via a received discovery beacon. \\
         \bottomrule
     \end{tabular}
-    \caption{Unsolicited notifications issued by the firmware.}
-    \label{tab:at_notifications}
 \end{table}
 
 \chapter{PCB Schematics}
