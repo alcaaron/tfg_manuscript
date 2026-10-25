@@ -39,3 +39,7 @@
 
 # debug information files
 *.dwo
+
+# vscode and platformio files
+firmware/.vscode/*
+firmware/.pio/*
