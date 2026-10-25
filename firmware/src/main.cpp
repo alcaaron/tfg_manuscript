@@ -11,6 +11,7 @@
 #include "CryptoManager.hh"
 #include "Battery.hh"
 #include "PowerManager.hh"
+#include "OTAUpdater.hh"
 
 // ======================
 // === Global Objects ===
@@ -433,9 +434,8 @@ void BLE2LoRaTask(void *pvParameters)
 
   const uint32_t node_id = a3mesh.get_node_id();
 
-  lib::packet::A3MESH_header_t header = {
-      .version = A3M_VERSION,
-  };
+  lib::packet::A3MESH_header_t header = {};
+  memcpy(header.version, A3M_VERSION, sizeof(A3M_VERSION)); // size checked in A3MESHPacket.h
 
   lib::packet::A3MESH_packet_t pkt = {
       .src = node_id,
@@ -887,7 +887,7 @@ void BLE2LoRaTask(void *pvParameters)
           "+NEIGHBORS=%d\r\n"
           "+OK\r\n",
           node_id,
-          A3M_FW_VERSION,
+          A3M_VERSION,
           bat_pct,
           h, m, s,
           freq_mhz,
@@ -950,10 +950,9 @@ void vSendDiscoveryTask(void *pvParameters)
 {
   const uint32_t node_id = a3mesh.get_node_id();
   // Create discovery packet msg
-  lib::packet::A3MESH_header_t header = {
-      .version = A3M_VERSION,
-      .type = lib::packet::a3mesh_msg_type_t::k_discovery_type,
-  };
+  lib::packet::A3MESH_header_t header = {};
+  memcpy(header.version, A3M_VERSION, sizeof(A3M_VERSION)); // size checked in A3MESHPacket.h
+  header.type = lib::packet::a3mesh_msg_type_t::k_discovery_type;
 
   lib::packet::A3MESH_packet_t pkt = {
       .pkt_id = a3mesh.get_next_pkt_id(),
@@ -976,12 +975,12 @@ void vSendDiscoveryTask(void *pvParameters)
 
   for (;;)
   {
-    // NOTE: pkt_id is patched directly at bytes [4:5] of the serialized buffer,
-    // right after the 4-byte A3MESH_header_t. Must be updated if the serialization
-    // format changes.
+    // NOTE: pkt_id is patched directly in the serialized buffer, as the first
+    // field (little endian) right after the A3MESH_header_t. Must be updated if
+    // the serialization format changes.
     uint16_t pkt_id = a3mesh.get_next_pkt_id();
-    discovery_msg.tx_data[4] = pkt_id & 0xFF;
-    discovery_msg.tx_data[5] = (pkt_id >> 8) & 0xFF;
+    discovery_msg.tx_data[lib::packet::HEADER_SIZE]     = pkt_id & 0xFF;
+    discovery_msg.tx_data[lib::packet::HEADER_SIZE + 1] = (pkt_id >> 8) & 0xFF;
     xQueueSend(xLoRaTxQueue, &discovery_msg, 0);
     vTaskDelay(pdMS_TO_TICKS(DISCOVERY_INTERVAL_MS) + (pdMS_TO_TICKS(rand() % 10000)));
   }
@@ -1064,6 +1063,15 @@ void setup()
   default:
     break;
   }
+
+#if OTA_ENABLED
+  // --------- OTA firmware check ---------
+  // Runs before setup_A3MESH() so WiFi never coexists with BLE/LoRa: it is
+  // switched off before returning.  On a successful update the node reboots
+  // inside check_and_update(); otherwise the boot continues normally.
+  lib::ota::OTAUpdater ota;
+  ota.check_and_update();
+#endif
 
   if (!setup_A3MESH())
   {

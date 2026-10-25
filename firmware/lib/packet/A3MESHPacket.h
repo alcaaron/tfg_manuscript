@@ -29,12 +29,26 @@ namespace lib::packet
         k_enc_network,       /*!< Shared network key encryption (mesh-wide). */
     } a3mesh_enc_type_t;
 
-    /*!< Fixed size of the A3MESH_header_t in bytes. */
-    constexpr size_t HEADER_SIZE = 4;
+    /*!< Size in bytes of the version string field of A3MESH_header_t
+     *   (NUL-terminated and zero-padded, so at most VERSION_SIZE - 1 characters). */
+    constexpr size_t VERSION_SIZE = 16;
+
+    /*!< Fixed size of the A3MESH_header_t in bytes (version + type + packet_length). */
+    constexpr size_t HEADER_SIZE = VERSION_SIZE + 1 + 2;
 
     /*!< Sum of the sizes of all fixed fields in A3MESH_packet_t
      *   (pkt_id + src + node_id + dst + ttl + type + flags + payload_len + crc). */
     constexpr size_t FIXED_FIELDS_SIZE = 2 + 4 + 4 + 4 + 1 + 1 + 1 + 1 + 2;
+
+    /*!< Largest frame (header + packet) that serialize_header_pkt() can produce. */
+    constexpr size_t MAX_FRAME_SIZE = HEADER_SIZE + FIXED_FIELDS_SIZE + A3MESH_MAX_PAYLOAD;
+
+    static_assert(sizeof(A3M_VERSION) <= VERSION_SIZE,
+                  "A3M_VERSION (plus NUL) does not fit in the header version field");
+    static_assert(MAX_FRAME_SIZE <= LORA_MAX_PACKET_SIZE,
+                  "A3MESH_MAX_PAYLOAD too large for the LoRa TX/RX buffers");
+    static_assert(MAX_FRAME_SIZE <= 255,
+                  "SX127x payload length is 8-bit: a frame cannot exceed 255 bytes");
 
 
     /*!
@@ -59,14 +73,18 @@ namespace lib::packet
 
 
     /*!
-     * \brief Fixed 4-byte frame header prepended to every A3MESH transmission.
+     * \brief Fixed-size (HEADER_SIZE bytes) frame header prepended to every
+     *        A3MESH transmission.
      */
     typedef struct __attribute__((packed))
     {
-        uint8_t           version;        /*!< Protocol version (current: A3M_VERSION). */
-        a3mesh_msg_type_t type;           /*!< Frame type, determines how the payload is interpreted. */
-        uint16_t          packet_length;  /*!< Length in bytes of the following A3MESH_packet_t. */
+        char              version[VERSION_SIZE]; /*!< Protocol version string (current: A3M_VERSION), NUL-terminated. */
+        a3mesh_msg_type_t type;                  /*!< Frame type, determines how the payload is interpreted. */
+        uint16_t          packet_length;         /*!< Length in bytes of the following A3MESH_packet_t. */
     } A3MESH_header_t;
+
+    static_assert(sizeof(A3MESH_header_t) == HEADER_SIZE,
+                  "HEADER_SIZE out of sync with A3MESH_header_t");
 
     /*!
      * \brief Utility class with static methods for A3MESH packet serialisation
@@ -108,7 +126,9 @@ namespace lib::packet
          * \brief Serialises a complete A3MESH frame (header + packet) into a
          *        raw byte buffer, ready to be handed to the LoRa driver.
          *
-         * The header's packet_length field is filled automatically.
+         * The header's packet_length field is filled automatically.  The
+         * version string is written zero-padded to VERSION_SIZE bytes and is
+         * always NUL-terminated on the wire.
          *
          * \param [IN,OUT] header  Header to prepend; packet_length is updated.
          * \param [IN]     pkt     Packet to serialise after the header.
@@ -122,8 +142,11 @@ namespace lib::packet
         /*!
          * \brief Deserialises a raw byte buffer into an A3MESH header and packet.
          *
-         * Performs version, length, payload sanity checks, and CRC-16/CCITT
-         * integrity verification before accepting the frame.
+         * Performs length and payload sanity checks and CRC-16/CCITT integrity
+         * verification before accepting the frame.  The received version
+         * string is always NUL-terminated in \p header (it is not compared
+         * against A3M_VERSION).  Multi-byte fields are decoded byte-wise in
+         * little endian, so \p buffer needs no particular alignment.
          *
          * \param [IN]  buffer  Raw bytes received from the LoRa radio.
          * \param [IN]  len     Number of valid bytes in buffer.
@@ -132,8 +155,9 @@ namespace lib::packet
          *
          * \retval  0   Success; frame is structurally valid and CRC matches.
          * \retval -1   Buffer too short to contain a header (len < HEADER_SIZE).
-         * \retval -2   Buffer shorter than header.packet_length indicates.
-         * \retval -3   payload_len exceeds A3MESH_MAX_PAYLOAD or overruns the buffer.
+         * \retval -2   header.packet_length is smaller than FIXED_FIELDS_SIZE or
+         *              larger than the bytes available after the header.
+         * \retval -3   payload_len exceeds A3MESH_MAX_PAYLOAD or overruns header.packet_length.
          * \retval -4   CRC mismatch; payload is corrupt.
          */
         static int8_t deserialize_pkt(const uint8_t *buffer, size_t len, A3MESH_header_t &header, A3MESH_packet_t &pkt);

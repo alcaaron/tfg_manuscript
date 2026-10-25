@@ -77,10 +77,16 @@ namespace lib::packet
 
         header.packet_length = packet_len;
 
-        buffer[0] = header.version;
-        buffer[1] = header.type;
-        buffer[2] = packet_len & 0xFF;
-        buffer[3] = packet_len >> 8;
+        // Version string: copied up to its terminator and zero-padded to
+        // VERSION_SIZE, so the field is always NUL-terminated on the wire.
+        const size_t ver_len = strnlen(header.version, VERSION_SIZE - 1);
+        memcpy(buffer, header.version, ver_len);
+        memset(buffer + ver_len, 0, VERSION_SIZE - ver_len);
+
+        size_t i = VERSION_SIZE;
+        buffer[i++] = header.type;
+        buffer[i++] = packet_len & 0xFF;
+        buffer[i++] = packet_len >> 8;
 
         return HEADER_SIZE + packet_len;
     }
@@ -96,62 +102,44 @@ namespace lib::packet
         size_t i = 0;
 
         // -----------------------------
-        // HEADER (fixed 4 bytes)
+        // HEADER (fixed HEADER_SIZE bytes)
         // -----------------------------
-        header.version = buffer[i++];
+        memcpy(header.version, &buffer[i], VERSION_SIZE);
+        header.version[VERSION_SIZE - 1] = '\0';   // never trust the sender's terminator
+        i += VERSION_SIZE;
+
         header.type = (a3mesh_msg_type_t)buffer[i++];
-
-        header.packet_length =
-            (uint16_t)buffer[i] |
-            ((uint16_t)buffer[i + 1] << 8);
-
-        i += 2;
+        header.packet_length = read_u16(buffer, i);
 
         // -----------------------------
         // Length validation
         // -----------------------------
-        const size_t expected_len = HEADER_SIZE + header.packet_length;
-
-        if (len < expected_len)
+        // The packet must at least hold its fixed fields and must not
+        // extend past the received bytes.
+        if (header.packet_length < FIXED_FIELDS_SIZE ||
+            len < HEADER_SIZE + header.packet_length)
             return -2;
 
         // -----------------------------
-        // PAYLOAD POINTER BASE
+        // FIXED FIELDS (little endian, byte-wise: buffer may be unaligned)
         // -----------------------------
-        const uint8_t* p = buffer + HEADER_SIZE;
+        pkt.pkt_id  = read_u16(buffer, i);
+        pkt.src     = read_u32(buffer, i);
+        pkt.node_id = read_u32(buffer, i);
+        pkt.dst     = read_u32(buffer, i);
 
-        // -----------------------------
-        // FIXED FIELDS
-        // -----------------------------
-        pkt.pkt_id =
-            *(const uint16_t*)p;
-        p += 2;
+        pkt.ttl         = buffer[i++];
+        pkt.type        = buffer[i++];
+        pkt.flags       = buffer[i++];
+        pkt.payload_len = buffer[i++];
 
-        pkt.src =
-            *(const uint32_t*)p;
-        p += 4;
-
-        pkt.node_id =
-            *(const uint32_t*)p;
-        p += 4;
-
-        pkt.dst =
-            *(const uint32_t*)p;
-        p += 4;
-
-        pkt.ttl = *p++;
-        pkt.type = *p++;
-        pkt.flags = *p++;
-        pkt.payload_len = *p++;
-
-        const uint16_t stored_crc = (uint16_t)p[0] | ((uint16_t)p[1] << 8);
-        p += 2;
+        const uint16_t stored_crc = read_u16(buffer, i);
 
         // -----------------------------
         // Payload validation
         // -----------------------------
         if (pkt.payload_len > A3MESH_MAX_PAYLOAD ||
-            (size_t)(p - buffer) + pkt.payload_len > len)
+            FIXED_FIELDS_SIZE + pkt.payload_len > header.packet_length)
         {
             return -3;
         }
@@ -159,7 +147,7 @@ namespace lib::packet
         // -----------------------------
         // Payload copy
         // -----------------------------
-        memcpy(pkt.payload, p, pkt.payload_len);
+        memcpy(pkt.payload, &buffer[i], pkt.payload_len);
 
         // -----------------------------
         // CRC verification

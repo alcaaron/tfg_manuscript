@@ -1,7 +1,11 @@
 # Name,   Type, SubType, Offset,   Size, Flags
+# Two app slots (ota_0/ota_1) are required for OTA updates (lib/ota): the new
+# image is written to the inactive slot and otadata selects it on reboot.
+# 4 MB flash: 64K (bootloader/ptable/nvs/otadata) + 2 x 1920K + 4K + 124K + 64K.
 nvs,      data, nvs,     0x9000,   20K,
 otadata,  data, ota,     0xe000,   8K,
-firm,     app,  ota_0,   , 3400K,
-eeprom,   data, 0x99,    , 4K,
-spiffs,   data, spiffs,  , 444K,
-coredump, data, coredump, , 64K,
+app0,     app,  ota_0,   0x10000,  1920K,
+app1,     app,  ota_1,   ,         1920K,
+eeprom,   data, 0x99,    ,         4K,
+spiffs,   data, spiffs,  ,         124K,
+coredump, data, coredump, ,        64K,

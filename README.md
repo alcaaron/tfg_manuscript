@@ -25,10 +25,12 @@ tfg_firmware/
     │   ├── lora/                 LoRa radio driver (RadioLib wrapper)
     │   ├── mesh/                 A3MESHManager: neighbour table, Smart Gossip,
     │   │                         duplicate cache, neighbour-check task
+    │   ├── ota/                  Boot-time OTA updates from GitHub releases
+    │   │                         (see lib/ota/README.md)
     │   ├── packet/               A3MESH packet serialisation / deserialisation
     │   └── power/                Battery LUT and adaptive CPU-frequency manager
     ├── test/                     Native unit tests
-    └── custom.csv                Custom NVS partition table
+    └── custom.csv                Partition table (NVS + two OTA app slots)
 ```
 
 Appendix D of the manuscript summarises this layout; Appendix A gives

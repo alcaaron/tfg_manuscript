@@ -19,7 +19,7 @@
 // === A3MESH APP PARAMETERS ===
 // =============================
 
-#define A3M_VERSION                 1
+#define A3M_VERSION                 "1.0.0.0"
 #define A3M_TAG                     "A3MESH"
 
 
@@ -90,7 +90,7 @@
 #define NODE_TIMEOUT                180000           // ms after which a neighbor is considered lost
 #define MAX_TTL                     0x05
 #define MIN_TTL                     0x01
-#define A3MESH_MAX_PAYLOAD          233             // LORA_MAX_PACKET_SIZE - (HEADER_SIZE + FIXED_FIELDS_SIZE); reduced by 2 for the crc field
+#define A3MESH_MAX_PAYLOAD          216             // 255 (SX127x max frame) - (HEADER_SIZE 19 + FIXED_FIELDS_SIZE 20); must stay a literal (used with STR()); checked by static_assert in A3MESHPacket.h
 #define DUP_CACHE_SIZE              50              // ring buffer of recent packet hashes for dedup
 #define DUP_TIMEOUT                 30000           // ms before a duplicate record expires
 #define MAX_PENDING_FORWARDS        8               // Max simultaneous forwards awaiting passive-ACK confirmation
@@ -127,13 +127,6 @@
 #define LORA_AIRTIME_RECORDS        20         // Ring buffer depth for recent TX records
 
 
-// ==============================
-// === FIRMWARE VERSION ===
-// ==============================
-
-#define A3M_FW_VERSION               "1.0.0"
-
-
 // ================================
 // === POWER MANAGEMENT ===
 // ================================
@@ -163,12 +156,44 @@
 // === DEBUG CONFIGURATION ===
 // ==============================
 
-#define A3MESH_DEBUG 0
+#define A3MESH_DEBUG 1
 
 #if A3MESH_DEBUG
   #define MESH_LOG(fmt, ...) Serial.printf(fmt, ##__VA_ARGS__)
 #else
   #define MESH_LOG(fmt, ...) do {} while(0)
+#endif
+
+
+// ===========================
+// === WI-FI CONFIGURATION ===
+// ===========================
+
+// WIFI_SSID and WIFI_PASSWORD come from .env (see load_env.py)
+
+
+// ===========================
+// === OTA CONFIGURATION ===
+// ===========================
+// At boot (before BLE/LoRa start) the node joins WIFI_SSID, reads
+// OTA_VERSION_URL (a plain-text file holding only the latest version, e.g.
+// "1.0.1") and, if it is newer than A3M_FW_VERSION, flashes OTA_FIRMWARE_URL
+// into the inactive OTA slot and reboots.  WiFi is switched off afterwards.
+// "{version}" in OTA_FIRMWARE_URL is replaced by the remote version string, so
+// the binary always comes from the release tagged v<version> (lib/ota/README.md).
+
+#define OTA_ENABLED                 1               // 0 = skip the boot-time OTA check
+#define OTA_VERSION_URL             "https://raw.githubusercontent.com/alcaaron/a3mesh_ota_fw/refs/heads/main/version.txt"
+#define OTA_FIRMWARE_URL            "https://github.com/alcaaron/a3mesh_ota_fw/releases/download/v{version}/firmware.bin"
+#define OTA_ROOT_CA                 nullptr         // PEM root CA(s) for github.com + *.githubusercontent.com; nullptr = no TLS verification
+#define OTA_WIFI_TIMEOUT_MS         10000UL         // Max wait for WiFi association; boot continues without OTA on timeout
+#define OTA_HTTP_TIMEOUT_MS         15000           // TCP connect / read timeout per HTTP request (HTTPClient limit: 65535 ms)
+#define OTA_DOWNLOAD_TIMEOUT_MS     30000UL         // Abort the download after this long without receiving data
+#define OTA_BUFFER_SIZE             1024            // Download chunk size in bytes (allocated on the caller's stack)
+#define OTA_MAX_VERSION_LEN         32              // Max length (incl. NUL) accepted for the remote version string
+
+#if !defined(WIFI_SSID) || !defined(WIFI_PASSWORD)
+  #error "Secrets missing: copy .env.example to .env (injected by load_env.py)"
 #endif
 
 #endif // CONFIG_H
